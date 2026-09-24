@@ -1,0 +1,68 @@
+# ───── Build artifacts ─────
+/target/
+/library/target/
+/dist/
+*.rlib
+
+# ───── Gurobi / CPLEX logs ─────
+gurobi.log
+cplex.log
+error.txt
+
+# ───── Heavy result directories (too large for GitHub) ─────
+/results/
+/results_combined/
+/docs/
+/2026-05-16-Verified-Result-For-Graduation-Thesis/
+
+# ───── CPLEX solver outputs ─────
+cplex_cp/results/original
+cplex_cp/results/addstationtime
+cplex_cp/results/addtracktime
+cplex_milp/results/ti/original
+cplex_milp/results/ti/addstationtime
+cplex_milp/results/ti/addtracktime
+cplex_milp/results/bigm/original
+cplex_milp/results/bigm/addstationtime
+cplex_milp/results/bigm/addtracktime
+
+# ───── Manuscript PDFs and build artifacts ─────
+# (keep .tex source files; ignore compiled PDFs and LaTeX temp files)
+manuscript/**/*.pdf
+manuscript/**/*.xdv
+manuscript/**/*.aux
+manuscript/**/*.log
+manuscript/**/*.toc
+manuscript/**/*.out
+manuscript/**/*.fls
+manuscript/**/*.fdb_latexmk
+manuscript/**/*.bbl
+manuscript/**/*.blg
+manuscript/**/*.synctex.gz
+
+# ───── Salvers (external dependency, not in repo) ─────
+/salvers/
+
+# ───── Native libraries ─────
+libipamir.a
+*.a
+*.so
+*.dylib
+
+# ───── Editor and OS ─────
+.DS_Store
+desktop.ini
+*.swp
+*.swo
+.idea/
+.vscode/
+.zed/
+.helix/
+*.iml
+
+# ───── Python ─────
+__pycache__/
+*.py[cod]
+
+# ───── Execution scratch ─────
+quick_scripts/execution.txt

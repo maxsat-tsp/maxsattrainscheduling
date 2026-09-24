@@ -1,0 +1,878 @@
+% !TeX program = xelatex
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=25mm,headheight=14pt]{geometry}
+\usepackage{fontspec}
+\setmainfont{texgyretermes}[Extension=.otf,UprightFont=*-regular,
+ BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmonofont{lmmono10-regular.otf}[Scale=0.86]
+\usepackage{booktabs,tabularx,longtable,array}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem,fancyhdr,titlesec}
+\usepackage[unicode,colorlinks=true,linkcolor=black,
+ urlcolor=black,citecolor=black]{hyperref}
+\usepackage{xurl}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.7em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlength{\emergencystretch}{2em}
+\linespread{1.06}
+\setlist{leftmargin=1.6em,itemsep=2pt,topsep=3pt}
+\renewcommand{\arraystretch}{1.15}
+\renewcommand{\contentsname}{Mục lục}
+\setcounter{tocdepth}{1}
+\renewcommand{\refname}{Tài liệu tham khảo}
+
+\newcommand{\pathref}[1]{\nolinkurl{#1}}
+\newcommand{\AMO}{\operatorname{AMO}}
+\newcommand{\LB}{\mathrm{LB}}
+\newcommand{\UB}{\mathrm{UB}}
+\newcommand{\file}[1]{\texttt{#1}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Hướng dẫn nâng cấp MaxSAT-DDD}
+\fancyhead[R]{\small Bản dành cho sinh viên --- v3.0}
+\fancyfoot[C]{\thepage}
+\hypersetup{pdftitle={Hướng dẫn sinh viên nâng cấp MaxSAT-DDD},
+ pdfauthor={Tài liệu hướng dẫn sinh viên}}
+
+% =============================================================================
+\begin{document}
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\vspace*{20mm}
+{\large TÀI LIỆU HƯỚNG DẪN SINH VIÊN\par}
+\vspace{12mm}
+{\LARGE\bfseries Nâng cấp MaxSAT-DDD\par}
+\vspace{4mm}
+{\Large cho bài toán điều độ lại tàu\par}
+\vspace{10mm}
+{\large Hướng dẫn triển khai theo từng giai đoạn\par}
+\vspace{10mm}
+\rule{\textwidth}{0.4pt}
+\vspace{4mm}
+
+Tài liệu này hướng dẫn sinh viên mở rộng kết quả của bài hội nghị~\cite{conference}
+theo hướng nộp tạp chí \emph{Computers \& Operations Research}.
+Tài liệu được tổ chức theo đúng thứ tự thực hiện:
+\begin{enumerate}
+\item Đọc và chạy được code hiện tại (Mục~\ref{sec:read}).
+\item Hiểu bài toán và ký hiệu (Mục~\ref{sec:problem}).
+\item Chốt kết quả nền để so sánh (Mục~\ref{sec:baseline}).
+\item Cài đặt từng cải tiến và kiểm thử (Mục~\ref{sec:improve1}--\ref{sec:improve3}).
+\item Tích hợp, thực nghiệm và viết báo cáo (Mục~\ref{sec:integrate}--\ref{sec:report}).
+\end{enumerate}
+
+Mỗi phần đều bắt đầu bằng ví dụ số cụ thể \emph{trước} khi đưa ra công thức.
+Sinh viên nên đọc tuần tự, không bỏ qua bước kiểm thử.
+
+\vfill
+{\normalsize Phiên bản 3.0 --- tháng 9 năm 2026\par}
+\vspace{3mm}
+Nguồn nền: \pathref{manuscript/submission/main.tex} và mã nguồn tại \pathref{maxsattrainscheduling/}.
+\end{titlepage}
+\hypersetup{pageanchor=true}
+\begingroup\small\setlength{\parskip}{0pt}\tableofcontents\endgroup
+\newpage
+
+% =============================================================================
+\section{Đọc code trước khi làm bất cứ điều gì}
+\label{sec:read}
+% =============================================================================
+
+Đọc 5 file sau theo đúng thứ tự. Không cần đọc toàn bộ mỗi file --- chỉ cần
+hiểu phần được chỉ định.
+
+\begin{tabularx}{\textwidth}{@{}p{9mm}p{62mm}X@{}}
+\toprule
+TT & File & Cần hiểu gì \\\midrule
+1 & \file{src/problem.rs} &
+  Struct \texttt{Visit}, \texttt{Train}, \texttt{Problem};
+  hàm \texttt{visit\_delay\_cost()} tính chi phí trễ. \\
+2 & \file{src/solvers/ddd/shared/precedence.rs} &
+  Hàm \texttt{chain\_earliest()}: lan truyền thời gian dọc hành trình. \\
+3 & \file{src/solvers/ddd/shared/common.rs} &
+  Struct \texttt{Occ} và trường \texttt{delays}: nơi lưu các mốc thời gian. \\
+4 & \file{src/solvers/ddd/maxsat\_rc2.rs} &
+  Vòng \texttt{loop\{...\}} từ dòng 139. Đây là file cần sửa nhiều nhất. \\
+5 & \file{src/solvers/util/heuristic.rs} &
+  Hàm \texttt{solve\_heuristic\_better()}: sinh lịch hợp lệ $\UB$. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Câu hỏi cần trả lời được sau khi đọc:
+\begin{itemize}
+\item Dữ liệu đi vào từ đâu? Struct nào nhận?
+\item Một mốc thời gian được thêm vào model ở dòng nào?
+\item Chi phí trễ được tính và gửi vào solver ở đâu?
+\item Chương trình biết khi nào thì dừng?
+\end{itemize}
+
+\textit{Kết quả cần có:} Chạy được ít nhất 1 instance nhỏ và in ra số vòng lặp,
+số mốc thêm mỗi vòng, chi phí cuối cùng.
+
+% =============================================================================
+\section{Hiểu bài toán}
+\label{sec:problem}
+% =============================================================================
+
+\subsection{Bài toán là gì?}
+
+Ba tàu bị trễ do sự cố. Mỗi tàu phải đi qua một chuỗi đoạn đường và ga.
+Một số đoạn đường chỉ cho 1 tàu đi cùng lúc (đường đơn). Chương trình cần
+quyết định thứ tự và thời điểm sao cho: (1) không có 2 tàu nào chiếm cùng
+đoạn đường đơn, và (2) tổng thời gian trễ là nhỏ nhất.
+
+\subsection{DDD hoạt động như thế nào?}
+
+Thay vì xét mọi giây có thể, DDD bắt đầu với rất ít mốc thời gian rồi
+tăng dần theo vòng lặp:
+
+\begin{enumerate}
+\item Tạo mô hình nhỏ (ít mốc thời gian).
+\item Giải MaxSAT $\to$ nhận lịch ứng viên.
+\item Kiểm tra lịch: nếu không còn vi phạm $\to$ dừng, trả nghiệm tối ưu.
+\item Thêm mốc thời gian ở chỗ vi phạm $\to$ quay lại bước 1.
+\end{enumerate}
+
+Bước 4 gọi là \textbf{refinement} --- đây là phần đề tài muốn cải thiện.
+
+\subsection{Ba loại hàm chi phí trong code}
+
+Xem \file{src/problem.rs}, enum \texttt{DelayCostType}.
+
+\begin{tabularx}{\textwidth}{@{}p{38mm}p{30mm}X@{}}
+\toprule
+Tên trong code & Cách tính phạt & Ví dụ (trễ 200s, $\Delta{=}180$s) \\\midrule
+\texttt{FiniteSteps*} & Phạt cố định khi vượt ngưỡng
+  & Trễ 200s: phạt 1; trễ 10000s: vẫn 1 \\
+\texttt{InfiniteSteps180} & Mỗi 180s trễ tăng thêm 1 bậc
+  & Trễ 200s: phạt $\lceil200/180\rceil=2$ \\
+\texttt{Continuous} & Mỗi giây trễ = 1 điểm phạt
+  & Trễ 200s: phạt 200 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Lưu ý quan trọng: với \texttt{FiniteSteps}, phạt bị chặn trên nên không thể
+suy ra giới hạn thời gian từ ngân sách chi phí. Với hai loại còn lại thì có thể.
+Điều này sẽ quan trọng ở Mục~\ref{sec:cost-bound}.
+
+\subsection{Ký hiệu dùng trong các công thức}
+\label{sec:notation}
+
+Mỗi hoạt động được đánh dấu bằng mã $v = (\text{tàu},\,\text{vị trí trên hành trình})$.
+
+\begin{tabularx}{\textwidth}{@{}p{28mm}X@{}}
+\toprule
+Ký hiệu & Ý nghĩa \\\midrule
+$t_v$ & Thời điểm bắt đầu hoạt động $v$ (biến cần tìm). \\
+$e_v = t_{s(v)}$ & Thời điểm rời tài nguyên = thời điểm hoạt động kế tiếp bắt đầu. \\
+$L_v,\;U_v$ & Sớm nhất và muộn nhất $t_v$ được phép ($L_v \le t_v \le U_v$). \\
+$p_v$ & Thời gian chạy tối thiểu (travel time). \\
+$s(v)$ & Hoạt động kế tiếp cùng tàu. \\
+$a_v$ & Thời điểm theo lịch ban đầu (aimed time). \\
+$d_v(\tau)$ & Biến Boolean: đúng khi $t_v \ge \tau$. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Ba ràng buộc cơ bản:
+\begin{align}
+ t_{s(v)} &\ge t_v + p_v
+   &&\text{(tàu phải ở đủ thời gian trên tài nguyên)}\label{eq:travel}\\
+ t_w \ge e_v \;\;&\text{hoặc}\;\; t_v \ge e_w
+   &&\text{(hai tàu không chiếm cùng tài nguyên)}\label{eq:resource}\\
+ F(t) &= \sum_{v \in M} c_v\!\bigl(\max(0,\,t_v - a_v)\bigr)
+   &&\text{(tổng chi phí trễ cần tối thiểu hóa)}\label{eq:objective}
+\end{align}
+
+% =============================================================================
+\section{Giai đoạn 0: chốt kết quả nền}
+\label{sec:baseline}
+% =============================================================================
+
+Trước khi thêm bất kỳ cải tiến nào, cần xác định chính xác phiên bản code và
+dữ liệu đã tạo ra kết quả của bài hội nghị.
+
+\begin{tabularx}{\textwidth}{@{}p{42mm}X@{}}
+\toprule
+Điểm cần kiểm tra & Việc cần làm \\\midrule
+Số bài CPLEX giải được & Đối chiếu số trong bảng bài báo và file CSV. \\
+Mã hóa SC-AMO & Xác định đúng phiên bản code và ngưỡng đã dùng. \\
+Đơn vị thời gian & Kiểm tra 180 là giây hay phút trong dữ liệu và code. \\
+Ý nghĩa track/station & Dữ liệu thay đổi gì: travel time, dwell time, hay cấu trúc tài nguyên? \\
+Giới hạn chạy & Ghi rõ timeout, giới hạn RAM, số luồng, phiên bản solver. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Chạy script kiểm tra (chỉ đọc, không sửa):
+\begin{center}
+\texttt{python3 manuscript/journal/audit\_existing\_results.py}
+\end{center}
+
+\textit{Kết quả cần có:} Một cấu hình nền chạy lại được; file ghi rõ cấu hình;
+bảng ánh xạ tên instance giữa CSV và code.
+
+% =============================================================================
+\section{Cải tiến 1: suy luận sớm về thời gian}
+\label{sec:improve1}
+% =============================================================================
+
+\subsection{Vấn đề trong code hiện tại}
+
+Tại \file{maxsat\_rc2.rs} dòng 96--100, mỗi hoạt động được khởi tạo với:
+
+\begin{verbatim}
+delays: vec![(true,  visit.earliest),  // L_v = gio som nhat
+             (false, i32::MAX)],       // U_v = VO CUC
+\end{verbatim}
+
+\texttt{i32::MAX} $\approx$ 68 năm. Chương trình không biết tàu muộn nhất
+được phép đến lúc nào, nên DDD có thể thêm mốc ở những thời điểm vô nghĩa.
+
+Thêm vào đó, giá trị $\UB$ (chi phí lịch tốt nhất) ở dòng 141 chỉ dùng để
+in khi timeout, chưa được dùng để siết $U_v$ cho từng hoạt động.
+
+\subsection{Ví dụ số trước khi xem công thức}
+
+\textbf{Ví dụ 1: Lan truyền trong cùng một tàu.}
+
+Tàu A có 3 điểm dừng với travel time 5s và 3s. Thời điểm sớm nhất ban đầu:
+$L_0 = 10$, $L_1 = 8$, $L_2 = 20$.
+
+Sau lan truyền forward:
+\[
+ L_1 \leftarrow \max(8,\; 10+5) = 15,\qquad
+ L_2 \leftarrow \max(20,\; 15+3) = 20.
+\]
+
+Tàu A không thể đến điểm 1 trước giây 15, dù \texttt{visit.earliest} ghi là 8.
+
+\medskip
+\textbf{Ví dụ 2: Suy ra thứ tự bắt buộc giữa 2 tàu.}
+
+Tàu A và tàu B cùng cần đoạn đường X:
+\begin{itemize}
+\item $e_A^{\min} = 15$: tàu A thoát đường X sớm nhất lúc giây 15.
+\item $U_B = 13$: tàu B muộn nhất được vào lúc giây 13.
+\end{itemize}
+
+Nếu A đi trước B: B phải vào sau giây 15, nhưng $U_B = 13 < 15$. Không thể!
+Vậy B \emph{bắt buộc} đi trước A. Thêm ngay ràng buộc này vào solver.
+
+\subsection{Mức 1: lan truyền $L_v$ và $U_v$}
+\label{sec:prop}
+
+Hàm cần viết: \file{shared/precedence.rs}, hàm \texttt{propagate\_bounds()}.
+(Hàm \texttt{chain\_earliest()} đã có sẵn; mở rộng từ đó.)
+
+Với bất kỳ ràng buộc $t_b \ge t_a + h$ nào, cập nhật hai chiều:
+\begin{align}
+ L_b &\leftarrow \max(L_b,\; L_a + h), \label{eq:prop-lower}\\
+ U_a &\leftarrow \min(U_a,\; U_b - h). \label{eq:prop-upper}
+\end{align}
+
+Lặp đến khi không có giá trị nào thay đổi nữa. Cho cặp liên tiếp trong cùng
+một tàu: dùng $a = v$, $b = s(v)$, $h = p_v$.
+
+\textbf{Ví dụ tính tay:} $L_a=10$, $L_b=8$, $U_a=30$, $U_b=20$, $h=5$:
+\[
+ L_b = \max(8,\; 10+5) = 15,\qquad
+ U_a = \min(30,\; 20-5) = 15.
+\]
+
+\textbf{Cài đặt trong \file{maxsat\_rc2.rs}:}
+\begin{itemize}
+\item Sau dòng 112 (sau vòng khởi tạo occupations): khởi tạo \texttt{eff\_lb}
+      bằng \texttt{chain\_earliest()}, \texttt{eff\_ub} bằng \texttt{i32::MAX};
+      gọi \texttt{propagate\_bounds()} lần đầu.
+\item Mỗi vòng lặp, sau khi phát hiện vi phạm và sau khi $\UB$ được cập nhật:
+      gọi lại \texttt{propagate\_bounds()}.
+\end{itemize}
+
+Lưu ý: dùng \texttt{saturating\_add} / \texttt{saturating\_sub} thay vì
+\texttt{+} / \texttt{-} khi làm việc với \texttt{i32::MAX} để tránh tràn số.
+
+\subsection{Tìm thứ tự bắt buộc giữa hai tàu}
+\label{sec:forced}
+
+Hàm cần viết: \file{shared/precedence.rs}, hàm \texttt{find\_forced\_orders()}.
+
+Gọi $e_v^{\min} = L_{s(v)}$ là thời điểm sớm nhất tàu rời tài nguyên.
+Với hai hoạt động $v$, $w$ cùng xung đột (cùng cần 1 đoạn đường):
+\begin{align}
+ e_v^{\min} > U_w
+ &\;\Longrightarrow\; \text{loại thứ tự } v \text{ trước } w,\label{eq:reject-vw}\\
+ e_w^{\min} > U_v
+ &\;\Longrightarrow\; \text{loại thứ tự } w \text{ trước } v.\label{eq:reject-wv}
+\end{align}
+
+Dùng dấu $>$ không phải $\ge$: hai tàu vừa khít vẫn là hợp lệ.
+
+\begin{itemize}
+\item Chỉ loại được~\eqref{eq:reject-vw}: $w$ bắt buộc đi trước $v$.
+\item Chỉ loại được~\eqref{eq:reject-wv}: $v$ bắt buộc đi trước $w$.
+\item Loại cả hai: bài toán vô nghiệm trong phạm vi đang xét.
+\item Không loại được gì: giữ cả hai, chưa kết luận.
+\end{itemize}
+
+\textbf{Thêm ràng buộc cứng vào solver.} Xem hàm \texttt{Occ::time\_point()}
+tại \file{shared/common.rs} dòng 54--94:
+
+\begin{verbatim}
+// Buoc t_v2 >= tau_exit
+let (var, _) = occupations[v2_id].time_point(&mut solver, tau_exit);
+solver.add_clause(vec![var]);  // unit clause = bat buoc TRUE
+\end{verbatim}
+
+\subsection{Mức 2: siết $U_v$ từ ngân sách chi phí}
+\label{sec:cost-bound}
+
+Hàm cần viết: \file{shared/precedence.rs}, hàm \texttt{tighten\_ub\_from\_cost()}.
+
+\textbf{Chỉ làm sau khi Mức 1 đã đúng và ổn định.
+Chỉ áp dụng với \texttt{Continuous} và \texttt{InfiniteSteps}.}
+
+Ý tưởng: nếu heuristic tìm được lịch chi phí $B$, thì nghiệm tối ưu không
+thể đắt hơn $B$. Từ đó ta có thể suy ra tàu $v$ được phép trễ tối đa bao lâu.
+
+\begin{enumerate}
+\item Phạt tối thiểu của mọi hoạt động $u \ne v$:
+      $\ell_u = c_u\!\bigl(\max(0,\; L_u - a_u)\bigr)$.
+\item Ngân sách còn lại cho $v$:
+      $R_v = B - \sum_{u \ne v} \ell_u$.
+\item Trễ tối đa cho phép:
+      $D_v^{\mathrm{Cont}} = \lfloor R_v/w_v \rfloor$,\quad
+      $D_v^{\mathrm{Round}} = \Delta\lfloor R_v/w_v \rfloor$.
+\item Cập nhật: $U_v \leftarrow \min(U_v,\; a_v + D_v)$.
+\end{enumerate}
+
+\textbf{Ví dụ tính tay.} $B=50$, 2 tàu, Continuous.
+Tàu 0: aimed=100, $L_0=100$ nên $\ell_0=0$.
+Tàu 1: aimed=200, $L_1=210$ nên $\ell_1=10$.
+\[
+ R_0 = 50 - 10 = 40 \;\Rightarrow\; U_0 = 100 + 40 = 140.
+ \qquad
+ R_1 = 50 - 0 = 50 \;\Rightarrow\; U_1 = 200 + 50 = 250.
+\]
+Trước: $U_0 = U_1 = i32{::}MAX$. Sau: $U_0=140$, $U_1=250$.
+
+\textbf{Cài đặt:} Sau khi \texttt{best\_heur} được cập nhật (dòng 190 của
+\file{maxsat\_rc2.rs}), gọi \texttt{tighten\_ub\_from\_cost()}, rồi gọi lại
+\texttt{propagate\_bounds()} để lan truyền $U_v$ mới ngược về phía trước.
+
+\subsection{Các lỗi hay gặp}
+\begin{itemize}
+\item Dùng $\ge$ thay $>$ khi kiểm tra loại thứ tự --- trường hợp bằng nhau vẫn hợp lệ.
+\item Không tính lại $U_v$ khi $B$ giảm (nghiệm heuristic tốt hơn xuất hiện).
+\item Tràn số khi cộng \texttt{i32::MAX} mà không dùng \texttt{saturating\_add}.
+\item Áp dụng Mức 2 cho \texttt{FiniteSteps} --- sẽ cho $U_v$ sai vì phạt không tăng theo thời gian.
+\end{itemize}
+
+\textit{Kết quả cần có:} Thành phần suy luận bật/tắt được; log số thứ tự bắt buộc
+mỗi vòng; kết quả cuối cùng giống hệt baseline.
+
+% =============================================================================
+\section{Cải tiến 2: refinement có chọn lọc}
+\label{sec:improve2}
+% =============================================================================
+
+\subsection{Vấn đề trong code hiện tại}
+
+Tại \file{maxsat\_rc2.rs} dòng 574:
+
+\begin{verbatim}
+for (visit, var, t) in new_time_points.drain(..) {
+    // them tat ca moc vi pham vao solver
+}
+\end{verbatim}
+
+Sau khi phát hiện vi phạm (dòng 196--480), mọi mốc thời gian liên quan đều
+được thêm ngay. Một vòng có 10 vi phạm có thể thêm 50+ mốc, khiến model
+phình nhanh và solver chậm dần.
+
+\subsection{Ví dụ số: tại sao cần chọn lọc}
+
+Vòng 3 phát hiện 5 vấn đề. Có 3 gói ứng viên:
+
+\begin{tabularx}{\textwidth}{@{}lXXX@{}}
+\toprule
+Gói & Giải quyết được & Mốc cần thêm & Điểm $= |C|/(1+m)$ \\\midrule
+A & 3 vấn đề & 2 mốc & $3/3 = 1{,}0$ \\
+B & 2 vấn đề & 3 mốc & $2/4 = 0{,}5$ \\
+C & 1 vấn đề & 0 mốc mới & $1/1 = 1{,}0$ \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Chọn A và C: chỉ cần thêm 2 mốc. Vòng tiếp theo xử lý 2 vấn đề còn lại.
+Kết quả cuối giống hệt khi thêm tất cả, nhưng mỗi vòng ít tốn kém hơn.
+
+\subsection{Ba loại vi phạm cần nhận biết}
+
+\begin{tabularx}{\textwidth}{@{}p{34mm}X@{}}
+\toprule
+Loại & Ý nghĩa \\\midrule
+Hành trình &
+  Một tàu đến hoạt động sau quá sớm so với hoạt động trước (vi phạm ràng buộc~\eqref{eq:travel}). \\
+Tài nguyên &
+  Hai tàu chiếm cùng tài nguyên trong cùng khoảng thời gian (vi phạm~\eqref{eq:resource}). \\
+Chi phí &
+  Lịch hợp lệ nhưng mô hình chưa biểu diễn đủ các mức chi phí thật.
+  Không còn xung đột không có nghĩa là đã tối ưu. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Tách phát hiện khỏi áp dụng}
+
+Hiện tại phát hiện và thêm mốc xảy ra trong cùng một vòng lặp. Cần tách
+thành 3 pha:
+
+\begin{enumerate}
+\item \textbf{Phát hiện:} duyệt tất cả hoạt động, ghi danh sách vi phạm.
+      Không tạo biến mới, không sửa solver.
+\item \textbf{Lập danh sách ứng viên:} với mỗi vi phạm, tạo một
+      \texttt{RefinementPackage} chứa danh sách vấn đề nó xử lý và danh
+      sách mốc cần thêm.
+\item \textbf{Chọn lọc và áp dụng:} tính điểm, chọn $K$ mốc tốt nhất,
+      thêm vào solver.
+\end{enumerate}
+
+\textbf{Mã giả tổng thể của vòng lặp DDD sau khi tách 3 pha:}
+
+\begin{verbatim}
+-- Moi vong lap DDD --
+
+packages = []
+
+-- PHA 1a: PHAT HIEN VI PHAM HANH TRINH (travel-time)
+--   doc du lieu, KHONG goi time_point(), KHONG them clause
+for each visit v in touched_intervals:
+    t_in  = incumbent_time(v)
+    t_out = incumbent_time(next(v))
+    if t_in + travel_time(v) > t_out:
+        t_in_var = delays[v][incumbent_idx].var   -- lit hien tai
+        new_t    = t_in + travel_time(v)
+        packages.add( TravelPackage(
+            violation  = TravelTime(v),
+            points     = [(next(v), new_t)],
+            t1_in_var  = t_in_var,
+            new_t      = new_t
+        ))
+
+-- PHA 1b: PHAT HIEN XUNG DOT TAI NGUYEN (resource conflict)
+--   doc du lieu, KHONG goi time_point(), KHONG them clause
+for each (v, w) in conflicting pairs:
+    t1_out = incumbent_time(next(v))
+    t2_out = incumbent_time(next(w))
+    if intervals [t1_in, t1_out) and [t2_in, t2_out) overlap:
+        t1_out_lit = delays[next(v)][incumbent_idx].var
+        t2_out_lit = delays[next(w)][incumbent_idx].var
+        packages.add( ResourcePackage(
+            violation    = Resource(v, w),
+            points       = [(w, t1_out), (v, t2_out)],
+            t1_out_lit   = t1_out_lit,
+            t2_out_lit   = t2_out_lit
+        ))
+
+-- PHA 2: CHON LOC (select_packages)
+selected = greedy_select(packages, budget=K)
+-- neu selected rong: buoc chon goi cu nhat (fallback)
+
+-- PHA 3: AP DUNG goi da chon (apply_package)
+for each package p in selected:
+    if p is TravelPackage:
+        var, is_new = time_point(next(v), p.new_t)  -- goi solver
+        add_clause([NOT p.t1_in_var, var])           -- implication
+        if is_new: new_time_points.add((next(v), var, p.new_t))
+    if p is ResourcePackage:
+        delay_w, _ = time_point(w, p.t1_out)        -- goi solver
+        delay_v, _ = time_point(v, p.t2_out)        -- goi solver
+        add_clause([NOT t1_out_lit, NOT t2_out_lit,  -- AMO clause
+                    delay_v, delay_w])
+        if is_new: new_time_points.add(...)
+\end{verbatim}
+
+\textbf{Tại sao tách pha?} Ở code cũ, phát hiện và thêm mốc xảy ra cùng lúc nên
+không thể biết tổng chi phí của một tập vi phạm trước khi áp dụng. Sau khi tách,
+pha 1 chỉ đọc; pha 2 quyết định; pha 3 mới ghi. Ba pha độc lập, có thể thay thuật toán chọn lọc mà không ảnh hưởng phần còn lại.
+
+Struct cần tạo (thêm vào \file{shared/refinement.rs} mới):
+\begin{verbatim}
+pub enum ViolationId {
+    TravelTime(VisitId),
+    Resource(VisitId, VisitId),
+    MissingCost(VisitId),
+}
+pub struct RefinementPackage {
+    pub resolves:    Vec<ViolationId>,
+    pub time_points: Vec<(VisitId, i32)>,
+    pub first_seen:  usize,
+}
+\end{verbatim}
+
+\subsection{Công thức tính điểm và chọn gói}
+
+Gọi $C_{\mathrm{sel}}$ và $P_{\mathrm{sel}}$ là tập vấn đề và mốc đã được
+chọn trong vòng hiện tại. Điểm của gói $b$:
+\begin{equation}
+ \operatorname{score}(b)
+ = \frac{\bigl|C_b \setminus C_{\mathrm{sel}}\bigr|}
+        {1 + \bigl|P_b \setminus P_{\mathrm{sel}}\bigr|}.
+\label{eq:score}
+\end{equation}
+
+Tử số: số vấn đề mới gói xử lý được.
+Mẫu số: số mốc mới cần thêm (cộng 1 tránh chia 0).
+
+Vòng chọn lọc (lặp cho đến khi hết ngân sách $K$):
+\begin{enumerate}
+\item Tìm gói có điểm cao nhất và $\operatorname{score} > 0$.
+\item Kiểm tra ngân sách: nếu tổng mốc sẽ vượt $K$ thì dừng.
+\item Cập nhật $C_{\mathrm{sel}}$ và $P_{\mathrm{sel}}$.
+\item Lặp lại.
+\end{enumerate}
+
+\textbf{Mã giả hàm \texttt{select\_packages}:}
+
+\begin{verbatim}
+fn select_packages(packages, budget K):
+    if K = None: return all indices  -- budget vo han, them tat ca
+
+    selected   = []      -- chi so goi da chon
+    sel_viol   = {}      -- tap vi pham da duoc xu ly
+    sel_points = {}      -- tap moc da duoc them
+    total_pts  = 0       -- so moc moi da dung
+
+    loop:
+        best_score = -1
+        best_idx   = None
+
+        for each package p[i] not yet selected:
+            if p[i].violation in sel_viol: skip  -- vi pham da co roi
+            new_pts = count points in p[i].points NOT in sel_points
+            if total_pts + new_pts > K: skip      -- vuot ngan sach
+            score = 1 / (1 + new_pts)             -- luon giai quyet 1 vi pham moi
+            if score > best_score:
+                best_score = score
+                best_idx   = i
+
+        if best_idx = None: break  -- khong con goi nao vua
+
+        -- Chon goi best_idx
+        p = packages[best_idx]
+        sel_viol.add(p.violation)
+        sel_points.add_all(p.points)
+        total_pts += count new points added
+        selected.add(best_idx)
+
+    -- FALLBACK: dam bao luon co tien trien
+    if selected is empty:
+        oldest = package with smallest first_seen
+        selected.add(index of oldest)
+
+    return selected
+\end{verbatim}
+
+\textbf{Fallback bắt buộc:} Nếu $P_{\mathrm{sel}}$ vẫn rỗng sau vòng chọn lọc,
+chương trình sẽ bị lặp vô hạn. Xử lý: lấy gói có \texttt{first\_seen} nhỏ nhất
+và thêm bắt buộc dù có vượt ngân sách.
+
+Giá trị $K$ để thử: $8, 32, 128$ và thêm tất cả ($\infty$).
+Kiểm thử với $K=\infty$ trước để đảm bảo kết quả giống baseline.
+
+\subsection{Cách mốc được biểu diễn trong solver}
+\label{sec:encoding}
+
+Với các mốc $\tau_1 < \tau_2$ trong $\Lambda_v$, biến $d_v(\tau)$ mang nghĩa
+$t_v \ge \tau$ và phải thỏa:
+\begin{equation}
+ d_v(\tau_2) \Rightarrow d_v(\tau_1)
+ \quad\text{(clause: }\neg d_v(\tau_2) \lor d_v(\tau_1)\text{).}
+\label{eq:ladder}
+\end{equation}
+
+Nếu lịch vi phạm $t_b \ge t_a + h$ và đang chọn $t_a = \alpha$, gói cơ bản:
+\begin{align}
+ \Lambda_b &\leftarrow \Lambda_b \cup \{\alpha+h\},\\
+ &\neg d_a(\alpha) \lor d_b(\alpha+h).
+\end{align}
+
+Ví dụ $t_a=10$, $h=5$: thêm mốc 15 cho $b$ và implication
+$d_a(10) \Rightarrow d_b(15)$. Lịch cũ không thể giữ nguyên vì vế trái đúng,
+vế phải sai.
+
+\textit{Kết quả cần có:} Chính sách bật/tắt được; không lặp vô hạn; log số
+vấn đề, số gói đề xuất, số gói chọn, số mốc thực sự thêm mỗi vòng.
+
+% =============================================================================
+\section{Cải tiến 3: chia sẻ mã hóa AMO}
+\label{sec:improve3}
+% =============================================================================
+
+\subsection{Đây là hướng khảo sát có điều kiện}
+
+Tại mỗi thời điểm, mỗi đoạn đường chỉ cho tối đa 1 tàu đi (AMO --- At Most One).
+Ở các thời điểm gần nhau, danh sách tàu tranh nhau thường gần giống nhau. Nếu
+hai nhóm có phần chung $S$ lớn, có thể tạo biến chung $g$ thay vì mã hóa lại
+từ đầu.
+
+Tuy nhiên, chia sẻ sai có thể loại bỏ lịch hợp lệ. Vì vậy sinh viên phải đo
+dữ liệu thực tế trước, rồi mới cài đặt.
+
+\subsection{Bước khảo sát cần làm trước}
+\begin{enumerate}
+\item Xuất danh sách tất cả nhóm AMO trong quá trình chạy.
+\item Đo mức độ giao nhau giữa các nhóm liên tiếp.
+\item Ước lượng số biến và clause có thể tiết kiệm.
+\item Chỉ tiếp tục nếu: nhiều nhóm có giao nhau đáng kể \emph{và} chi phí
+      tạo cấu trúc dùng chung thấp hơn lợi ích.
+\end{enumerate}
+
+\subsection{Hai cách mã hóa cần có để so sánh}
+
+\textbf{Pairwise} ($n < \theta$, không cần biến phụ):
+\[
+ \neg x_i \lor \neg x_j\quad(1 \le i < j \le n),
+ \qquad n(n-1)/2\text{ clause.}
+\]
+
+\textbf{Sequential Counter} ($n \ge \theta$, tạo $3n-4$ clause, $n-1$ biến phụ):
+\begin{align}
+ &\neg x_1 \lor s_1,\label{eq:sc}\\
+ &\neg x_i \lor s_i,\;\;
+   \neg s_{i-1} \lor s_i,\;\;
+   \neg x_i \lor \neg s_{i-1}
+   \quad(2 \le i \le n-1),\notag\\
+ &\neg x_n \lor \neg s_{n-1}.\notag
+\end{align}
+
+Lưu ý: code hiện tại có thêm chiều đảo của prefix nên thực tế tạo $4n-5$ clause.
+Đây là biến thể khác, phải ghi rõ trong cấu hình khi so sánh.
+
+\subsection{Chia sẻ phần chung $S$}
+
+Nếu $X = A \cup S$ và $Y = S \cup B$ ($A, S, B$ rời nhau), tạo biến
+$g \Leftrightarrow \bigvee_{s \in S} s$, rồi thay bằng:
+\[
+ \AMO(S) \;\land\; \AMO(A \cup \{g\}) \;\land\; \AMO(B \cup \{g\}).
+\]
+Nếu $S = \emptyset$: không chia sẻ. Nếu $|S|=1$: dùng phần tử đó thay $g$.
+
+Chỉ đưa vào cùng AMO các indicator đã xác nhận đôi một xung đột. Hai biến
+của cùng hoạt động ở hai thời điểm khác nhau là hai biến khác nhau.
+
+\textit{Kết quả cần có:} Trước hết là báo cáo mức độ giao nhau. Prototype chỉ
+làm nếu báo cáo cho thấy có triển vọng.
+
+% =============================================================================
+\section{Tích hợp và kiểm thử}
+\label{sec:integrate}
+% =============================================================================
+
+\subsection{Luồng chương trình sau khi tích hợp}
+
+Sau khi hoàn thành riêng từng phần, luồng chính là:
+
+\begin{center}
+\textit{Đọc dữ liệu}
+$\to$ \textit{Suy luận sớm (Cải tiến 1)}
+$\to$ \textit{Giải MaxSAT}
+$\to$ \textit{Kiểm tra lịch + chi phí}
+$\to$ \textit{Chọn refinement (Cải tiến 2)}
+$\to$ quay lại suy luận sớm.
+\end{center}
+
+Chương trình chỉ báo tối ưu khi $\LB = \UB$. Nếu hết thời gian: trả lịch
+tốt nhất cùng hai cận và trạng thái timeout.
+
+\subsection{Nguyên tắc kiểm thử}
+
+Sau mỗi cải tiến, chạy lại cùng instance. Nghiệm cuối phải y hệt baseline
+về chi phí. Số vòng lặp có thể giảm, không được tăng.
+
+Viết một chương trình brute-force (thử tất cả lịch có thể) cho 2--3 tàu.
+Chương trình này không dùng lại code của MaxSAT-DDD và đóng vai trò đáp án
+đối chiếu cho mọi cải tiến.
+
+\subsection{Bộ bài kiểm thử tối thiểu}
+
+\begingroup\small
+\begin{longtable}{@{}p{12mm}p{58mm}p{80mm}@{}}
+\toprule
+ID & Tình huống & Điều cần kiểm tra \\\midrule\endhead
+T01 & Một tàu, 3 hoạt động & $L_v$ được truyền đúng dọc hành trình. \\
+T02 & Hai thứ tự đều còn khả thi & Chương trình không tự ép thứ tự. \\
+T03 & Chỉ một thứ tự khả thi & Phát hiện và ghi lý do bắt buộc. \\
+T04 & Không thứ tự nào khả thi & Báo không khả thi, không treo. \\
+T05 & Tàu phải chờ trên tài nguyên & Thời gian chiếm dụng được kiểm tra đủ. \\
+T06 & Độ trễ nằm đúng sát ngưỡng & Chi phí Step/Round đúng ở hai phía ngưỡng. \\
+T07 & Lịch hợp lệ nhưng chi phí chưa khớp & Chương trình tiếp tục refinement. \\
+T08 & Giới hạn refinement rất nhỏ ($K=1$) & Vẫn có tiến triển nhờ fallback. \\
+T09 & Cùng mốc đề xuất nhiều lần & Mốc không bị thêm lặp. \\
+T10 & Hai AMO có phần chung & Chia sẻ không cấm lịch hợp lệ. \\
+T11 & Hết thời gian trước khi tối ưu & Trả lịch tốt nhất + hai cận + timeout. \\
+T12 & Dữ liệu bất thường & Dừng với thông báo đủ để debug. \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+\subsection{Các cấu hình cần so sánh}
+
+\begin{tabularx}{\textwidth}{@{}p{24mm}X@{}}
+\toprule
+Tên & Nội dung \\\midrule
+C & Phiên bản hội nghị đã chốt. \\
+C+B & Thêm suy luận sớm (Cải tiến 1). \\
+C+R & Thêm refinement có chọn lọc (Cải tiến 2). \\
+C+B+R & Kết hợp cả hai. \\
+C+B+R+S & Thêm chia sẻ AMO (nếu hướng này được tiếp tục). \\
+\bottomrule
+\end{tabularx}
+
+% =============================================================================
+\section{Thiết kế thực nghiệm}
+\label{sec:experiment}
+% =============================================================================
+
+\subsection{Chỉ số cần báo cáo}
+\begin{itemize}
+\item Số bài chứng minh được tối ưu; số bài tìm được lịch hợp lệ.
+\item Thời gian chứng minh tối ưu: trung vị, phân tán, PAR-2.
+\item Số vòng refinement và số mốc thêm mỗi vòng.
+\item Thời gian dành cho: suy luận, tạo model, solver, kiểm tra nghiệm.
+\end{itemize}
+
+PAR-2 với giới hạn $T$ và $N$ bài:
+\[
+ \mathrm{PAR2} = \frac{1}{N}\sum_{i=1}^{N} p_i,\quad
+ p_i = \begin{cases}
+   t_i & \text{chứng minh tối ưu trong }T,\\
+   2T  & \text{không chứng minh trong }T.
+ \end{cases}
+\]
+
+Không dùng thời gian trung bình trên các bài đã giải để kết luận một phương
+pháp tốt hơn: hai phương pháp có thể giải được hai tập bài khác nhau.
+
+\subsection{Cách chạy công bằng}
+\begin{itemize}
+\item Chạy ít nhất 5 lần mỗi cấu hình; với bài dưới 100ms thì tăng lên 20 lần.
+\item Xáo trộn thứ tự chạy để giảm ảnh hưởng cache.
+\item Tham số chính sách chỉ được điều chỉnh trên bộ bài dành riêng cho tuning,
+      không trên bộ test chính.
+\item Ghi rõ: số luồng, seed, timeout, giới hạn RAM, phiên bản solver, phần cứng.
+\end{itemize}
+
+% =============================================================================
+\section{Kế hoạch 10 tuần}
+\label{sec:plan}
+% =============================================================================
+
+\begingroup\small
+\begin{longtable}{@{}p{13mm}p{68mm}p{69mm}@{}}
+\toprule
+Tuần & Công việc chính & Kết quả cuối tuần \\\midrule\endhead
+1 & Đọc 5 file ở Mục~\ref{sec:read}; chạy script audit.
+  & In được số vòng lặp, số mốc/vòng, chi phí. \\
+2 & Chốt baseline; đọc bài hội nghị và bài Croella.
+  & Cấu hình nền chạy lại được; file ghi cấu hình. \\
+3 & Xây bộ bài T01--T12; viết chương trình brute-force.
+  & Có đáp án đúng để kiểm thử các cải tiến. \\
+4 & Cài đặt \texttt{propagate\_bounds()} và \texttt{find\_forced\_orders()}.
+  & Qua T01--T05; log số thứ tự bắt buộc tìm được. \\
+5 & Thêm hard clause vào solver; thử \texttt{tighten\_ub\_from\_cost()}.
+  & Nghiệm y hệt baseline; quyết định giữ Mức 2 không. \\
+6 & Tách 3 pha phát hiện/lập kế hoạch/áp dụng trong refinement.
+  & Với $K=\infty$: kết quả y hệt baseline. \\
+7 & Cài đặt scoring, vòng chọn lọc và fallback.
+  & Không lặp vô hạn; log đủ mỗi vòng. \\
+8 & Tích hợp C+B+R; khảo sát mức độ giao nhau AMO.
+  & Pilot ngắn; quyết định có làm Cải tiến 3 không. \\
+9 & Chạy thí nghiệm chính trên toàn bộ benchmark.
+  & Log đầy đủ; tách rõ tối ưu, timeout, lỗi. \\
+10 & Phân tích kết quả; viết báo cáo.
+  & Tái tạo được bảng/hình; xác định đóng góp thực tế. \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+Nếu bước baseline hoặc kiểm thử phát hiện lỗi mô hình, ưu tiên sửa trước
+khi tiếp tục tối ưu tốc độ.
+
+% =============================================================================
+\section{Báo cáo và bàn giao}
+\label{sec:report}
+% =============================================================================
+
+\subsection{Sản phẩm cuối cùng}
+\begin{itemize}
+\item Mã nguồn có thể bật/tắt từng cải tiến qua tùy chọn dòng lệnh.
+\item Bộ bài T01--T12 và chương trình kiểm tra brute-force.
+\item File ghi cấu hình của từng chiến dịch thực nghiệm.
+\item Dữ liệu thô và log theo từng vòng lặp.
+\item Script sinh bảng và hình từ CSV.
+\item Báo cáo chỉ rõ cải tiến nào có ích, trong trường hợp nào, giới hạn là gì.
+\end{itemize}
+
+\subsection{Mẫu báo cáo hằng tuần}
+
+Mỗi báo cáo khoảng 1--2 trang, gồm: (1) mục tiêu tuần; (2) phần đã hoàn thành;
+(3) cách kiểm tra và kết quả (kể cả kết quả âm); (4) vấn đề còn tồn tại;
+(5) kế hoạch tuần tiếp theo. Kèm một lệnh chạy lại ví dụ quan trọng nhất.
+
+\subsection{Tiêu chí hoàn thành}
+\begin{enumerate}
+\item Baseline đã xác minh; các sai khác cũ được giải thích.
+\item Hai cải tiến chính bật/tắt độc lập và đều qua T01--T12.
+\item Chương trình không báo tối ưu khi chưa có đủ bằng chứng ($\LB = \UB$).
+\item Thí nghiệm có ablation, đo lặp và phản ánh cả timeout.
+\item Báo cáo phân biệt rõ phần đã có ở bài hội nghị với phần mới.
+\end{enumerate}
+
+% =============================================================================
+\section{Biên dịch tài liệu}
+% =============================================================================
+
+\begin{verbatim}
+cd manuscript/journal
+latexmk -xelatex student_implementation_guide_vi.tex
+mkdir -p ../../output/pdf
+cp student_implementation_guide_vi.pdf ../../output/pdf/
+\end{verbatim}
+
+Trên Overleaf: chọn compiler XeLaTeX.
+
+\clearpage
+\begin{thebibliography}{9}
+\bibitem{croella}
+A.~L. Croella, B.~Luteberget, C.~Mannino và P.~Ventura.
+\emph{A MaxSAT approach for solving a new Dynamic Discretization Discovery
+model for train rescheduling problems}.
+Computers \& Operations Research, 167, 106679, 2024.
+\url{https://doi.org/10.1016/j.cor.2024.106679}.
+
+\bibitem{sinz}
+C.~Sinz.
+\emph{Towards an Optimal CNF Encoding of Boolean Cardinality Constraints}.
+CP 2005.
+
+\bibitem{source}
+B.~Luteberget và cộng sự. Repository MaxSAT train scheduling.
+\url{https://github.com/luteberget/maxsattrainscheduling}.
+
+\bibitem{conference}
+T.~V. Kieu, T.~H. Nguyen và K.~V. To.
+\emph{An Efficient MaxSAT-DDD Approach for Train Rescheduling via
+Precedence Propagation and Hybrid AMO Encodings}.
+Bản thảo tại \pathref{manuscript/submission/main.tex}.
+\end{thebibliography}
+\end{document}

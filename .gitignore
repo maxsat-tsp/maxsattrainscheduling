@@ -10,7 +10,9 @@ cplex.log
 error.txt
 
 # ───── Heavy result directories (too large for GitHub) ─────
-/results/
+# Keep results/*.csv (reference data for audit script, ~700 KB total).
+# Only exclude large experiment subdirectories.
+/results/2*/          # timestamped experiment runs (JSON + raw data)
 /results_combined/
 /docs/
 /2026-05-16-Verified-Result-For-Graduation-Thesis/

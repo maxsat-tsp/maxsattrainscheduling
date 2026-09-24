@@ -9,27 +9,37 @@ gurobi.log
 cplex.log
 error.txt
 
-# ───── Heavy result directories (too large for GitHub) ─────
-# Keep results/*.csv (reference data for audit script, ~700 KB total).
-# Only exclude large experiment subdirectories.
-/results/2*/          # timestamped experiment runs (JSON + raw data)
+# ───── Heavy result directories ─────
+# Keep results/*.csv (9 files needed by audit script, ~700 KB total).
+# Exclude all timestamped experiment subdirectories and loose data files.
+/results/2022-*/
+/results/2023-*/
+/results/2024-*/
+/results/2025-*/
+/results/2026-*/
+/results/2022-*.json
+/results/2022-*.txt
+/results/2023-*.json
+/results/2023-*.txt
+/results/2024-*.json
+/results/2024-*.txt
+/results/2025-*.json
+/results/2025-*.txt
+/results/2026-*.json
+/results/2026-*.txt
 /results_combined/
+/results_repeated/
 /docs/
 /2026-05-16-Verified-Result-For-Graduation-Thesis/
 
-# ───── CPLEX solver outputs ─────
-cplex_cp/results/original
-cplex_cp/results/addstationtime
-cplex_cp/results/addtracktime
-cplex_milp/results/ti/original
-cplex_milp/results/ti/addstationtime
-cplex_milp/results/ti/addtracktime
-cplex_milp/results/bigm/original
-cplex_milp/results/bigm/addstationtime
-cplex_milp/results/bigm/addtracktime
+# ───── CPLEX / solver scripts (not needed to run the Rust solver) ─────
+/cplex_cp/
+/cplex_milp/
+/generate_summary_table.py
+/run_all_combined.sh
 
-# ───── Manuscript PDFs and build artifacts ─────
-# (keep .tex source files; ignore compiled PDFs and LaTeX temp files)
+# ───── Manuscript PDFs and LaTeX build artifacts ─────
+# Keep .tex source; ignore compiled outputs.
 manuscript/**/*.pdf
 manuscript/**/*.xdv
 manuscript/**/*.aux

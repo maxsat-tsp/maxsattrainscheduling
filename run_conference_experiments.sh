@@ -91,7 +91,7 @@ echo ""
 mkdir -p "$OUT_DIR"
 
 OBJECTIVES=(finsteps123 infsteps180 cont)
-TOTAL_RUNS=9  # 3 configs × 3 objectives (MaxsatBaseline đã chạy trước rồi, bỏ qua)
+TOTAL_RUNS=9   # 3 configs × 3 objectives (MaxsatDefault đã chạy trước, bỏ qua)
 CURRENT_RUN=0
 
 START_ALL=$(date +%s)
@@ -144,10 +144,8 @@ run_one() {
 
 for obj in "${OBJECTIVES[@]}"; do
 
-    # MaxsatBaseline đã chạy trước rồi — bỏ qua
-
-    # Default: cả 2 cải tiến bật (mặc định)
-    run_one MaxsatDefault maxsat_ddd_ladder_sc "$obj"
+    # Baseline: Croella 2024 (không có cải tiến)
+    run_one MaxsatBaseline maxsat_ddd_ladder "$obj"
 
     # Chỉ SC AMO (tắt precedence graph)
     run_one MaxsatSC maxsat_ddd_ladder_sc "$obj" \

@@ -1,9 +1,8 @@
 //! Sequential Counter (SC) AMO encoding for resource-conflict cliques —
 //!
-//! `add_sc_amo` emits a bidirectional sequential-counter AMO: the standard
-//! forward clauses (Sinz 2005) plus reverse implications that define the
-//! prefix variables exactly. `add_pairwise_amo` is the legacy O(n²) pairwise
-//! encoding for comparison. `add_hybrid_amo` dispatches
+//! `add_sc_amo` emits the standard Sinz (2005) sequential-counter AMO.
+//! `add_pairwise_amo` is the legacy O(n²) pairwise encoding for comparison.
+//! `add_hybrid_amo` dispatches
 //! between the two based on clique size (`PAIRWISE_AMO_MAX_SIZE`).
 
 use std::collections::{HashMap, HashSet};
@@ -17,8 +16,11 @@ use super::precedence::add_fixed_precedence_row;
 use super::settings::PAIRWISE_AMO_MAX_SIZE;
 use super::solve::{Occ, VisitId};
 
-/// Sequential Counter (SC) encoding for At-Most-One
-/// four-formula form.
+/// Standard Sinz sequential-counter encoding for At-Most-One.
+///
+/// For `n >= 3`, this introduces `n - 1` prefix variables and emits `3n - 4`
+/// clauses. Reverse implications that define prefix variables exactly are
+/// redundant for AMO and are deliberately omitted below.
 pub(super) fn add_sc_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lits: &[Bool<L>]) {
     match lits.len() {
         0 | 1 => return,
@@ -34,21 +36,23 @@ pub(super) fn add_sc_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lit
         prefix.push(solver.new_var());
     }
 
-    // R_1 layer: x_1 ↔ R_1 via (1) one direction + (3) the other.
-    // Together they make prefix[0] equivalent to lits[0].
-    solver.add_clause(vec![!lits[0], prefix[0]]);                // (1) for j=1
-    solver.add_clause(vec![lits[0], !prefix[0]]);                // (3) for j=1
+    solver.add_clause(vec![!lits[0], prefix[0]]); // x_1 -> s_1
+
+    // Redundant definitional reverse clause, intentionally not emitted:
+    // solver.add_clause(vec![lits[0], !prefix[0]]); // s_1 -> x_1
 
     for i in 1..(lits.len() - 1) {
-        solver.add_clause(vec![!lits[i], prefix[i]]);            // (1)
-        solver.add_clause(vec![!prefix[i - 1], prefix[i]]);      // (2)
-        solver.add_clause(vec![lits[i], prefix[i - 1], !prefix[i]]); // (3)
-        solver.add_clause(vec![!lits[i], !prefix[i - 1]]);       // (4)
+        solver.add_clause(vec![!lits[i], prefix[i]]); // x_i -> s_i
+        solver.add_clause(vec![!prefix[i - 1], prefix[i]]); // s_(i-1) -> s_i
+        solver.add_clause(vec![!lits[i], !prefix[i - 1]]); // x_i -> !s_(i-1)
+
+        // Redundant definitional reverse clause, intentionally not emitted:
+        // solver.add_clause(vec![lits[i], prefix[i - 1], !prefix[i]]);
     }
     solver.add_clause(vec![
         !lits[lits.len() - 1],
         !prefix[prefix.len() - 1],
-    ]); // (4) for j=w
+    ]); // x_n -> !s_(n-1)
 }
 
 pub(super) fn add_pairwise_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lits: &[Bool<L>]) {

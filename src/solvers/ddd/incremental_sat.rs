@@ -98,8 +98,8 @@ pub struct SatDddSettings {
     /// earliest occupation intervals overlap by ≥ 180s. Adds ~7 clauses
     /// + 2 aux vars per pair. Default `false` (lazy — DDD rediscovers).
     pub seed_resource_conflicts: bool,
-    /// Use SC (Sequential Counter) AMO encoding from Truong/Kieu/To
-    /// (ICAART 2025) for resource-clique AMOs of size > [`PAIRWISE_AMO_MAX_SIZE`].
+    /// Use the standard Sinz sequential-counter AMO encoding for
+    /// resource-clique AMOs of size > [`PAIRWISE_AMO_MAX_SIZE`].
     /// If `false`, AMOs always use pairwise regardless of size.
     /// Default `true` (use SC for large cliques).
     pub use_sc_amo: bool,
@@ -1190,17 +1190,12 @@ fn compute_initial_heuristic_upper_bound<L: satcoder::Lit>(
 // Two knobs control how AMO over conflict cliques is encoded.
 
 /// Maximum clique size encoded by pairwise AMO. Cliques strictly larger
-/// than this use SC (Sequential Counter) AMO from Truong/Kieu/To, ICAART
-/// 2025 §3.1 (see [`add_sc_amo`]). Larger value keeps pairwise for
-/// medium cliques whose simplicity may beat SC's tighter propagation in
-/// the DDD setting.
+/// than this use the standard Sinz sequential-counter AMO (see [`add_sc_amo`]).
 ///
-/// Empirically tuned to 5 via threshold sweep on Croella2024 TRP bench.
+/// Set to 5 for the benchmark configuration, so the counter starts at `n = 6`,
+/// where its `3n - 4` clauses first improve on pairwise clause count.
 /// See [`crate::solvers::maxsat_ladder_sc::PAIRWISE_AMO_MAX_SIZE`]
-/// for the full sweep result (n ∈ {3, 5, 10}). Theoretical crossover
-/// on raw clause count is at n ≈ 15 (Thesis §3.2.1), but CDCL benefits
-/// from SC register-chain learning on smaller cliques, putting the
-/// practical optimum at 5.
+/// for the shared setting.
 const PAIRWISE_AMO_MAX_SIZE: usize = 5;
 
 /// Lazy AMO threshold. A clique with > 2 members must be detected this
@@ -1212,21 +1207,14 @@ const PAIRWISE_AMO_MAX_SIZE: usize = 5;
 #[allow(dead_code)]
 const LAZY_AMO_THRESHOLD: usize = 0;
 
-/// SC (Sequential Counter) AMO encoding from Truong/Kieu/To (ICAART 2025).
+/// Standard Sinz sequential-counter AMO encoding.
 ///
-/// For lits = `[x_1, ..., x_w]` introduces `w-1` fresh register bits `R_j`
-/// (`prefix[i] ≡ R_{i+1}`) and emits the four-formula encoding:
+/// For `lits = [x_1, ..., x_n]`, introduces `n - 1` prefix variables and emits
+/// `3n - 4` clauses:
 ///
-///   (1) x_j → R_j                            — `(¬lits[i] ∨ prefix[i])`
-///   (2) R_{j-1} → R_j                        — `(¬prefix[i-1] ∨ prefix[i])`
-///   (3) R_j → x_j ∨ R_{j-1}                  — `(lits[i] ∨ prefix[i-1] ∨ ¬prefix[i])`
-///   (4) x_j → ¬R_{j-1}                       — `(¬lits[i] ∨ ¬prefix[i-1])`
-///
-/// Formula (3) is the *downward* propagation (register stays false when no
-/// var has fired yet). Earlier versions of this file omitted it, which kept
-/// soundness for AMO but weakened unit propagation. The added clauses are
-/// O(n) and let CDCL conclude `prefix[i]` cannot be forced true unless some
-/// `lits[k≤i]` is.
+/// - `x_j -> s_j`;
+/// - `s_(j-1) -> s_j`;
+/// - `x_j -> !s_(j-1)`.
 fn add_sc_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lits: &[Bool<L>]) {
     match lits.len() {
         0 | 1 => return,
@@ -1242,21 +1230,23 @@ fn add_sc_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lits: &[Bool<L
         prefix.push(solver.new_var());
     }
 
-    // R_1 layer: x_1 ↔ R_1 via (1) one direction + (3) the other.
-    // Together they make prefix[0] equivalent to lits[0].
-    solver.add_clause(vec![!lits[0], prefix[0]]);                // (1) for j=1
-    solver.add_clause(vec![lits[0], !prefix[0]]);                // (3) for j=1
+    solver.add_clause(vec![!lits[0], prefix[0]]); // x_1 -> s_1
+
+    // Redundant definitional reverse clause, intentionally not emitted:
+    // solver.add_clause(vec![lits[0], !prefix[0]]); // s_1 -> x_1
 
     for i in 1..(lits.len() - 1) {
-        solver.add_clause(vec![!lits[i], prefix[i]]);            // (1)
-        solver.add_clause(vec![!prefix[i - 1], prefix[i]]);      // (2)
-        solver.add_clause(vec![lits[i], prefix[i - 1], !prefix[i]]); // (3)
-        solver.add_clause(vec![!lits[i], !prefix[i - 1]]);       // (4)
+        solver.add_clause(vec![!lits[i], prefix[i]]); // x_i -> s_i
+        solver.add_clause(vec![!prefix[i - 1], prefix[i]]); // s_(i-1) -> s_i
+        solver.add_clause(vec![!lits[i], !prefix[i - 1]]); // x_i -> !s_(i-1)
+
+        // Redundant definitional reverse clause, intentionally not emitted:
+        // solver.add_clause(vec![lits[i], prefix[i - 1], !prefix[i]]);
     }
     solver.add_clause(vec![
         !lits[lits.len() - 1],
         !prefix[prefix.len() - 1],
-    ]); // (4) for j=w
+    ]); // x_n -> !s_(n-1)
 }
 
 fn add_pairwise_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lits: &[Bool<L>]) {

@@ -94,8 +94,8 @@ pub struct SatDddSettings {
     /// Pre-seed pairwise AMO conflict clauses for visit pairs whose
     /// earliest occupation intervals overlap by ≥ 180s. Default `false`.
     pub seed_resource_conflicts: bool,
-    /// Use SC (Sequential Counter) AMO encoding from Truong/Kieu/To
-    /// (ICAART 2025) for resource-clique AMOs of size > [`PAIRWISE_AMO_MAX_SIZE`].
+    /// Use the standard Sinz sequential-counter AMO encoding for
+    /// resource-clique AMOs of size > [`PAIRWISE_AMO_MAX_SIZE`].
     /// If `false`, AMOs always use pairwise. Default `true`.
     pub use_sc_amo: bool,
 }
@@ -1052,27 +1052,19 @@ fn compute_effective_earliest(problem: &Problem) -> Vec<Vec<i32>> {
 // ─── AMO encoding constants (kept in sync with maxsat_ladder_sc + incremental_sat) ──
 
 /// Maximum clique size encoded by pairwise AMO. Cliques strictly larger
-/// than this use SC (Sequential Counter) AMO from Truong/Kieu/To, ICAART
-/// 2025 §3.1. Larger value keeps pairwise for medium cliques whose
-/// simplicity may beat SC's tighter propagation in the DDD setting.
+/// than this use the standard Sinz sequential-counter AMO.
 ///
-/// Empirically tuned to 5 via threshold sweep on Croella2024 TRP bench.
+/// Set to 5 for the benchmark configuration, so the counter starts at `n = 6`,
+/// where its `3n - 4` clauses first improve on pairwise clause count.
 /// See [`crate::solvers::maxsat_ladder_sc::PAIRWISE_AMO_MAX_SIZE`]
-/// for the full sweep result (n ∈ {3, 5, 10}). Theoretical crossover
-/// on raw clause count is at n ≈ 15 (Thesis §3.2.1), but CDCL benefits
-/// from SC register-chain learning on smaller cliques, putting the
-/// practical optimum at 5.
+/// for the shared setting.
 const PAIRWISE_AMO_MAX_SIZE: usize = 5;
 
 /// Lazy AMO threshold (kept for API parity — not used by puresat path).
 #[allow(dead_code)]
 const LAZY_AMO_THRESHOLD: usize = 0;
 
-/// SC (Sequential Counter) AMO encoding from Truong/Kieu/To (ICAART 2025).
-///
-/// Emits formulas (1)–(4) per index plus the R_1 biconditional via (1)+(3)
-/// for j=1. Including formula (3) for both the R_1 layer and inner indexes
-/// gives stronger unit propagation than earlier versions that omitted it.
+/// Standard Sinz sequential-counter AMO encoding (`3n - 4` clauses).
 fn add_sc_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lits: &[Bool<L>]) {
     match lits.len() {
         0 | 1 => return,
@@ -1088,20 +1080,23 @@ fn add_sc_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lits: &[Bool<L
         prefix.push(solver.new_var());
     }
 
-    // R_1 layer: x_1 ↔ R_1 via (1) one direction + (3) the other.
-    solver.add_clause(vec![!lits[0], prefix[0]]);                // (1) for j=1
-    solver.add_clause(vec![lits[0], !prefix[0]]);                // (3) for j=1
+    solver.add_clause(vec![!lits[0], prefix[0]]); // x_1 -> s_1
+
+    // Redundant definitional reverse clause, intentionally not emitted:
+    // solver.add_clause(vec![lits[0], !prefix[0]]); // s_1 -> x_1
 
     for i in 1..(lits.len() - 1) {
-        solver.add_clause(vec![!lits[i], prefix[i]]);            // (1)
-        solver.add_clause(vec![!prefix[i - 1], prefix[i]]);      // (2)
-        solver.add_clause(vec![lits[i], prefix[i - 1], !prefix[i]]); // (3)
-        solver.add_clause(vec![!lits[i], !prefix[i - 1]]);       // (4)
+        solver.add_clause(vec![!lits[i], prefix[i]]); // x_i -> s_i
+        solver.add_clause(vec![!prefix[i - 1], prefix[i]]); // s_(i-1) -> s_i
+        solver.add_clause(vec![!lits[i], !prefix[i - 1]]); // x_i -> !s_(i-1)
+
+        // Redundant definitional reverse clause, intentionally not emitted:
+        // solver.add_clause(vec![lits[i], prefix[i - 1], !prefix[i]]);
     }
     solver.add_clause(vec![
         !lits[lits.len() - 1],
         !prefix[prefix.len() - 1],
-    ]); // (4) for j=w
+    ]); // x_n -> !s_(n-1)
 }
 
 fn add_pairwise_amo<L: satcoder::Lit>(solver: &mut impl SatInstance<L>, lits: &[Bool<L>]) {

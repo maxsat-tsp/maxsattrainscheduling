@@ -1,38 +1,55 @@
 #!/usr/bin/env bash
-# Kiểm thử các cải tiến 1 (suy luận sớm) và 2 (refinement có chọn lọc).
+# Kiểm thử cải tiến 1 (suy luận sớm) và cải tiến 2 (refinement có chọn lọc)
+# cho bài journal, dựa trên solver maxsat_rc2 (chưa có CLI riêng).
 #
-# CÁCH DÙNG:
-#   Sau khi sửa const trong src/solvers/ddd/maxsat_rc2.rs, chạy:
-#     bash test_improvements.sh <tên_cấu_hình> [timeout]
+# ĐỌC TRƯỚC:
+#   maxsat_rc2 là solver mới cho bài journal, KHÁC hoàn toàn với:
+#     - maxsat_ddd_ladder     → Croella 2024 (baseline gốc)
+#     - maxsat_ddd_ladder_sc  → MaxSAT-Default của bài hội nghị
 #
-# Ví dụ:
-#   bash test_improvements.sh C           # phiên bản gốc (tắt hết)
-#   bash test_improvements.sh C+B         # Cải tiến 1: suy luận sớm
-#   bash test_improvements.sh C+R         # Cải tiến 2: refinement chọn lọc
-#   bash test_improvements.sh C+B+R       # Kết hợp cả hai
-#   bash test_improvements.sh C+B+R 60    # Timeout 60s
+#   Để chạy được, sinh viên cần wire maxsat_rc2 vào main.rs trước.
+#   Xem hướng dẫn trong student_implementation_guide_vi.tex, Mục "Tích hợp".
 #
-# Trước mỗi lần chạy, sửa các const trong maxsat_rc2.rs:
+# 4 cấu hình so sánh (tên đặt theo tài liệu hướng dẫn):
 #
-#   Dòng 162  REFINEMENT_BUDGET:
-#     None          → không giới hạn (add-all = baseline Cải tiến 2)
-#     Some(32)      → budget K=32 (Cải tiến 2 có chọn lọc)
+#   RC2-Base   — maxsat_rc2 không có cải tiến nào
+#                  const REFINEMENT_BUDGET = None (add-all)
+#                  KHÔNG gọi propagate_bounds()
 #
-#   Cải tiến 1 (propagate_bounds, tighten_ub_from_cost):
-#     Bật/tắt bằng cách xoá hoặc thêm lại các lời gọi trong code.
-#     (Xem hướng dẫn Mục 4 trong student_implementation_guide_vi.tex)
+#   RC2+B      — + Cải tiến 1: suy luận sớm (propagate_bounds + tighten_ub)
+#                  const REFINEMENT_BUDGET = None
+#                  GỌI propagate_bounds()
 #
-# Kết quả lưu vào: results/improvements/<TIMESTAMP>-<tên_cấu_hình>/
+#   RC2+R      — + Cải tiến 2: refinement có chọn lọc
+#                  const REFINEMENT_BUDGET = Some(32)
+#                  KHÔNG gọi propagate_bounds()
+#
+#   RC2+B+R    — kết hợp cả hai (mục tiêu cuối)
+#                  const REFINEMENT_BUDGET = Some(32)
+#                  GỌI propagate_bounds()
+#
+# Usage:
+#   bash test_improvements.sh RC2-Base
+#   bash test_improvements.sh RC2+B
+#   bash test_improvements.sh RC2+R
+#   bash test_improvements.sh RC2+B+R
+#   bash test_improvements.sh RC2+B+R 60     # timeout 60s
+#
+# Kết quả lưu vào: results/improvements/<TIMESTAMP>-<cấu_hình>/
 
 set -euo pipefail
 
-CONFIG="${1:-C}"
+CONFIG="${1:-RC2-Base}"
 TIMEOUT_SECS="${2:-120}"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
 OUT_DIR="results/improvements/${TIMESTAMP}-${CONFIG}"
 BIN="./target/release/ddd"
 RUN_SCRIPT="quick_scripts/run_all_txt_instances_limited.sh"
 CSV_BATCH="quick_scripts/analyze/json_to_csv_batch.py"
+
+# Solver CLI name cho maxsat_rc2 (sinh viên cần đặt tên này khi wire vào main.rs)
+# Đổi nếu sinh viên đặt tên khác trong main.rs
+SOLVER_NAME="${SOLVER_NAME:-maxsat_rc2}"
 
 # ── Kiểm tra ──────────────────────────────────────────────────────────────────
 
@@ -41,33 +58,51 @@ if [ ! -f "Cargo.toml" ]; then
     exit 1
 fi
 
-# ── Nhắc nhở sinh viên kiểm tra const ─────────────────────────────────────────
+# ── Hướng dẫn đặt const ────────────────────────────────────────────────────────
 
 echo "================================================================"
-echo "KIỂM THỬ CẢI TIẾN: $CONFIG"
+echo "KIỂM THỬ CẢI TIẾN JOURNAL: $CONFIG"
 echo "================================================================"
 echo ""
-echo "Kiểm tra const hiện tại trong maxsat_rc2.rs:"
+echo "Const hiện tại trong src/solvers/ddd/maxsat_rc2.rs:"
+grep -n "REFINEMENT_BUDGET" src/solvers/ddd/maxsat_rc2.rs \
+    | grep "const" | sed 's/^/  /'
 echo ""
 
-# Hiển thị các dòng const liên quan để sinh viên xác nhận trước khi chạy
-grep -n "REFINEMENT_BUDGET\|USE_HEURISTIC" src/solvers/ddd/maxsat_rc2.rs \
-    | grep "^[0-9]*:.*const" \
-    | sed 's/^/  /'
+case "$CONFIG" in
+  "RC2-Base")
+    echo "Yêu cầu cho RC2-Base:"
+    echo "  - Dòng 162: const REFINEMENT_BUDGET: Option<usize> = None;"
+    echo "  - Dòng 129: TẮT propagate_bounds() (comment out hoặc xoá)"
+    ;;
+  "RC2+B")
+    echo "Yêu cầu cho RC2+B (Cải tiến 1 BẬT):"
+    echo "  - Dòng 162: const REFINEMENT_BUDGET: Option<usize> = None;"
+    echo "  - Dòng 129: BẬT propagate_bounds() (đang bật sẵn)"
+    ;;
+  "RC2+R")
+    echo "Yêu cầu cho RC2+R (Cải tiến 2 BẬT):"
+    echo "  - Dòng 162: const REFINEMENT_BUDGET: Option<usize> = Some(32);"
+    echo "  - Dòng 129: TẮT propagate_bounds()"
+    ;;
+  "RC2+B+R")
+    echo "Yêu cầu cho RC2+B+R (cả hai BẬT):"
+    echo "  - Dòng 162: const REFINEMENT_BUDGET: Option<usize> = Some(32);"
+    echo "  - Dòng 129: BẬT propagate_bounds() (đang bật sẵn)"
+    ;;
+  *)
+    echo "Cấu hình không hợp lệ. Dùng: RC2-Base | RC2+B | RC2+R | RC2+B+R"
+    exit 1
+    ;;
+esac
 
-echo ""
-echo "Cấu hình bạn muốn chạy: $CONFIG"
-echo "  C       → REFINEMENT_BUDGET = None,    Cải tiến 1 TẮT"
-echo "  C+B     → REFINEMENT_BUDGET = None,    Cải tiến 1 BẬT"
-echo "  C+R     → REFINEMENT_BUDGET = Some(K), Cải tiến 1 TẮT"
-echo "  C+B+R   → REFINEMENT_BUDGET = Some(K), Cải tiến 1 BẬT"
 echo ""
 read -rp "Đã đặt const đúng chưa? Nhấn Enter để tiếp tục, Ctrl+C để huỷ... "
 echo ""
 
 # ── Bước 1: Build ─────────────────────────────────────────────────────────────
 
-echo "[1/3] Building (cargo build --release)..."
+echo "[1/3] Building..."
 if ! cargo build --release 2>&1; then
     echo "ERROR: Build thất bại."
     exit 1
@@ -80,25 +115,26 @@ mkdir -p "$OUT_DIR"
 # ── Bước 2: Chạy 3 objectives ─────────────────────────────────────────────────
 
 OBJECTIVES=(finsteps123 infsteps180 cont)
-CURRENT_RUN=0
 START_ALL=$(date +%s)
 
 echo "[2/3] Running 3 objectives (timeout ${TIMEOUT_SECS}s/instance)..."
 echo ""
 
+run_idx=0
 for obj in "${OBJECTIVES[@]}"; do
-    CURRENT_RUN=$((CURRENT_RUN + 1))
+    run_idx=$((run_idx + 1))
     json_out="${OUT_DIR}/${CONFIG}_${obj}.json"
 
     echo "------------------------------------------------------------"
-    echo "[$CURRENT_RUN/3] $CONFIG | $obj"
+    echo "[$run_idx/3] $CONFIG | $obj"
+    echo "  Solver: $SOLVER_NAME"
     echo "  Output: $json_out"
     echo "------------------------------------------------------------"
 
     t0=$(date +%s)
 
     BIN="$BIN" \
-    SOLVER=maxsat_rc2 \
+    SOLVER="$SOLVER_NAME" \
     OBJECTIVE="$obj" \
     JSON_OUT="$json_out" \
     INSTANCE_TIMEOUT_SECS="$TIMEOUT_SECS" \
@@ -122,26 +158,17 @@ done
 END_ALL=$(date +%s)
 ELAPSED=$((END_ALL - START_ALL))
 
-echo "[3/3] Xong"
+echo "[3/3] Kết quả"
 echo "================================================================"
-echo "Cấu hình:        $CONFIG"
-echo "Tổng thời gian:  ${ELAPSED}s ($((ELAPSED / 60))m $((ELAPSED % 60))s)"
-echo "Kết quả tại:     $OUT_DIR/"
+echo "Cấu hình:       $CONFIG"
+echo "Thời gian:      ${ELAPSED}s ($((ELAPSED / 60))m $((ELAPSED % 60))s)"
+echo "Kết quả tại:    $OUT_DIR/"
 echo ""
-echo "Files:"
-ls -lh "$OUT_DIR"/*.csv 2>/dev/null | awk '{print "  " $NF}' || echo "  (không có CSV)"
+echo "Files CSV:"
+ls -lh "$OUT_DIR"/*.csv 2>/dev/null | awk '{print "  " $NF}' || echo "  (không có)"
 echo ""
 echo "================================================================"
 echo ""
-echo "Bước tiếp theo:"
-echo "  1. So sánh với cấu hình khác:"
-echo "       python3 quick_scripts/analyze/mk_table.py $OUT_DIR"
-echo ""
-echo "  2. Kiểm tra nghiệm giống nhau (chi phí phải bằng C):"
-echo "       diff <(grep -h cost $OUT_DIR/*.csv | sort) \\"
-echo "            <(grep -h cost results/improvements/*-C/*.csv | sort)"
-echo ""
-echo "  3. Debug instance đơn lẻ:"
-echo "       ./target/release/ddd -s maxsat_rc2 --txt-instances \\"
-echo "         --instance-name-filter origA1 --instance-name-exact \\"
-echo "         --objective finsteps123"
+echo "So sánh chi phí giữa các cấu hình (phải bằng nhau):"
+echo "  ls results/improvements/"
+echo "  # rồi so sánh cột 'cost' giữa RC2-Base và RC2+B+R"

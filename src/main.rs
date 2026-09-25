@@ -6,6 +6,7 @@ use ddd::{
     solvers::{
         ddd::{
             self as ddd_solvers, maxsat_ladder, maxsat_ladder_abstract, maxsat_ladder_sc,
+            maxsat_rc2,
         },
         legacy::{maxsat_ddd, maxsat_ti},
         milp::{bigm, milp_ti},
@@ -326,6 +327,7 @@ enum SolverType {
     MaxSatDddIncrementalNoProp,
     MaxSatDddPairwiseCustomRc2,
     MaxSatDddPairwiseCustomRc2NoProp,
+    MaxsatRc2,
 }
 
 const TIMEOUT: f64 = 120.0;
@@ -387,6 +389,7 @@ fn main() {
             "maxsat_ddd_incremental_noprop" => SolverType::MaxSatDddIncrementalNoProp,
             "maxsat_ddd_pairwise_customrc2" => SolverType::MaxSatDddPairwiseCustomRc2,
             "maxsat_ddd_pairwise_customrc2_noprop" => SolverType::MaxSatDddPairwiseCustomRc2NoProp,
+            "maxsat_rc2" => SolverType::MaxsatRc2,
             _ => panic!("unknown solver type"),
         })
         .collect::<Vec<_>>();
@@ -732,6 +735,19 @@ fn main() {
                             counting_solver::CountingSolver::new(
                                 satcoder::solvers::minisat::Solver::new(),
                             ),
+                            &p.problem,
+                            TIMEOUT,
+                            delay_cost_type,
+                            |k, v| {
+                                solve_data.insert(k, v);
+                            },
+                        )
+                        .map(|(v, _)| v)
+                    }
+                    SolverType::MaxsatRc2 => {
+                        maxsat_rc2::solve(
+                            &mk_env,
+                            satcoder::solvers::minisat::Solver::new(),
                             &p.problem,
                             TIMEOUT,
                             delay_cost_type,

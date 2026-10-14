@@ -33,7 +33,7 @@ git clone https://github.com/maxsat-tsp/maxsattrainscheduling.git
 git clone https://github.com/luteberget/salvers.git
 git clone https://github.com/arminbiere/cadical.git
 git clone https://github.com/marekpiotrow/uwrmaxsat.git
-git clone https://github.com/biotomas/ipamir.git ipamir-rs
+git clone https://github.com/luteberget/ipamir-rs.git ipamir-rs
 ```
 
 ### Step 2: Build External Solvers

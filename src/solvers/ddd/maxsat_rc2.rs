@@ -16,12 +16,101 @@ use satcoder::{
 };
 use typed_index_collections::TiVec;
 
-use super::shared::common::{do_output_stats, extract_solution, IterationType, Occ, SolveStats, VisitId};
-use super::shared::precedence::{chain_earliest, propagate_bounds, tighten_ub_from_cost};
+use super::shared::common::{
+    do_output_stats, extract_solution, IterationType, Occ, SolveStats, VisitId,
+};
+use super::shared::precedence::{
+    chain_earliest, find_forced_orders, propagate_bounds, propagate_bounds_with_orders,
+    tighten_ub_from_cost, ForcedOrder,
+};
 use super::shared::refinement::{
-    apply_package, select_packages, PackageAction, RefinementPackage,
+    apply_package, select_packages, PackageAction, RefinementPackage, RefinementPlan,
     ViolationAgeTracker, ViolationId,
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BoundMode {
+    Off,
+    Chain,
+    ChainCost,
+    ChainCostForced,
+}
+
+impl BoundMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Chain => "chain",
+            Self::ChainCost => "chain-cost",
+            Self::ChainCostForced => "chain-cost-forced",
+        }
+    }
+
+    fn uses_chain(self) -> bool {
+        self != Self::Off
+    }
+
+    fn uses_cost(self) -> bool {
+        matches!(self, Self::ChainCost | Self::ChainCostForced)
+    }
+
+    fn uses_forced_orders(self) -> bool {
+        self == Self::ChainCostForced
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct JournalSettings {
+    pub bound_mode: BoundMode,
+    /// `None` means that every detected package is applied.
+    pub refinement_budget: Option<usize>,
+    pub max_wait_iterations: usize,
+    /// A full scan is the safe default. The local scan remains available only
+    /// to reproduce earlier experimental runs.
+    pub full_scan: bool,
+    pub validate_before_return: bool,
+}
+
+impl Default for JournalSettings {
+    fn default() -> Self {
+        Self {
+            bound_mode: BoundMode::Off,
+            refinement_budget: None,
+            max_wait_iterations: 5,
+            full_scan: true,
+            validate_before_return: true,
+        }
+    }
+}
+
+fn output_journal_stats(
+    output_stats: &mut impl FnMut(String, serde_json::Value),
+    detected: usize,
+    selected: usize,
+    new_points: usize,
+    forced_orders: usize,
+) {
+    output_stats("refinement_detected_total".to_string(), detected.into());
+    output_stats("refinement_selected_total".to_string(), selected.into());
+    output_stats("refinement_new_points_total".to_string(), new_points.into());
+    output_stats("forced_orders_total".to_string(), forced_orders.into());
+}
+
+fn candidate_cost_if_valid(
+    problem: &Problem,
+    solution: &[Vec<i32>],
+    delay_cost_type: DelayCostType,
+) -> Option<i32> {
+    if solution.len() != problem.trains.len()
+        || solution
+            .iter()
+            .zip(&problem.trains)
+            .any(|(times, train)| times.len() != train.visits.len() + 1)
+    {
+        return None;
+    }
+    problem.verify_solution(solution, delay_cost_type)
+}
 
 pub fn solve<L: satcoder::Lit + Copy + std::fmt::Debug>(
     mk_env: impl Fn() -> grb::Env + Send + 'static,
@@ -31,12 +120,33 @@ pub fn solve<L: satcoder::Lit + Copy + std::fmt::Debug>(
     delay_cost_type: DelayCostType,
     output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
+    solve_with_settings(
+        mk_env,
+        solver,
+        problem,
+        timeout,
+        delay_cost_type,
+        JournalSettings::default(),
+        output_stats,
+    )
+}
+
+pub fn solve_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug>(
+    mk_env: impl Fn() -> grb::Env + Send + 'static,
+    solver: impl SatInstance<L> + SatSolverWithCore<Lit = L> + std::fmt::Debug,
+    problem: &Problem,
+    timeout: f64,
+    delay_cost_type: DelayCostType,
+    settings: JournalSettings,
+    output_stats: impl FnMut(String, serde_json::Value),
+) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
     solve_debug(
         mk_env,
         solver,
         problem,
         timeout,
         delay_cost_type,
+        settings,
         |_| {},
         output_stats,
     )
@@ -46,14 +156,15 @@ thread_local! { pub static  WATCH : std::cell::RefCell<Option<(usize,usize)>>  =
 
 use crate::{debug::DebugInfo, problem::DelayCostType, solvers::util::heuristic};
 
-use crate::solvers::SolverError;
 use super::shared::costtree::CostTree;
+use crate::solvers::SolverError;
 pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
     mk_env: impl Fn() -> grb::Env + Send + 'static,
     mut solver: impl SatInstance<L> + SatSolverWithCore<Lit = L> + std::fmt::Debug,
     problem: &Problem,
     timeout: f64,
     delay_cost_type: DelayCostType,
+    settings: JournalSettings,
     debug_out: impl Fn(DebugInfo),
     mut output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
@@ -71,7 +182,32 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
     let mut solver_time = std::time::Duration::ZERO;
     let mut stats = SolveStats::default();
 
+    output_stats(
+        "maxsat_rc2_bound_mode".to_string(),
+        settings.bound_mode.as_str().into(),
+    );
+    output_stats(
+        "maxsat_rc2_refinement_budget".to_string(),
+        settings
+            .refinement_budget
+            .map_or_else(|| "all".to_string(), |value| value.to_string())
+            .into(),
+    );
+    output_stats(
+        "maxsat_rc2_max_wait_iterations".to_string(),
+        settings.max_wait_iterations.into(),
+    );
+    output_stats(
+        "maxsat_rc2_full_scan".to_string(),
+        settings.full_scan.into(),
+    );
+    output_stats(
+        "maxsat_rc2_validate_before_return".to_string(),
+        settings.validate_before_return.into(),
+    );
+
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
+    let mut train_visit_ids: Vec<Vec<VisitId>> = Vec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
     let mut occupations: TiVec<VisitId, Occ<_>> = TiVec::new();
     let mut touched_intervals = Vec::new();
@@ -87,6 +223,25 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
     let mut n_timepoints = 0;
     let mut n_conflict_constraints = 0;
 
+    let raw_lb: Vec<Vec<i32>> = problem
+        .trains
+        .iter()
+        .map(|train| train.visits.iter().map(|visit| visit.earliest).collect())
+        .collect();
+    let mut eff_lb = if settings.bound_mode.uses_chain() {
+        chain_earliest(problem)
+    } else {
+        raw_lb
+    };
+    let mut eff_ub: Vec<Vec<i32>> = problem
+        .trains
+        .iter()
+        .map(|train| vec![i32::MAX; train.visits.len()])
+        .collect();
+    if settings.bound_mode.uses_chain() {
+        (eff_lb, eff_ub) = propagate_bounds(problem, eff_lb, eff_ub);
+    }
+
     for (a, b) in problem.conflicts.iter() {
         conflicts.entry(*a).or_default().push(*b);
         if *a != *b {
@@ -95,16 +250,18 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
     }
 
     for (train_idx, train) in problem.trains.iter().enumerate() {
+        train_visit_ids.push(Vec::with_capacity(train.visits.len()));
         for (visit_idx, visit) in train.visits.iter().enumerate() {
             let visit_id: VisitId = visits.push_and_get_key((train_idx, visit_idx));
+            train_visit_ids[train_idx].push(visit_id);
+            let initial_time = eff_lb[train_idx][visit_idx];
 
             occupations.push(Occ {
                 cost: vec![true.into()],
                 cost_tree: CostTree::new(),
-                delays: vec![(true.into(), visit.earliest), (false.into(), i32::MAX)],
+                delays: vec![(true.into(), initial_time), (false.into(), i32::MAX)],
                 incumbent_idx: 0,
             });
-            n_timepoints += 1;
 
             while resource_visits.len() <= visit.resource_id {
                 resource_visits.push(Vec::new());
@@ -112,22 +269,9 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
 
             resource_visits[visit.resource_id].push(visit_id);
             touched_intervals.push(visit_id);
-            new_time_points.push((visit_id, true.into(), visit.earliest));
+            new_time_points.push((visit_id, true.into(), initial_time));
         }
     }
-
-    // §4.4 / §4.6: khởi tạo bảng lower/upper bound.
-    // eff_lb[train][visit] = L_v (lan truyền earliest theo chain)
-    // eff_ub[train][visit] = U_v (ban đầu = i32::MAX, được siết sau khi có best_heur)
-    let mut eff_lb: Vec<Vec<i32>> = chain_earliest(problem);
-    let mut eff_ub: Vec<Vec<i32>> = problem
-        .trains
-        .iter()
-        .map(|t| vec![i32::MAX; t.visits.len()])
-        .collect();
-    // Lan truyền backward lần đầu (chưa có ub hữu ích, nhưng forward sẽ update eff_lb)
-    let (lb_init, _ub_init) = propagate_bounds(problem, eff_lb.clone(), eff_ub.clone());
-    eff_lb = lb_init;
 
     // The first iteration (0) does not need a solve call; we
     // know it's SAT because there are no constraints yet.
@@ -155,11 +299,11 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
     });
     let mut best_heur: Option<(i32, Vec<Vec<i32>>)> = None;
 
-    // §Cải tiến 2: tracks the first iteration each violation was seen (persists across DDD iterations).
     let mut age_tracker = ViolationAgeTracker::default();
-    // Budget for selective refinement. None = add all (baseline behaviour).
-    // Try Some(128) → Some(32) → Some(8) after verifying None gives identical results.
-    const REFINEMENT_BUDGET: Option<usize> = None;
+    let mut forced_orders: HashSet<ForcedOrder> = HashSet::new();
+    let mut refinement_detected_total = 0usize;
+    let mut refinement_selected_total = 0usize;
+    let mut refinement_new_points_total = 0usize;
 
     loop {
         if start_time.elapsed().as_secs_f64() > timeout {
@@ -177,6 +321,13 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                 total_cost,
                 ub,
             );
+            output_journal_stats(
+                &mut output_stats,
+                refinement_detected_total,
+                refinement_selected_total,
+                refinement_new_points_total,
+                forced_orders.len(),
+            );
             return Err(SolverError::Timeout);
         }
 
@@ -189,7 +340,15 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                 let _ = sol_tx.send(sol);
 
                 while let Ok((ub_cost, ub_sol)) = sol_rx.try_recv() {
-                    assert!(ub_cost >= total_cost as i32);
+                    let verified_cost = candidate_cost_if_valid(problem, &ub_sol, delay_cost_type);
+                    if verified_cost != Some(ub_cost) {
+                        output_stats("invalid_heuristic_solution".to_string(), true.into());
+                        continue;
+                    }
+                    if ub_cost < total_cost as i32 {
+                        output_stats("heuristic_below_lower_bound".to_string(), true.into());
+                        continue;
+                    }
                     if ub_cost == total_cost as i32 {
                         println!("HEURISTIC UB=LB");
                         println!("TERMINATE HEURISTIC");
@@ -208,6 +367,13 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                             total_cost,
                             ub_cost,
                         );
+                        output_journal_stats(
+                            &mut output_stats,
+                            refinement_detected_total,
+                            refinement_selected_total,
+                            refinement_new_points_total,
+                            forced_orders.len(),
+                        );
 
                         return Ok((ub_sol, stats));
                     }
@@ -215,86 +381,110 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                     if ub_cost < best_heur.as_ref().map(|(c, _)| *c).unwrap_or(i32::MAX) {
                         best_heur = Some((ub_cost, ub_sol));
 
-                        // §4.6: siết U_v bằng ngân sách chi phí mới.
-                        // Chỉ có tác dụng với Continuous / InfiniteSteps;
-                        // FiniteSteps được tighten_ub_from_cost tự bỏ qua.
-                        let new_ub = tighten_ub_from_cost(
-                            problem,
-                            delay_cost_type,
-                            &eff_lb,
-                            eff_ub.clone(),
-                            ub_cost,
-                        );
+                        if settings.bound_mode.uses_cost() {
+                            let tightened_ub = tighten_ub_from_cost(
+                                problem,
+                                delay_cost_type,
+                                &eff_lb,
+                                eff_ub.clone(),
+                                ub_cost,
+                            );
+                            let (mut updated_lb, mut updated_ub) = if settings
+                                .bound_mode
+                                .uses_forced_orders()
+                            {
+                                let mut previous_count = usize::MAX;
+                                let mut lb = eff_lb.clone();
+                                let mut ub = tightened_ub;
+                                while previous_count != forced_orders.len() {
+                                    previous_count = forced_orders.len();
+                                    let known: Vec<_> = forced_orders.iter().copied().collect();
+                                    (lb, ub) =
+                                        propagate_bounds_with_orders(problem, lb, ub, &known);
+                                    let (new_orders, infeasible) =
+                                        find_forced_orders(problem, &lb, &ub);
+                                    if infeasible {
+                                        return Err(SolverError::InvalidSolution(
+                                            "Cost bounds rejected both orders of a resource conflict"
+                                                .to_string(),
+                                        ));
+                                    }
+                                    forced_orders.extend(new_orders);
+                                }
+                                let known: Vec<_> = forced_orders.iter().copied().collect();
+                                propagate_bounds_with_orders(problem, lb, ub, &known)
+                            } else {
+                                propagate_bounds(problem, eff_lb.clone(), tightened_ub)
+                            };
 
-                        // §4.4: lan truyền backward — U_v mới ảnh hưởng đến U_{v-1}
-                        let (upd_lb, upd_ub) = propagate_bounds(problem, eff_lb.clone(), new_ub);
-                        eff_lb = upd_lb;
+                            if updated_lb
+                                .iter()
+                                .zip(&updated_ub)
+                                .any(|(lower, upper)| lower.iter().zip(upper).any(|(l, u)| l > u))
+                            {
+                                return Err(SolverError::InvalidSolution(
+                                    "Propagated lower bound is greater than upper bound"
+                                        .to_string(),
+                                ));
+                            }
 
-                        // Nếu ub tại visit nào đó giảm, thêm hard clause vào solver:
-                        // buộc d_v(upd_ub + 1) = FALSE, tức là t_v <= upd_ub.
-                        // Cách thực hiện: time_point(upd_ub + 1) rồi add_clause([!var]).
-                        for (ti, train) in problem.trains.iter().enumerate() {
-                            for vi in 0..train.visits.len() {
-                                let old_ub = eff_ub[ti][vi];
-                                let tightened = upd_ub[ti][vi];
-                                if tightened < old_ub && tightened < i32::MAX {
-                                    // Tính visit_id tương ứng
-                                    let vid: VisitId = (problem
-                                        .trains
-                                        .iter()
-                                        .take(ti)
-                                        .map(|t| t.visits.len())
-                                        .sum::<usize>()
-                                        + vi)
-                                        .into();
-                                    // Chỉ thêm sentinel nếu tightened+1 nằm trong khoảng hợp lệ
-                                    // (> earliest và < sentinel hiện tại i32::MAX)
-                                    let sentinel = tightened.saturating_add(1);
-                                    if sentinel > occupations[vid].delays[0].1
-                                        && sentinel < occupations[vid].delays.last().unwrap().1
-                                    {
-                                        let (ub_var, _) =
-                                            occupations[vid].time_point(&mut solver, sentinel);
-                                        // d_v(sentinel) = FALSE => t_v < sentinel => t_v <= tightened
-                                        SatInstance::add_clause(&mut solver, vec![!ub_var]);
+                            for (train_index, train) in problem.trains.iter().enumerate() {
+                                for visit_index in 0..train.visits.len() {
+                                    let old_ub = eff_ub[train_index][visit_index];
+                                    let tightened = updated_ub[train_index][visit_index];
+                                    if tightened < old_ub && tightened < i32::MAX {
+                                        let visit_id = train_visit_ids[train_index][visit_index];
+                                        let sentinel = tightened.saturating_add(1);
+                                        let first_time = occupations[visit_id].delays[0].1;
+                                        if sentinel <= first_time {
+                                            return Err(SolverError::InvalidSolution(format!(
+                                                "Upper bound {} is below lower bound {} for train {}, visit {}",
+                                                tightened, first_time, train_index, visit_index
+                                            )));
+                                        }
+                                        if sentinel < i32::MAX {
+                                            let (upper_lit, is_new) = occupations[visit_id]
+                                                .time_point(&mut solver, sentinel);
+                                            if is_new {
+                                                n_timepoints += 1;
+                                            }
+                                            SatInstance::add_clause(&mut solver, vec![!upper_lit]);
+                                        }
                                     }
                                 }
                             }
+                            eff_lb = std::mem::take(&mut updated_lb);
+                            eff_ub = std::mem::take(&mut updated_ub);
+                            println!("    UB_TIGHTEN best_cost={}", ub_cost);
                         }
-                        eff_ub = upd_ub;
-                        println!("    UB_TIGHTEN best_cost={}", ub_cost);
                     }
                 }
             }
 
             let mut found_travel_time_conflict = false;
             let mut found_resource_conflict = false;
-
-            // let mut touched_intervals = visits.keys().collect::<Vec<_>>();
-
-            // §Cải tiến 2 — Phase 1a: detect travel-time violations, collect packages.
-            // Solver is NOT modified here; time_point() will be called in the apply phase.
             let mut packages: Vec<RefinementPackage<L>> = Vec::new();
+            let mut active_violations = HashSet::new();
+            let scan_visits: Vec<VisitId> = if settings.full_scan {
+                visits.keys().collect()
+            } else {
+                touched_intervals.clone()
+            };
 
-            for visit_id in touched_intervals.iter().copied() {
+            // Travel-time constraints are scanned independently of resource
+            // conflicts. A visit can therefore never disappear merely because
+            // it did not have a resource conflict in the previous iteration.
+            for visit_id in scan_visits.iter().copied() {
                 let _p = hprof::enter("travel time check");
                 let (train_idx, visit_idx) = visits[visit_id];
-                let next_visit: Option<VisitId> =
-                    if visit_idx + 1 < problem.trains[train_idx].visits.len() {
-                        Some((usize::from(visit_id) + 1).into())
-                    } else {
-                        None
-                    };
-
                 let t1_in = occupations[visit_id].incumbent_time();
                 let visit = problem.trains[train_idx].visits[visit_idx];
-
-                if let Some(next_visit) = next_visit {
+                if visit_idx + 1 < problem.trains[train_idx].visits.len() {
+                    let next_visit = train_visit_ids[train_idx][visit_idx + 1];
                     let t1_out = occupations[next_visit].incumbent_time();
-
-                    if t1_in + visit.travel_time > t1_out {
+                    let required_time = t1_in.saturating_add(visit.travel_time);
+                    if required_time > t1_out {
                         found_travel_time_conflict = true;
-
                         debug_actions.push(SolverAction::TravelTimeConflict(ResourceInterval {
                             train_idx,
                             visit_idx,
@@ -302,158 +492,164 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                             time_in: t1_in,
                             time_out: t1_out,
                         }));
-
-                        // Capture the incumbent lit at detection time (safe: no solver mutation).
                         let t1_in_var =
                             occupations[visit_id].delays[occupations[visit_id].incumbent_idx].0;
-                        let new_t = t1_in + visit.travel_time;
-                        let vid = ViolationId::TravelTime(visit_id);
-                        let first_seen = age_tracker.record(vid.clone(), iteration);
+                        let violation = ViolationId::TravelTime {
+                            visit: visit_id,
+                            current_time: t1_in,
+                            required_time,
+                        };
+                        active_violations.insert(violation.clone());
+                        let first_seen = age_tracker.record(violation.clone(), iteration);
+                        let planned_points =
+                            if occupations[next_visit].has_time_point(required_time) {
+                                Vec::new()
+                            } else {
+                                vec![(next_visit, required_time)]
+                            };
                         packages.push(RefinementPackage {
-                            violation: vid,
-                            planned_points: vec![(next_visit, new_t)],
-                            first_seen,
-                            action: PackageAction::TravelTime { t1_in_var, next_visit, new_t },
+                            plan: RefinementPlan {
+                                violation,
+                                planned_points,
+                                first_seen,
+                            },
+                            action: PackageAction::TravelTime {
+                                t1_in_var,
+                                next_visit,
+                                new_t: required_time,
+                            },
                         });
                     }
                 }
             }
 
-            // println!("Solving conflicts in iteration {}", iteration);
+            // A forced order has the same implication shape as a travel-time
+            // constraint. It is refined at the current source time and will be
+            // checked again after the next SAT model is found.
+            for order in forced_orders.iter().copied() {
+                let (first_train, first_visit) = order.first;
+                let (second_train, second_visit) = order.second;
+                let (source_visit, offset) =
+                    if first_visit + 1 < problem.trains[first_train].visits.len() {
+                        (train_visit_ids[first_train][first_visit + 1], order.gap)
+                    } else {
+                        (
+                            train_visit_ids[first_train][first_visit],
+                            problem.trains[first_train].visits[first_visit]
+                                .travel_time
+                                .saturating_add(order.gap),
+                        )
+                    };
+                let target_visit = train_visit_ids[second_train][second_visit];
+                let source_time = occupations[source_visit].incumbent_time();
+                let target_time = occupations[target_visit].incumbent_time();
+                let required_time = source_time.saturating_add(offset);
+                if target_time < required_time {
+                    found_travel_time_conflict = true;
+                    let source_lit =
+                        occupations[source_visit].delays[occupations[source_visit].incumbent_idx].0;
+                    let violation = ViolationId::ForcedOrder {
+                        first: source_visit,
+                        second: target_visit,
+                        source_time,
+                        required_time,
+                    };
+                    active_violations.insert(violation.clone());
+                    let first_seen = age_tracker.record(violation.clone(), iteration);
+                    let planned_points = if occupations[target_visit].has_time_point(required_time)
+                    {
+                        Vec::new()
+                    } else {
+                        vec![(target_visit, required_time)]
+                    };
+                    packages.push(RefinementPackage {
+                        plan: RefinementPlan {
+                            violation,
+                            planned_points,
+                            first_seen,
+                        },
+                        action: PackageAction::Precedence {
+                            source_lit,
+                            target_visit,
+                            new_t: required_time,
+                        },
+                    });
+                }
+            }
 
-            // SOLVE ALL SIMPLE PRESEDENCES BEFORE CONFLICTS
-            // if !found_conflict {
-
-            let mut deconflicted_train_pairs: HashSet<(usize, usize)> = HashSet::new();
-            // for visit_id in touched_intervals.iter().copied() {
-
-            touched_intervals.retain(|visit_id| {
-                let visit_id = *visit_id;
-
+            let mut seen_resource_pairs = HashSet::new();
+            for visit_id in scan_visits.iter().copied() {
                 let _p = hprof::enter("conflict check");
                 let (train_idx, visit_idx) = visits[visit_id];
-                let next_visit: Option<VisitId> =
-                    if visit_idx + 1 < problem.trains[train_idx].visits.len() {
-                        Some((usize::from(visit_id) + 1).into())
-                    } else {
-                        None
-                    };
-
-                // GATHER INFORMATION ABOUT TWO CONSECUTIVE TIME POINTS
+                let next_visit = (visit_idx + 1 < problem.trains[train_idx].visits.len())
+                    .then(|| train_visit_ids[train_idx][visit_idx + 1]);
                 let t1_in = occupations[visit_id].incumbent_time();
                 let visit = problem.trains[train_idx].visits[visit_idx];
-
-                // RESOURCE CONFLICT
-                // println!("touchesd {:?}", usize::from(visit_id));
-
-                let mut retain = false;
-
                 if let Some(conflicting_resources) = conflicts.get(&visit.resource_id) {
                     for other_resource in conflicting_resources.iter().copied() {
-                        // println!(" other resource {:?}", other_resource);
                         let t1_out = next_visit
                             .map(|nx| occupations[nx].incumbent_time())
-                            .unwrap_or(t1_in + visit.travel_time);
-
-                        // Waiting in stations, but not in tracks (where conflicts occur).
-                        // assert!(t1_in + travel_time == t1_out);
-
-                        for other_visit in resource_visits[other_resource].iter().copied() {
-                            if usize::from(visit_id) == usize::from(other_visit) {
+                            .unwrap_or_else(|| t1_in.saturating_add(visit.travel_time));
+                        let Some(other_visits) = resource_visits.get(other_resource) else {
+                            continue;
+                        };
+                        for other_visit in other_visits.iter().copied() {
+                            let (other_train_idx, other_visit_idx) = visits[other_visit];
+                            if other_train_idx == train_idx {
                                 continue;
                             }
-
-                            let _v1 = &occupations[visit_id];
-                            let v2 = &occupations[other_visit];
-                            let t2_in = v2.incumbent_time();
-                            let (other_train_idx, other_visit_idx) = visits[other_visit];
-
-                            // We have a train2 that is conflicting.
-                            if other_train_idx == train_idx {
-                                continue; // Assume for now that the train doesn't conflict with itself.
-                            }
-
-                            let other_next_visit: Option<VisitId> = if other_visit_idx + 1
-                                < problem.trains[other_train_idx].visits.len()
-                            {
-                                Some((usize::from(other_visit) + 1).into())
+                            let pair = if usize::from(visit_id) < usize::from(other_visit) {
+                                (visit_id, other_visit)
                             } else {
-                                None
+                                (other_visit, visit_id)
                             };
-
+                            if !seen_resource_pairs.insert(pair) {
+                                continue;
+                            }
+                            let t2_in = occupations[other_visit].incumbent_time();
+                            let other_next_visit = (other_visit_idx + 1
+                                < problem.trains[other_train_idx].visits.len())
+                            .then(|| train_visit_ids[other_train_idx][other_visit_idx + 1]);
                             let t2_out = other_next_visit
                                 .map(|v| occupations[v].incumbent_time())
                                 .unwrap_or_else(|| {
-                                    let other_visit =
+                                    let other_visit_data =
                                         problem.trains[other_train_idx].visits[other_visit_idx];
-                                    t2_in + other_visit.travel_time
+                                    t2_in.saturating_add(other_visit_data.travel_time)
                                 });
-
-                            // let t2_earliest_out = t2_in
-                            //     + problem.trains[other_train_idx].visits[other_visit_idx].2;
-                            // let t1_earliest_out =
-                            //     t1_in + problem.trains[train_idx].visits[visit_idx].2;
-
-                            // They are not overlapping so not in conflict.
                             if t1_out <= t2_in || t2_out <= t1_in {
                                 continue;
                             }
-
-                            // let conflict_id_a = (visit_id, t1_out);
-                            // let conflict_id_b = (other_visit, t2_out);
-
-                            // if conflicts_added.contains(&(conflict_id_b, conflict_id_a)) {
-                            //     continue;
-                            // }
-
-                            // println!("Inserting {:?}", (conflict_id_a, conflict_id_b));
-                            // assert!(conflicts_added.insert((conflict_id_a, conflict_id_b)));
-
-                            // let t2_out = t2_earliest_out;
-                            // let t1_out = t1_earliest_out;
-                            // if t1_out <= t2_in || t2_out <= t1_in {
-                            //     panic!("kejks");
-                            // }
-
-                            if !deconflicted_train_pairs.insert((train_idx, other_train_idx))
-                                || !deconflicted_train_pairs.insert((other_train_idx, train_idx))
-                            {
-                                retain = true;
-                                continue;
-                            }
-
                             found_resource_conflict = true;
-                            stats.n_conflict += 1;
-
-                            // println!(
-                            //         " - RESOURCE conflict between t{}-v{}-r{}-in{}-out{} t{}-v{}-r{}-in{}-out{}",
-                            //         train_idx,
-                            //         visit_idx,
-                            //         problem.trains[train_idx].visits[visit_idx].0,
-                            //         t1_in,
-                            //         t1_out,
-                            //         other_train_idx,
-                            //         other_visit_idx,
-                            //         problem.trains[other_train_idx].visits[other_visit_idx].0,
-                            //         t2_in,
-                            //         t2_out,
-                            //     );
-
-                            // §Cải tiến 2 — Phase 1b: capture lits, build resource package.
-                            // Read-only: no time_point() or add_clause() here.
                             let t1_out_lit = next_visit
                                 .map(|v| occupations[v].delays[occupations[v].incumbent_idx].0)
                                 .unwrap_or_else(|| true.into());
                             let t2_out_lit = other_next_visit
                                 .map(|v| occupations[v].delays[occupations[v].incumbent_idx].0)
                                 .unwrap_or_else(|| true.into());
-
-                            let vid = ViolationId::resource(visit_id, other_visit);
-                            let first_seen = age_tracker.record(vid.clone(), iteration);
+                            let violation = ViolationId::resource(
+                                visit_id,
+                                t1_in,
+                                t1_out,
+                                other_visit,
+                                t2_in,
+                                t2_out,
+                            );
+                            active_violations.insert(violation.clone());
+                            let first_seen = age_tracker.record(violation.clone(), iteration);
+                            let mut planned_points = Vec::new();
+                            if !occupations[other_visit].has_time_point(t1_out) {
+                                planned_points.push((other_visit, t1_out));
+                            }
+                            if !occupations[visit_id].has_time_point(t2_out) {
+                                planned_points.push((visit_id, t2_out));
+                            }
                             packages.push(RefinementPackage {
-                                violation: vid,
-                                planned_points: vec![(other_visit, t1_out), (visit_id, t2_out)],
-                                first_seen,
+                                plan: RefinementPlan {
+                                    violation,
+                                    planned_points,
+                                    first_seen,
+                                },
                                 action: PackageAction::Resource {
                                     visit1: visit_id,
                                     visit2: other_visit,
@@ -466,37 +662,45 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                         }
                     }
                 }
+            }
 
-                retain
-            });
-
-            // §Cải tiến 2 — Phase 2: select packages, Phase 3: apply selected ones.
-            let selected_indices: HashSet<usize> =
-                select_packages(&packages, REFINEMENT_BUDGET).into_iter().collect();
+            age_tracker.retain_active(&active_violations);
+            let selected_indices: HashSet<usize> = select_packages(
+                &packages,
+                settings.refinement_budget,
+                iteration,
+                settings.max_wait_iterations,
+            )
+            .into_iter()
+            .collect();
+            refinement_detected_total += packages.len();
+            refinement_selected_total += selected_indices.len();
             println!(
-                "    REFINE it={} detected={} selected={}",
+                "    REFINE it={} detected={} selected={} budget={}",
                 iteration,
                 packages.len(),
-                selected_indices.len()
+                selected_indices.len(),
+                settings
+                    .refinement_budget
+                    .map_or_else(|| "all".to_string(), |value| value.to_string())
             );
             for (i, pkg) in packages.drain(..).enumerate() {
                 if selected_indices.contains(&i) {
-                    for tp in apply_package(
+                    let added = apply_package(
                         pkg,
                         &mut solver,
                         &mut occupations,
                         &mut n_conflict_constraints,
                         &mut stats.n_conflict,
                         &mut stats.n_travel,
-                    ) {
+                    );
+                    refinement_new_points_total += added.len();
+                    for tp in added {
                         new_time_points.push(tp);
                     }
                 }
             }
-
-            // touched_intervals.clear();
-            // assert!(touched_intervals.is_empty());
-            // }
+            touched_intervals.clear();
 
             let iterationtype = if found_travel_time_conflict && found_resource_conflict {
                 IterationType::TravelAndResourceConflict
@@ -527,62 +731,85 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                     panic!()
                 };
 
-                println!(
-                    "Finished with cost {} iterations {} solver {:?}",
-                    total_cost, iteration, solver
-                );
-                println!("Core size bins {:?}", core_sizes);
-                println!("Iteration types {:?}", iteration_types);
-                debug_out(DebugInfo {
-                    iteration,
-                    actions: std::mem::take(&mut debug_actions),
-                    solution: extract_solution(problem, &occupations),
-                });
+                let verified_cost = candidate_cost_if_valid(problem, &trains, delay_cost_type);
+                if settings.validate_before_return && verified_cost != Some(total_cost as i32) {
+                    output_stats(
+                        "candidate_verified_cost".to_string(),
+                        verified_cost.map_or(serde_json::Value::Null, Into::into),
+                    );
+                    if new_time_points.is_empty() {
+                        return Err(SolverError::InvalidSolution(format!(
+                            "Candidate verification returned {:?}, solver lower bound is {}",
+                            verified_cost, total_cost
+                        )));
+                    }
+                    // The initial or newly inserted time points still need
+                    // objective clauses. Register them below and solve again.
+                } else {
+                    println!(
+                        "Finished with cost {} iterations {} solver {:?}",
+                        total_cost, iteration, solver
+                    );
+                    println!("Core size bins {:?}", core_sizes);
+                    println!("Iteration types {:?}", iteration_types);
+                    debug_out(DebugInfo {
+                        iteration,
+                        actions: std::mem::take(&mut debug_actions),
+                        solution: extract_solution(problem, &occupations),
+                    });
 
-                stats.satsolver = format!("{:?}", solver);
+                    stats.satsolver = format!("{:?}", solver);
 
-                println!(
-                    "STATS {} {} {} {} {} {} {} {}",
-                    /* iter */ iteration,
-                    /* objective iters */
-                    iteration_types.get(&IterationType::Objective).unwrap_or(&0),
-                    /* travel iters */
-                    iteration_types
-                        .get(&IterationType::TravelTimeConflict)
-                        .unwrap_or(&0),
-                    /* resource iters */
-                    iteration_types
-                        .get(&IterationType::ResourceConflict)
-                        .unwrap_or(&0),
-                    /* both iters */
-                    iteration_types
-                        .get(&IterationType::TravelAndResourceConflict)
-                        .unwrap_or(&0),
-                    /* solution iters */
-                    iteration_types.get(&IterationType::Solution).unwrap_or(&0),
-                    /* num traveltime */ stats.n_travel,
-                    /* num conflicts */ stats.n_conflict,
-                );
+                    println!(
+                        "STATS {} {} {} {} {} {} {} {}",
+                        /* iter */ iteration,
+                        /* objective iters */
+                        iteration_types.get(&IterationType::Objective).unwrap_or(&0),
+                        /* travel iters */
+                        iteration_types
+                            .get(&IterationType::TravelTimeConflict)
+                            .unwrap_or(&0),
+                        /* resource iters */
+                        iteration_types
+                            .get(&IterationType::ResourceConflict)
+                            .unwrap_or(&0),
+                        /* both iters */
+                        iteration_types
+                            .get(&IterationType::TravelAndResourceConflict)
+                            .unwrap_or(&0),
+                        /* solution iters */
+                        iteration_types.get(&IterationType::Solution).unwrap_or(&0),
+                        /* num traveltime */ stats.n_travel,
+                        /* num conflicts */ stats.n_conflict,
+                    );
 
-                do_output_stats(
-                    &mut output_stats,
-                    iteration,
-                    &iteration_types,
-                    &stats,
-                    &occupations,
-                    start_time,
-                    solver_time,
-                    total_cost,
-                    total_cost,
-                );
+                    do_output_stats(
+                        &mut output_stats,
+                        iteration,
+                        &iteration_types,
+                        &stats,
+                        &occupations,
+                        start_time,
+                        solver_time,
+                        total_cost,
+                        total_cost,
+                    );
+                    output_journal_stats(
+                        &mut output_stats,
+                        refinement_detected_total,
+                        refinement_selected_total,
+                        refinement_new_points_total,
+                        forced_orders.len(),
+                    );
 
-                println!("VARSCLAUSES {:?}", solver);
+                    println!("VARSCLAUSES {:?}", solver);
 
-                println!(
-                    "MAXSAT ITERATIONS {}  {}",
-                    n_conflict_constraints, iteration
-                );
-                return Ok((trains, stats));
+                    println!(
+                        "MAXSAT ITERATIONS {}  {}",
+                        n_conflict_constraints, iteration
+                    );
+                    return Ok((trains, stats));
+                }
             }
         }
         enum Soft<L: satcoder::Lit> {
@@ -1053,6 +1280,13 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                     solver_time,
                     total_cost,
                     total_cost,
+                );
+                output_journal_stats(
+                    &mut output_stats,
+                    refinement_detected_total,
+                    refinement_selected_total,
+                    refinement_new_points_total,
+                    forced_orders.len(),
                 );
 
                 return Ok((best_heur.unwrap().1, stats));

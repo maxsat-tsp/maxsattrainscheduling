@@ -1,39 +1,40 @@
 #!/usr/bin/env bash
 # Kiểm thử cải tiến 1 (suy luận sớm) và cải tiến 2 (refinement có chọn lọc)
-# cho bài journal, dựa trên solver maxsat_rc2 (chưa có CLI riêng).
+# cho bài journal, dựa trên solver maxsat_rc2.
 #
 # ĐỌC TRƯỚC:
 #   maxsat_rc2 là solver mới cho bài journal, KHÁC hoàn toàn với:
 #     - maxsat_ddd_ladder     → Croella 2024 (baseline gốc)
 #     - maxsat_ddd_ladder_sc  → MaxSAT-Default của bài hội nghị
 #
-#   Để chạy được, sinh viên cần wire maxsat_rc2 vào main.rs trước.
-#   Xem hướng dẫn trong student_implementation_guide_vi.tex, Mục "Tích hợp".
-#
 # 4 cấu hình so sánh (tên đặt theo tài liệu hướng dẫn):
 #
 #   RC2-Base   — maxsat_rc2 không có cải tiến nào
-#                  const REFINEMENT_BUDGET = None (add-all)
-#                  KHÔNG gọi propagate_bounds()
+#                  --maxsat-rc2-bound-mode off
+#                  --maxsat-rc2-refinement-budget all
 #
-#   RC2+B      — + Cải tiến 1: suy luận sớm (propagate_bounds + tighten_ub)
-#                  const REFINEMENT_BUDGET = None
-#                  GỌI propagate_bounds()
+#   RC2+B      — + Cải tiến 1: suy luận cận và thứ tự bắt buộc
+#                  --maxsat-rc2-bound-mode chain-cost-forced
+#                  --maxsat-rc2-refinement-budget all
 #
 #   RC2+R      — + Cải tiến 2: refinement có chọn lọc
-#                  const REFINEMENT_BUDGET = Some(32)
-#                  KHÔNG gọi propagate_bounds()
+#                  --maxsat-rc2-bound-mode off
+#                  --maxsat-rc2-refinement-budget K
 #
 #   RC2+B+R    — kết hợp cả hai (mục tiêu cuối)
-#                  const REFINEMENT_BUDGET = Some(32)
-#                  GỌI propagate_bounds()
+#                  --maxsat-rc2-bound-mode chain-cost-forced
+#                  --maxsat-rc2-refinement-budget K
 #
 # Usage:
 #   bash test_improvements.sh RC2-Base
 #   bash test_improvements.sh RC2+B
 #   bash test_improvements.sh RC2+R
 #   bash test_improvements.sh RC2+B+R
-#   bash test_improvements.sh RC2+B+R 60     # timeout 60s
+#   bash test_improvements.sh RC2+B+R 60 128 # timeout 60s, K=128
+#   OUT_DIR=results/improvements/<thu_muc_cu> bash test_improvements.sh RC2+B+R 60 128
+#     → tiếp tục đúng chiến dịch cũ và dùng lại các instance đã có kết quả.
+#   RERUN_NON_OK=1 ...
+#     → vẫn dùng lại kết quả ok nhưng chạy lại timeout/panic của chiến dịch cũ.
 #
 # Kết quả lưu vào: results/improvements/<TIMESTAMP>-<cấu_hình>/
 
@@ -41,14 +42,13 @@ set -euo pipefail
 
 CONFIG="${1:-RC2-Base}"
 TIMEOUT_SECS="${2:-120}"
+REFINEMENT_BUDGET="${3:-128}"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
-OUT_DIR="results/improvements/${TIMESTAMP}-${CONFIG}"
+OUT_DIR="${OUT_DIR:-results/improvements/${TIMESTAMP}-${CONFIG}}"
 BIN="./target/release/ddd"
 RUN_SCRIPT="quick_scripts/run_all_txt_instances_limited.sh"
 CSV_BATCH="quick_scripts/analyze/json_to_csv_batch.py"
 
-# Solver CLI name cho maxsat_rc2 (sinh viên cần đặt tên này khi wire vào main.rs)
-# Đổi nếu sinh viên đặt tên khác trong main.rs
 SOLVER_NAME="${SOLVER_NAME:-maxsat_rc2}"
 
 # ── Kiểm tra ──────────────────────────────────────────────────────────────────
@@ -58,37 +58,26 @@ if [ ! -f "Cargo.toml" ]; then
     exit 1
 fi
 
-# ── Hướng dẫn đặt const ────────────────────────────────────────────────────────
-
 echo "================================================================"
 echo "KIỂM THỬ CẢI TIẾN JOURNAL: $CONFIG"
 echo "================================================================"
-echo ""
-echo "Const hiện tại trong src/solvers/ddd/maxsat_rc2.rs:"
-grep -n "REFINEMENT_BUDGET" src/solvers/ddd/maxsat_rc2.rs \
-    | grep "const" | sed 's/^/  /'
-echo ""
 
 case "$CONFIG" in
   "RC2-Base")
-    echo "Yêu cầu cho RC2-Base:"
-    echo "  - Dòng 162: const REFINEMENT_BUDGET: Option<usize> = None;"
-    echo "  - Dòng 129: TẮT propagate_bounds() (comment out hoặc xoá)"
+    BOUND_MODE="off"
+    EFFECTIVE_BUDGET="all"
     ;;
   "RC2+B")
-    echo "Yêu cầu cho RC2+B (Cải tiến 1 BẬT):"
-    echo "  - Dòng 162: const REFINEMENT_BUDGET: Option<usize> = None;"
-    echo "  - Dòng 129: BẬT propagate_bounds() (đang bật sẵn)"
+    BOUND_MODE="chain-cost-forced"
+    EFFECTIVE_BUDGET="all"
     ;;
   "RC2+R")
-    echo "Yêu cầu cho RC2+R (Cải tiến 2 BẬT):"
-    echo "  - Dòng 162: const REFINEMENT_BUDGET: Option<usize> = Some(32);"
-    echo "  - Dòng 129: TẮT propagate_bounds()"
+    BOUND_MODE="off"
+    EFFECTIVE_BUDGET="$REFINEMENT_BUDGET"
     ;;
   "RC2+B+R")
-    echo "Yêu cầu cho RC2+B+R (cả hai BẬT):"
-    echo "  - Dòng 162: const REFINEMENT_BUDGET: Option<usize> = Some(32);"
-    echo "  - Dòng 129: BẬT propagate_bounds() (đang bật sẵn)"
+    BOUND_MODE="chain-cost-forced"
+    EFFECTIVE_BUDGET="$REFINEMENT_BUDGET"
     ;;
   *)
     echo "Cấu hình không hợp lệ. Dùng: RC2-Base | RC2+B | RC2+R | RC2+B+R"
@@ -96,8 +85,10 @@ case "$CONFIG" in
     ;;
 esac
 
-echo ""
-read -rp "Đã đặt const đúng chưa? Nhấn Enter để tiếp tục, Ctrl+C để huỷ... "
+echo "  bound mode: $BOUND_MODE"
+echo "  refinement budget: $EFFECTIVE_BUDGET"
+echo "  full scan: true"
+echo "  validate before return: true"
 echo ""
 
 # ── Bước 1: Build ─────────────────────────────────────────────────────────────
@@ -111,6 +102,27 @@ echo "  OK: $BIN"
 echo ""
 
 mkdir -p "$OUT_DIR"
+
+config_file="$OUT_DIR/config.txt"
+expected_config_lines=(
+    "config=$CONFIG"
+    "bound_mode=$BOUND_MODE"
+    "refinement_budget=$EFFECTIVE_BUDGET"
+    "max_wait_iterations=${MAX_WAIT_ITERATIONS:-5}"
+    "timeout_seconds=$TIMEOUT_SECS"
+)
+if [[ -s "$config_file" ]]; then
+    for line in "${expected_config_lines[@]}"; do
+        if ! grep -Fqx "$line" "$config_file"; then
+            echo "ERROR: $config_file không khớp cấu hình cần chạy: $line" >&2
+            echo "Hãy dùng OUT_DIR mới hoặc chạy lại đúng cấu hình cũ." >&2
+            exit 2
+        fi
+    done
+    echo "Tiếp tục chiến dịch đã có tại $OUT_DIR"
+else
+    printf '%s\n' "${expected_config_lines[@]}" >"$config_file"
+fi
 
 # ── Bước 2: Chạy 3 objectives ─────────────────────────────────────────────────
 
@@ -137,8 +149,15 @@ for obj in "${OBJECTIVES[@]}"; do
     SOLVER="$SOLVER_NAME" \
     OBJECTIVE="$obj" \
     JSON_OUT="$json_out" \
+    RUN_LOG_DIR="${OUT_DIR}/${obj}.logs" \
     INSTANCE_TIMEOUT_SECS="$TIMEOUT_SECS" \
     RAM_LIMIT_KB="${RAM_LIMIT_KB:-15000000}" \
+    MAXSAT_RC2_BOUND_MODE="$BOUND_MODE" \
+    MAXSAT_RC2_REFINEMENT_BUDGET="$EFFECTIVE_BUDGET" \
+    MAXSAT_RC2_MAX_WAIT_ITERATIONS="${MAX_WAIT_ITERATIONS:-5}" \
+    MAXSAT_RC2_FULL_SCAN="true" \
+    MAXSAT_RC2_VALIDATE_BEFORE_RETURN="true" \
+    RERUN_NON_OK="${RERUN_NON_OK:-0}" \
     bash "$RUN_SCRIPT"
 
     t1=$(date +%s)

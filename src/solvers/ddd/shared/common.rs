@@ -1,26 +1,42 @@
 // src/solvers/ddd/common.rs
+use satcoder::{Bool, SatInstance};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     time::Instant,
 };
-use satcoder::{Bool, SatInstance};
 use typed_index_collections::TiVec;
 
+use super::costtree::CostTree;
 use crate::{
     debug::{ResourceInterval, SolverAction},
     problem::{DelayCostType, Problem},
 };
-use super::costtree::CostTree;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct VisitId(pub u32);
-impl From<VisitId> for usize { fn from(v: VisitId) -> Self { v.0 as usize } }
-impl From<usize> for VisitId { fn from(x: usize) -> Self { VisitId(x as u32) } }
+impl From<VisitId> for usize {
+    fn from(v: VisitId) -> Self {
+        v.0 as usize
+    }
+}
+impl From<usize> for VisitId {
+    fn from(x: usize) -> Self {
+        VisitId(x as u32)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ResourceId(pub u32);
-impl From<ResourceId> for usize { fn from(v: ResourceId) -> Self { v.0 as usize } }
-impl From<usize> for ResourceId { fn from(x: usize) -> Self { ResourceId(x as u32) } }
+impl From<ResourceId> for usize {
+    fn from(v: ResourceId) -> Self {
+        v.0 as usize
+    }
+}
+impl From<usize> for ResourceId {
+    fn from(x: usize) -> Self {
+        ResourceId(x as u32)
+    }
+}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum IterationType {
@@ -49,9 +65,17 @@ pub struct Occ<L: satcoder::Lit> {
 }
 
 impl<L: satcoder::Lit> Occ<L> {
-    pub fn incumbent_time(&self) -> i32 { self.delays[self.incumbent_idx].1 }
+    pub fn incumbent_time(&self) -> i32 {
+        self.delays[self.incumbent_idx].1
+    }
 
-pub fn time_point(&mut self, solver: &mut impl SatInstance<L>, t: i32) -> (Bool<L>, bool) {
+    pub fn has_time_point(&self, time: i32) -> bool {
+        self.delays
+            .binary_search_by_key(&time, |(_, existing)| *existing)
+            .is_ok()
+    }
+
+    pub fn time_point(&mut self, solver: &mut impl SatInstance<L>, t: i32) -> (Bool<L>, bool) {
         // The inserted time should be between the neighboring times.
         // assert!(idx == 0 || self.delays[idx - 1].1 < t);
         // assert!(idx == self.delays.len() || self.delays[idx + 1].1 > t);
@@ -95,12 +119,15 @@ pub fn time_point(&mut self, solver: &mut impl SatInstance<L>, t: i32) -> (Bool<
 }
 
 pub struct CostTerm<L: satcoder::Lit> {
-    pub var: Bool<L>,     // TRUE => pay weight
+    pub var: Bool<L>, // TRUE => pay weight
     pub weight: usize,
 }
 
 #[derive(Clone, Copy)]
-pub enum CostMode { Ladder, CostTree }
+pub enum CostMode {
+    Ladder,
+    CostTree,
+}
 
 pub struct DddState<L: satcoder::Lit> {
     pub visits: TiVec<VisitId, (usize, usize)>,

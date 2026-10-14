@@ -28,8 +28,8 @@ pub fn chain_earliest(problem: &Problem) -> Vec<Vec<i32>> {
         let mut train_bounds = Vec::with_capacity(train.visits.len());
         let mut propagated_lb: Option<i32> = None;
         for visit in &train.visits {
-            let lb = propagated_lb
-                .map_or(visit.earliest, |prev_lb: i32| prev_lb.max(visit.earliest));
+            let lb =
+                propagated_lb.map_or(visit.earliest, |prev_lb: i32| prev_lb.max(visit.earliest));
             train_bounds.push(lb);
             propagated_lb = Some(lb.saturating_add(visit.travel_time));
         }
@@ -105,7 +105,7 @@ pub fn propagate_bounds(
 /// In the DDD solver this translates to a hard clause:
 ///   `t_b >= e_a + gap`
 /// where `e_a = t_{s(a)}` (the start time of `a`'s successor).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ForcedOrder {
     /// (train_idx, visit_idx) of the visit that goes FIRST
     pub first: (usize, usize),
@@ -140,79 +140,121 @@ pub fn find_forced_orders(
     let mut forced = Vec::new();
     let mut infeasible = false;
 
-    for &(r1, r2) in &problem.conflicts {
-        // Iterate over all visit pairs that use these conflicting resources.
-        for (ti1, train1) in problem.trains.iter().enumerate() {
-            for (vi1, v1) in train1.visits.iter().enumerate() {
-                if v1.resource_id != r1 {
-                    continue;
-                }
-                // e_{v1} = t_{s(v1)} = lb of the NEXT visit (or lb+travel if last)
-                let exit_lb_v1 = if vi1 + 1 < train1.visits.len() {
-                    lb[ti1][vi1 + 1]
-                } else {
-                    lb[ti1][vi1].saturating_add(v1.travel_time)
-                };
+    let visits: Vec<_> = problem
+        .trains
+        .iter()
+        .enumerate()
+        .flat_map(|(train_index, train)| {
+            train
+                .visits
+                .iter()
+                .enumerate()
+                .map(move |(visit_index, visit)| (train_index, visit_index, visit))
+        })
+        .collect();
 
-                for (ti2, train2) in problem.trains.iter().enumerate() {
-                    for (vi2, v2) in train2.visits.iter().enumerate() {
-                        if (ti1, vi1) >= (ti2, vi2) {
-                            continue; // avoid double-counting
-                        }
-                        if v2.resource_id != r2 {
-                            continue;
-                        }
+    for left in 0..visits.len() {
+        let (ti1, vi1, v1) = visits[left];
+        for &(ti2, vi2, v2) in &visits[left + 1..] {
+            if ti1 == ti2 {
+                continue;
+            }
+            let resources_conflict = problem.conflicts.iter().any(|&(r1, r2)| {
+                (r1 == v1.resource_id && r2 == v2.resource_id)
+                    || (r1 == v2.resource_id && r2 == v1.resource_id)
+            });
+            if !resources_conflict {
+                continue;
+            }
 
-                        let exit_lb_v2 = if vi2 + 1 < train2.visits.len() {
-                            lb[ti2][vi2 + 1]
-                        } else {
-                            lb[ti2][vi2].saturating_add(v2.travel_time)
-                        };
+            let train1 = &problem.trains[ti1];
+            let train2 = &problem.trains[ti2];
+            let exit_lb_v1 = if vi1 + 1 < train1.visits.len() {
+                lb[ti1][vi1 + 1]
+            } else {
+                lb[ti1][vi1].saturating_add(v1.travel_time)
+            };
+            let exit_lb_v2 = if vi2 + 1 < train2.visits.len() {
+                lb[ti2][vi2 + 1]
+            } else {
+                lb[ti2][vi2].saturating_add(v2.travel_time)
+            };
 
-                        let ub_v1 = ub[ti1][vi1];
-                        let ub_v2 = ub[ti2][vi2];
-
-                        // gap = 0 (no additional safety headway in data)
-                        // Ordering v1 before v2: t_v2 >= e_v1
-                        // Impossible if exit_lb_v1 > ub_v2
-                        let v1_before_v2_impossible = exit_lb_v1 > ub_v2;
-
-                        // Ordering v2 before v1: t_v1 >= e_v2
-                        // Impossible if exit_lb_v2 > ub_v1
-                        let v2_before_v1_impossible = exit_lb_v2 > ub_v1;
-
-                        match (v1_before_v2_impossible, v2_before_v1_impossible) {
-                            (true, true) => {
-                                // Both orderings ruled out → infeasible in current bounds
-                                infeasible = true;
-                            }
-                            (true, false) => {
-                                // v2 must go first
-                                forced.push(ForcedOrder {
-                                    first: (ti2, vi2),
-                                    second: (ti1, vi1),
-                                    gap: 0,
-                                });
-                            }
-                            (false, true) => {
-                                // v1 must go first
-                                forced.push(ForcedOrder {
-                                    first: (ti1, vi1),
-                                    second: (ti2, vi2),
-                                    gap: 0,
-                                });
-                            }
-                            (false, false) => {
-                                // Both orderings still possible — nothing to do
-                            }
-                        }
-                    }
-                }
+            let v1_before_v2_impossible = exit_lb_v1 > ub[ti2][vi2];
+            let v2_before_v1_impossible = exit_lb_v2 > ub[ti1][vi1];
+            match (v1_before_v2_impossible, v2_before_v1_impossible) {
+                (true, true) => infeasible = true,
+                (true, false) => forced.push(ForcedOrder {
+                    first: (ti2, vi2),
+                    second: (ti1, vi1),
+                    gap: 0,
+                }),
+                (false, true) => forced.push(ForcedOrder {
+                    first: (ti1, vi1),
+                    second: (ti2, vi2),
+                    gap: 0,
+                }),
+                (false, false) => {}
             }
         }
     }
 
     (forced, infeasible)
+}
+
+/// Propagate train-chain constraints and already known forced orders to a
+/// fixed point. A forced order `a -> b` means that `b` starts no earlier than
+/// the exit of `a` plus the safety gap.
+pub fn propagate_bounds_with_orders(
+    problem: &Problem,
+    mut lb: Vec<Vec<i32>>,
+    mut ub: Vec<Vec<i32>>,
+    forced_orders: &[ForcedOrder],
+) -> (Vec<Vec<i32>>, Vec<Vec<i32>>) {
+    loop {
+        let (chain_lb, chain_ub) = propagate_bounds(problem, lb, ub);
+        lb = chain_lb;
+        ub = chain_ub;
+        let mut changed = false;
+
+        for order in forced_orders {
+            let (first_train, first_visit) = order.first;
+            let (second_train, second_visit) = order.second;
+            let first_route = &problem.trains[first_train];
+
+            if first_visit + 1 < first_route.visits.len() {
+                let exit_visit = first_visit + 1;
+                let new_second_lb = lb[first_train][exit_visit].saturating_add(order.gap);
+                if new_second_lb > lb[second_train][second_visit] {
+                    lb[second_train][second_visit] = new_second_lb;
+                    changed = true;
+                }
+                let new_exit_ub = ub[second_train][second_visit].saturating_sub(order.gap);
+                if new_exit_ub < ub[first_train][exit_visit] {
+                    ub[first_train][exit_visit] = new_exit_ub;
+                    changed = true;
+                }
+            } else {
+                let duration = first_route.visits[first_visit]
+                    .travel_time
+                    .saturating_add(order.gap);
+                let new_second_lb = lb[first_train][first_visit].saturating_add(duration);
+                if new_second_lb > lb[second_train][second_visit] {
+                    lb[second_train][second_visit] = new_second_lb;
+                    changed = true;
+                }
+                let new_first_ub = ub[second_train][second_visit].saturating_sub(duration);
+                if new_first_ub < ub[first_train][first_visit] {
+                    ub[first_train][first_visit] = new_first_ub;
+                    changed = true;
+                }
+            }
+        }
+
+        if !changed {
+            return (lb, ub);
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,9 +304,7 @@ pub fn tighten_ub_from_cost(
                 .visits
                 .iter()
                 .enumerate()
-                .map(|(vi, _)| {
-                    train.visit_delay_cost(delay_cost_type, vi, lb[ti][vi]) as i32
-                })
+                .map(|(vi, _)| train.visit_delay_cost(delay_cost_type, vi, lb[ti][vi]) as i32)
                 .collect()
         })
         .collect();
@@ -322,7 +362,12 @@ mod tests {
     use crate::problem::{DelayCostType, Problem, Train, Visit};
 
     fn make_visit(resource_id: usize, earliest: i32, aimed: i32, travel_time: i32) -> Visit {
-        Visit { resource_id, earliest, aimed: Some(aimed), travel_time }
+        Visit {
+            resource_id,
+            earliest,
+            aimed: Some(aimed),
+            travel_time,
+        }
     }
 
     /// Bài toán nhỏ T01: 1 tàu, 3 visit
@@ -333,9 +378,9 @@ mod tests {
             name: "T01".into(),
             trains: vec![Train {
                 visits: vec![
-                    make_visit(0, 10, 10, 5),  // v0: sớm nhất=10, chạy 5s
-                    make_visit(1,  8,  8, 3),  // v1: earliest=8 nhưng phải đợi v0
-                    make_visit(2, 20, 20, 0),  // v2: earliest=20
+                    make_visit(0, 10, 10, 5), // v0: sớm nhất=10, chạy 5s
+                    make_visit(1, 8, 8, 3),   // v1: earliest=8 nhưng phải đợi v0
+                    make_visit(2, 20, 20, 0), // v2: earliest=20
                 ],
             }],
             conflicts: vec![],
@@ -355,8 +400,12 @@ mod tests {
         let problem = Problem {
             name: "T03".into(),
             trains: vec![
-                Train { visits: vec![make_visit(0, 10, 10, 5)] },
-                Train { visits: vec![make_visit(0,  5,  5, 3)] },
+                Train {
+                    visits: vec![make_visit(0, 10, 10, 5)],
+                },
+                Train {
+                    visits: vec![make_visit(0, 5, 5, 3)],
+                },
             ],
             conflicts: vec![(0, 0)],
         };
@@ -368,8 +417,59 @@ mod tests {
         assert!(!infeasible, "bài toán vẫn khả thi");
         assert_eq!(forced.len(), 1, "phải có đúng 1 thứ tự bắt buộc");
         // B (train 1) phải đi trước A (train 0)
-        assert_eq!(forced[0].first,  (1, 0));
+        assert_eq!(forced[0].first, (1, 0));
         assert_eq!(forced[0].second, (0, 0));
+    }
+
+    #[test]
+    fn test_forced_order_detected_when_resource_pair_is_reversed() {
+        let problem = Problem {
+            name: "T04".into(),
+            trains: vec![
+                Train {
+                    visits: vec![make_visit(1, 10, 10, 5)],
+                },
+                Train {
+                    visits: vec![make_visit(0, 5, 5, 3)],
+                },
+            ],
+            conflicts: vec![(0, 1)],
+        };
+        let (forced, infeasible) =
+            find_forced_orders(&problem, &[vec![10], vec![5]], &[vec![20], vec![13]]);
+        assert!(!infeasible);
+        assert_eq!(forced.len(), 1);
+        assert_eq!(forced[0].first, (1, 0));
+        assert_eq!(forced[0].second, (0, 0));
+    }
+
+    #[test]
+    fn test_forced_order_propagates_both_bounds() {
+        let problem = Problem {
+            name: "T05".into(),
+            trains: vec![
+                Train {
+                    visits: vec![make_visit(0, 10, 10, 5)],
+                },
+                Train {
+                    visits: vec![make_visit(0, 0, 0, 3)],
+                },
+            ],
+            conflicts: vec![(0, 0)],
+        };
+        let order = ForcedOrder {
+            first: (0, 0),
+            second: (1, 0),
+            gap: 0,
+        };
+        let (lb, ub) = propagate_bounds_with_orders(
+            &problem,
+            vec![vec![10], vec![0]],
+            vec![vec![i32::MAX], vec![20]],
+            &[order],
+        );
+        assert_eq!(lb[1][0], 15);
+        assert_eq!(ub[0][0], 15);
     }
 
     /// T06: tighten_ub_from_cost với Continuous
@@ -378,8 +478,12 @@ mod tests {
         let problem = Problem {
             name: "T06".into(),
             trains: vec![
-                Train { visits: vec![make_visit(0, 100, 100, 0)] }, // tàu 0
-                Train { visits: vec![make_visit(1, 200, 200, 0)] }, // tàu 1
+                Train {
+                    visits: vec![make_visit(0, 100, 100, 0)],
+                }, // tàu 0
+                Train {
+                    visits: vec![make_visit(1, 200, 200, 0)],
+                }, // tàu 1
             ],
             conflicts: vec![],
         };
@@ -393,13 +497,7 @@ mod tests {
         let lb = vec![vec![100], vec![210]];
         let ub = vec![vec![i32::MAX], vec![i32::MAX]];
 
-        let ub2 = tighten_ub_from_cost(
-            &problem,
-            DelayCostType::Continuous,
-            &lb,
-            ub,
-            50,
-        );
+        let ub2 = tighten_ub_from_cost(&problem, DelayCostType::Continuous, &lb, ub, 50);
 
         assert_eq!(ub2[0][0], 140);
         assert_eq!(ub2[1][0], 250);

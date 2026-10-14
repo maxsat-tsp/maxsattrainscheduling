@@ -17,4 +17,5 @@ pub enum SolverError {
     GurobiError(grb::Error),
     Timeout,
     OutOfMemory,
+    InvalidSolution(String),
 }

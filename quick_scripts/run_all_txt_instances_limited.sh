@@ -9,6 +9,19 @@ INSTANCE_TIMEOUT_SECS="${INSTANCE_TIMEOUT_SECS:-130}"
 RAM_LIMIT_KB="${RAM_LIMIT_KB:-12000000}"
 KEEP_TMPDIR="${KEEP_TMPDIR:-0}"
 SATDDD_OBJECTIVE_ENCODING="${SATDDD_OBJECTIVE_ENCODING:-}"
+RUN_LOG_DIR="${RUN_LOG_DIR:-${JSON_OUT%.json}.logs}"
+MAXSAT_RC2_BOUND_MODE="${MAXSAT_RC2_BOUND_MODE:-}"
+MAXSAT_RC2_REFINEMENT_BUDGET="${MAXSAT_RC2_REFINEMENT_BUDGET:-}"
+MAXSAT_RC2_MAX_WAIT_ITERATIONS="${MAXSAT_RC2_MAX_WAIT_ITERATIONS:-}"
+MAXSAT_RC2_FULL_SCAN="${MAXSAT_RC2_FULL_SCAN:-}"
+MAXSAT_RC2_VALIDATE_BEFORE_RETURN="${MAXSAT_RC2_VALIDATE_BEFORE_RETURN:-}"
+RERUN_NON_OK="${RERUN_NON_OK:-0}"
+TIMEOUT_BIN="${TIMEOUT_BIN:-}"
+export RUST_BACKTRACE="${RUST_BACKTRACE:-1}"
+
+if [[ -z "$TIMEOUT_BIN" ]]; then
+  TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
+fi
 
 # `SatDddSettings` knobs forwarded to `--satddd-*` flags when set.
 # Empty value means "leave the binary's default in place".
@@ -30,6 +43,106 @@ MAXSATDDD_USE_TOUCHED_CLIQUE_AMO="${MAXSATDDD_USE_TOUCHED_CLIQUE_AMO:-}"
 tmpdir="$(mktemp -d /tmp/ddd-run-all.XXXXXX)"
 order_file="$tmpdir/order.txt"
 touch "$order_file"
+mkdir -p "$RUN_LOG_DIR"
+instance_json_dir="$RUN_LOG_DIR/instances"
+mkdir -p "$instance_json_dir"
+
+binary_sha256="unavailable"
+if command -v sha256sum >/dev/null 2>&1; then
+  binary_sha256="$(sha256sum "$BIN" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+  binary_sha256="$(shasum -a 256 "$BIN" | awk '{print $1}')"
+fi
+
+timeout_sha256="unavailable"
+if [[ -n "$TIMEOUT_BIN" && -f "$TIMEOUT_BIN" ]]; then
+  timeout_sha256="$(python3 - "$TIMEOUT_BIN" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)"
+fi
+
+script_sha256="$(python3 - "$0" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)"
+
+run_fingerprint="$(python3 - \
+  "$binary_sha256" "$script_sha256" "$SOLVER" "$OBJECTIVE" \
+  "$INSTANCE_TIMEOUT_SECS" "$RAM_LIMIT_KB" "${TIMEOUT_BIN:-unavailable}" "$timeout_sha256" \
+  "${MAXSAT_RC2_BOUND_MODE:-default}" \
+  "${MAXSAT_RC2_REFINEMENT_BUDGET:-default}" \
+  "${MAXSAT_RC2_MAX_WAIT_ITERATIONS:-default}" \
+  "${MAXSAT_RC2_FULL_SCAN:-default}" \
+  "${MAXSAT_RC2_VALIDATE_BEFORE_RETURN:-default}" \
+  "${SATDDD_OBJECTIVE_ENCODING:-default}" \
+  "${SATDDD_USE_PRECEDENCE_GRAPH:-default}" \
+  "${SATDDD_PREALLOC_COST_THRESHOLDS:-default}" \
+  "${SATDDD_SEED_PRECEDENCE_FROM_EARLIEST:-default}" \
+  "${SATDDD_SEED_RESOURCE_CONFLICTS:-default}" \
+  "${SATDDD_USE_SC_AMO:-default}" \
+  "${MAXSATDDD_USE_PRECEDENCE_GRAPH:-default}" \
+  "${MAXSATDDD_USE_SC_AMO:-default}" \
+  "${MAXSATDDD_USE_TOUCHED_CLIQUE_AMO:-default}" <<'PY'
+import hashlib
+import json
+import sys
+
+print(hashlib.sha256(json.dumps(sys.argv[1:], separators=(",", ":")).encode()).hexdigest())
+PY
+)"
+
+manifest="$RUN_LOG_DIR/manifest.txt"
+if [[ -s "$manifest" ]]; then
+  old_fingerprint="$(awk -F= '$1 == "run_fingerprint" {print $2; exit}' "$manifest")"
+  if [[ -z "$old_fingerprint" || "$old_fingerprint" != "$run_fingerprint" ]]; then
+    echo "ERROR: Không thể dùng lại $RUN_LOG_DIR vì cấu hình hoặc binary đã thay đổi." >&2
+    echo "Hãy dùng RUN_LOG_DIR mới, hoặc quay lại đúng binary và cấu hình cũ." >&2
+    exit 2
+  fi
+  printf 'resumed_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$manifest"
+else
+  {
+    printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'run_fingerprint=%s\n' "$run_fingerprint"
+    printf 'git_commit=%s\n' "$(git rev-parse HEAD 2>/dev/null || printf unavailable)"
+    printf 'git_dirty=%s\n' "$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    printf 'binary=%s\n' "$BIN"
+    printf 'binary_sha256=%s\n' "$binary_sha256"
+    printf 'run_script_sha256=%s\n' "$script_sha256"
+    printf 'solver=%s\n' "$SOLVER"
+    printf 'objective=%s\n' "$OBJECTIVE"
+    printf 'instance_timeout_seconds=%s\n' "$INSTANCE_TIMEOUT_SECS"
+    printf 'timeout_binary=%s\n' "${TIMEOUT_BIN:-unavailable}"
+    printf 'timeout_binary_sha256=%s\n' "$timeout_sha256"
+    printf 'ram_limit_kb=%s\n' "$RAM_LIMIT_KB"
+    printf 'maxsat_rc2_bound_mode=%s\n' "${MAXSAT_RC2_BOUND_MODE:-default}"
+    printf 'maxsat_rc2_refinement_budget=%s\n' "${MAXSAT_RC2_REFINEMENT_BUDGET:-default}"
+    printf 'maxsat_rc2_max_wait_iterations=%s\n' "${MAXSAT_RC2_MAX_WAIT_ITERATIONS:-default}"
+    printf 'maxsat_rc2_full_scan=%s\n' "${MAXSAT_RC2_FULL_SCAN:-default}"
+    printf 'maxsat_rc2_validate_before_return=%s\n' "${MAXSAT_RC2_VALIDATE_BEFORE_RETURN:-default}"
+    printf 'satddd_objective_encoding=%s\n' "${SATDDD_OBJECTIVE_ENCODING:-default}"
+    printf 'satddd_use_precedence_graph=%s\n' "${SATDDD_USE_PRECEDENCE_GRAPH:-default}"
+    printf 'satddd_prealloc_cost_thresholds=%s\n' "${SATDDD_PREALLOC_COST_THRESHOLDS:-default}"
+    printf 'satddd_seed_precedence_from_earliest=%s\n' "${SATDDD_SEED_PRECEDENCE_FROM_EARLIEST:-default}"
+    printf 'satddd_seed_resource_conflicts=%s\n' "${SATDDD_SEED_RESOURCE_CONFLICTS:-default}"
+    printf 'satddd_use_sc_amo=%s\n' "${SATDDD_USE_SC_AMO:-default}"
+    printf 'maxsatddd_use_precedence_graph=%s\n' "${MAXSATDDD_USE_PRECEDENCE_GRAPH:-default}"
+    printf 'maxsatddd_use_sc_amo=%s\n' "${MAXSATDDD_USE_SC_AMO:-default}"
+    printf 'maxsatddd_use_touched_clique_amo=%s\n' "${MAXSATDDD_USE_TOUCHED_CLIQUE_AMO:-default}"
+    printf 'rustc=%s\n' "$(rustc --version 2>/dev/null || printf unavailable)"
+    printf 'system=%s\n' "$(uname -a)"
+  } >"$manifest"
+  git diff --binary >"$RUN_LOG_DIR/source.diff" 2>/dev/null || true
+fi
 cleanup() {
   if [[ "$KEEP_TMPDIR" = "1" ]]; then
     echo "Preserved run artifacts in $tmpdir"
@@ -41,9 +154,9 @@ trap cleanup EXIT
 
 run_one() {
   local instance_name="$1"
-  local out_json="$tmpdir/$instance_name.json"
-  local stdout_log="$tmpdir/$instance_name.stdout.log"
-  local stderr_log="$tmpdir/$instance_name.stderr.log"
+  local out_json="$instance_json_dir/$instance_name.json"
+  local stdout_log="$RUN_LOG_DIR/$instance_name.stdout.log"
+  local stderr_log="$RUN_LOG_DIR/$instance_name.stderr.log"
   local -a extra_args=()
   local effective_solver="$SOLVER"
   local status=0
@@ -84,17 +197,59 @@ run_one() {
   if [[ -n "$MAXSATDDD_USE_TOUCHED_CLIQUE_AMO" ]]; then
     extra_args+=(--maxsat-ladder-sc-use-touched-clique-amo "$MAXSATDDD_USE_TOUCHED_CLIQUE_AMO")
   fi
+  if [[ -n "$MAXSAT_RC2_BOUND_MODE" ]]; then
+    extra_args+=(--maxsat-rc2-bound-mode "$MAXSAT_RC2_BOUND_MODE")
+  fi
+  if [[ -n "$MAXSAT_RC2_REFINEMENT_BUDGET" ]]; then
+    extra_args+=(--maxsat-rc2-refinement-budget "$MAXSAT_RC2_REFINEMENT_BUDGET")
+  fi
+  if [[ -n "$MAXSAT_RC2_MAX_WAIT_ITERATIONS" ]]; then
+    extra_args+=(--maxsat-rc2-max-wait-iterations "$MAXSAT_RC2_MAX_WAIT_ITERATIONS")
+  fi
+  if [[ -n "$MAXSAT_RC2_FULL_SCAN" ]]; then
+    extra_args+=(--maxsat-rc2-full-scan "$MAXSAT_RC2_FULL_SCAN")
+  fi
+  if [[ -n "$MAXSAT_RC2_VALIDATE_BEFORE_RETURN" ]]; then
+    extra_args+=(--maxsat-rc2-validate-before-return "$MAXSAT_RC2_VALIDATE_BEFORE_RETURN")
+  fi
+
+  printf '%s\n' "$instance_name" >> "$order_file"
+
+  if [[ -s "$out_json" ]] && python3 - "$out_json" "$instance_name" "$RERUN_NON_OK" <<'PY'
+import json
+import sys
+
+path, expected_name, rerun_non_ok = sys.argv[1:]
+try:
+    data = json.load(open(path))
+    item = data[0] if isinstance(data, list) and len(data) == 1 else data
+    solve = item["solves"][0]
+    valid = item.get("name") == expected_name and isinstance(solve.get("status"), str)
+    if rerun_non_ok == "1" and solve.get("status") != "ok":
+        valid = False
+except (OSError, ValueError, KeyError, IndexError, TypeError):
+    valid = False
+raise SystemExit(0 if valid else 1)
+PY
+  then
+    echo "Reusing $instance_name"
+    return 0
+  fi
 
   echo "Running $instance_name"
-  printf '%s\n' "$instance_name" >> "$order_file"
-  start_ms="$(date +%s%3N)"
+  if [[ -z "$TIMEOUT_BIN" ]]; then
+    echo "ERROR: Không tìm thấy timeout hoặc gtimeout trong PATH." >&2
+    echo "Cài GNU coreutils hoặc đặt TIMEOUT_BIN tới chương trình tương thích." >&2
+    exit 2
+  fi
+  start_ms="$(python3 -c 'import time; print(time.time_ns() // 1_000_000)')"
 
   (
     if [[ "$RAM_LIMIT_KB" -gt 0 ]]; then
       ulimit -Sv "$RAM_LIMIT_KB"
     fi
 
-    exec timeout -k 20 "${INSTANCE_TIMEOUT_SECS}s" \
+    exec "$TIMEOUT_BIN" -k 20 "${INSTANCE_TIMEOUT_SECS}s" \
       "$BIN" \
       -s "$effective_solver" \
       --txt-instances \
@@ -106,7 +261,7 @@ run_one() {
       >"$stdout_log" \
       2>"$stderr_log"
   ) || status=$?
-  end_ms="$(date +%s%3N)"
+  end_ms="$(python3 -c 'import time; print(time.time_ns() // 1_000_000)')"
   elapsed_ms=$((end_ms - start_ms))
   elapsed_seconds="$(awk "BEGIN { printf \"%.3f\", $elapsed_ms / 1000 }")"
 
@@ -160,7 +315,7 @@ for prefix in orig track station; do
   done
 done
 
-python3 - "$tmpdir" "$order_file" "$JSON_OUT" <<'PY'
+python3 - "$instance_json_dir" "$order_file" "$JSON_OUT" <<'PY'
 import json
 import sys
 from pathlib import Path

@@ -109,6 +109,26 @@ struct Opt {
     /// Objective encoding for `sat_ddd*` solvers: `scpb`, `totalizer`, or `bit_totalizer`.
     #[structopt(long)]
     satddd_objective_encoding: Option<String>,
+
+    /// Bounds for maxsat_rc2: off, chain, chain-cost, or chain-cost-forced.
+    #[structopt(long)]
+    maxsat_rc2_bound_mode: Option<String>,
+
+    /// Maximum new DDD time points per iteration, or "all".
+    #[structopt(long)]
+    maxsat_rc2_refinement_budget: Option<String>,
+
+    /// Force a waiting violation after this many iterations. Default: 5.
+    #[structopt(long)]
+    maxsat_rc2_max_wait_iterations: Option<usize>,
+
+    /// Scan every visit after each SAT model. Default: true.
+    #[structopt(long)]
+    maxsat_rc2_full_scan: Option<bool>,
+
+    /// Verify feasibility and cost before returning a solution. Default: true.
+    #[structopt(long)]
+    maxsat_rc2_validate_before_return: Option<bool>,
 }
 
 fn parse_delay_cost_type(value: &str) -> Option<DelayCostType> {
@@ -138,7 +158,34 @@ fn parse_delay_cost_type_or_panic(value: &str) -> DelayCostType {
     })
 }
 
-fn parse_sat_objective_encoding(value: &str) -> Option<ddd_solvers::incremental_sat::SatObjectiveEncoding> {
+fn parse_maxsat_rc2_bound_mode(value: &str) -> maxsat_rc2::BoundMode {
+    match value.to_ascii_lowercase().as_str() {
+        "off" => maxsat_rc2::BoundMode::Off,
+        "chain" => maxsat_rc2::BoundMode::Chain,
+        "chain-cost" => maxsat_rc2::BoundMode::ChainCost,
+        "chain-cost-forced" => maxsat_rc2::BoundMode::ChainCostForced,
+        _ => panic!(
+            "Unknown maxsat_rc2 bound mode '{}'. Supported: off, chain, chain-cost, chain-cost-forced",
+            value
+        ),
+    }
+}
+
+fn parse_refinement_budget(value: &str) -> Option<usize> {
+    match value.to_ascii_lowercase().as_str() {
+        "all" | "none" => None,
+        _ => Some(value.parse::<usize>().unwrap_or_else(|_| {
+            panic!(
+                "Invalid maxsat_rc2 refinement budget '{}'. Use all or a non-negative integer",
+                value
+            )
+        })),
+    }
+}
+
+fn parse_sat_objective_encoding(
+    value: &str,
+) -> Option<ddd_solvers::incremental_sat::SatObjectiveEncoding> {
     let key = value.to_ascii_lowercase();
     match key.as_str() {
         "scpb" | "nsc" => Some(ddd_solvers::incremental_sat::SatObjectiveEncoding::Scpb),
@@ -152,7 +199,9 @@ fn parse_sat_objective_encoding(value: &str) -> Option<ddd_solvers::incremental_
     }
 }
 
-fn parse_sat_objective_encoding_or_panic(value: &str) -> ddd_solvers::incremental_sat::SatObjectiveEncoding {
+fn parse_sat_objective_encoding_or_panic(
+    value: &str,
+) -> ddd_solvers::incremental_sat::SatObjectiveEncoding {
     parse_sat_objective_encoding(value).unwrap_or_else(|| {
         panic!(
             "Unknown SAT objective encoding '{}'. Supported: scpb, totalizer, bit_totalizer",
@@ -407,32 +456,40 @@ fn main() {
         .as_deref()
         .map(parse_delay_cost_type_or_panic);
 
+    let maxsat_rc2_settings = maxsat_rc2::JournalSettings {
+        bound_mode: opt
+            .maxsat_rc2_bound_mode
+            .as_deref()
+            .map(parse_maxsat_rc2_bound_mode)
+            .unwrap_or(maxsat_rc2::BoundMode::Off),
+        refinement_budget: opt
+            .maxsat_rc2_refinement_budget
+            .as_deref()
+            .map(parse_refinement_budget)
+            .unwrap_or(None),
+        max_wait_iterations: opt.maxsat_rc2_max_wait_iterations.unwrap_or(5),
+        full_scan: opt.maxsat_rc2_full_scan.unwrap_or(true),
+        validate_before_return: opt.maxsat_rc2_validate_before_return.unwrap_or(true),
+    };
+    println!("MaxsatRc2 settings {:?}", maxsat_rc2_settings);
+
     // Default config = Option B: precedence + touched-clique AMO + SC AMO,
     // with eager-chain-expansion and full interval-graph clique cover OFF.
     // Empirically best on this benchmark; can be overridden via the
     // matching --maxsat-ladder-sc-* flags.
     let maxsat_ladder_sc_settings = maxsat_ladder_sc::MaxSatDddLadderScSettings {
-        use_precedence_graph: opt
-            .maxsat_ladder_sc_use_precedence_graph
-            .unwrap_or(true),
+        use_precedence_graph: opt.maxsat_ladder_sc_use_precedence_graph.unwrap_or(true),
         use_eager_chain_expansion: opt
             .maxsat_ladder_sc_use_eager_chain_expansion
             .unwrap_or(false),
         use_sc_amo: opt.maxsat_ladder_sc_use_sc_amo.unwrap_or(true),
-        use_touched_clique_amo: opt
-            .maxsat_ladder_sc_use_touched_clique_amo
-            .unwrap_or(true),
-        seed_sc_from_earliest: opt
-            .maxsat_ladder_sc_seed_from_earliest
-            .unwrap_or(false),
+        use_touched_clique_amo: opt.maxsat_ladder_sc_use_touched_clique_amo.unwrap_or(true),
+        seed_sc_from_earliest: opt.maxsat_ladder_sc_seed_from_earliest.unwrap_or(false),
         prealloc_cost_thresholds: opt
             .maxsat_ladder_sc_prealloc_cost_thresholds
             .unwrap_or(false),
     };
-    println!(
-        "MaxSatDddLadderSc settings {:?}",
-        maxsat_ladder_sc_settings
-    );
+    println!("MaxSatDddLadderSc settings {:?}", maxsat_ladder_sc_settings);
 
     let satddd_objective_encoding = opt
         .satddd_objective_encoding
@@ -441,18 +498,10 @@ fn main() {
         .unwrap_or(ddd_solvers::incremental_sat::SatObjectiveEncoding::Scpb);
     println!("SatDdd objective encoding {:?}", satddd_objective_encoding);
     let satddd_settings = ddd_solvers::incremental_sat::SatDddSettings {
-        use_precedence_graph: opt
-            .satddd_use_precedence_graph
-            .unwrap_or(true),
-        prealloc_cost_thresholds: opt
-            .satddd_prealloc_cost_thresholds
-            .unwrap_or(false),
-        seed_precedence_from_earliest: opt
-            .satddd_seed_precedence_from_earliest
-            .unwrap_or(false),
-        seed_resource_conflicts: opt
-            .satddd_seed_resource_conflicts
-            .unwrap_or(false),
+        use_precedence_graph: opt.satddd_use_precedence_graph.unwrap_or(true),
+        prealloc_cost_thresholds: opt.satddd_prealloc_cost_thresholds.unwrap_or(false),
+        seed_precedence_from_earliest: opt.satddd_seed_precedence_from_earliest.unwrap_or(false),
+        seed_resource_conflicts: opt.satddd_seed_resource_conflicts.unwrap_or(false),
         use_sc_amo: opt.satddd_use_sc_amo.unwrap_or(true),
     };
     println!("SatDdd settings {:?}", satddd_settings);
@@ -531,8 +580,8 @@ fn main() {
             println!("Starting solver {:?}", solver);
             let mut solve_data = serde_json::Map::new();
 
-            solution =
-                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match solver {
+            solution = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                match solver {
                     SolverType::Cutting => unimplemented!(),
                     // ddd::solvers::cutting::solve_cutting(
                     //     &p.problem,
@@ -745,12 +794,13 @@ fn main() {
                         .map(|(v, _)| v)
                     }
                     SolverType::MaxsatRc2 => {
-                        maxsat_rc2::solve(
+                        maxsat_rc2::solve_with_settings(
                             &mk_env,
                             satcoder::solvers::minisat::Solver::new(),
                             &p.problem,
                             TIMEOUT,
                             delay_cost_type,
+                            maxsat_rc2_settings,
                             |k, v| {
                                 solve_data.insert(k, v);
                             },
@@ -1033,16 +1083,17 @@ fn main() {
                             },
                         )
                     }
-                })) {
-                    Ok(result) => result,
-                    Err(payload) => {
-                        if is_likely_oom_panic(payload.as_ref()) {
-                            Err(SolverError::OutOfMemory)
-                        } else {
-                            std::panic::resume_unwind(payload);
-                        }
+                }
+            })) {
+                Ok(result) => result,
+                Err(payload) => {
+                    if is_likely_oom_panic(payload.as_ref()) {
+                        Err(SolverError::OutOfMemory)
+                    } else {
+                        std::panic::resume_unwind(payload);
                     }
-                };
+                }
+            };
             hprof::end_frame();
             let sol_time = solve_wall_start.elapsed().as_secs_f64() * 1000.0;
             let solver_name = format!("{:?}", solver);
@@ -1057,12 +1108,16 @@ fn main() {
                     format!("{:?}", other_delay_cost_type).into(),
                 );
             }
+            if let Err(SolverError::InvalidSolution(message)) = solution.as_ref() {
+                solve_data.insert("validation_error".to_string(), message.clone().into());
+            }
             let solve_status = match solution.as_ref() {
                 Ok(_) => "ok",
                 Err(SolverError::NoSolution) => "no_solution",
                 Err(SolverError::Timeout) => "timeout",
                 Err(SolverError::OutOfMemory) => "oom",
                 Err(SolverError::GurobiError(_)) => "gurobi_error",
+                Err(SolverError::InvalidSolution(_)) => "invalid_solution",
             };
             solve_data.insert("status".to_string(), solve_status.into());
             solve_data.insert("sol_time".to_string(), sol_time.into());

@@ -36,7 +36,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn triển khai bản tạp chí}
-\fancyhead[R]{\small Phiên bản 4.0}
+\fancyhead[R]{\small Phiên bản 4.1}
 \fancyfoot[C]{\thepage}
 \hypersetup{
   pdftitle={Hướng dẫn triển khai và kiểm tra MaxSAT-DDD cho bản tạp chí},
@@ -67,7 +67,7 @@ Các công thức được giữ lại để sinh viên hiểu mình đang kiể
 công thức đều có giải thích bằng lời và chỉ ra vị trí tương ứng trong mã.
 
 \vfill
-{\normalsize Phiên bản 4.0, tháng 10 năm 2026\par}
+{\normalsize Phiên bản 4.1, tháng 10 năm 2026\par}
 \vspace{3mm}
 Mã nguồn: \file{maxsattrainscheduling/}.\par
 Bản thảo hội nghị: \file{manuscript/submission/main.tex}.
@@ -91,15 +91,25 @@ Mục tiêu trước mắt là trả lời hai câu hỏi:
       trong cùng giới hạn thời gian và bộ nhớ?
 \end{enumerate}
 
-Hãy làm theo đúng thứ tự sau:
+Trước mắt chỉ chạy một lần, nhưng phải chạy toàn bộ tập dữ liệu. Làm theo thứ
+tự sau:
 
 \begin{enumerate}
-\item Chạy kiểm thử nhỏ.
-\item So sánh \code{RC2-Base} với \code{RC2+B+R} ở chế độ thêm tất cả mốc.
-\item Chạy \code{RC2+B+R} với ngân sách 128 mốc.
-\item Chỉ sau khi ba bước trên đạt yêu cầu mới chạy đủ 72 instance.
+\item Chạy kiểm thử đơn vị và build đúng một binary \code{ddd}.
+\item Chạy đủ 72 instance cho cả bốn cấu hình, với ba hàm mục tiêu.
+\item Mỗi cặp cấu hình--hàm mục tiêu--instance chỉ chạy một lần.
 \item Phân tích số bài thành công, chi phí, thời gian và loại lỗi.
 \end{enumerate}
+
+Trên môi trường mới, phải checkout \code{salvers} đúng commit và áp dụng bản
+vá đi kèm repository theo README. Nếu bỏ bước này, bản clone sạch của
+\code{salvers} không có lớp tương thích mà mã hiện tại cần để build.
+
+Tập dữ liệu có 24 bài \code{original}, 24 bài \code{addtracktime} và 24 bài
+\code{addstationtime}. Do đó, lượt chạy mới có
+$72\times3\times4=864$ lần gọi solver. Baseline hội nghị đã có kết quả nên
+không chạy lại trong chiến dịch này; nhóm sẽ kiểm tra file baseline khi nhận
+được.
 
 Không triển khai chia sẻ AMO ở giai đoạn này. Phần đó làm thay đổi thêm một
 thành phần lớn của mô hình và sẽ làm khó việc xác định nguyên nhân nếu kết quả
@@ -147,7 +157,7 @@ Các kết quả tuần 5 được dùng lại cho ba việc:
 \begin{itemize}
 \item chọn 128 làm ngân sách chính và 32 làm ablation;
 \item dùng chi phí đã ghi làm mốc hồi quy khi kiểm tra mã mới;
-\item dùng danh sách panic và timeout để chọn các instance khó cho pilot.
+\item dùng danh sách panic và timeout để chẩn đoán nếu mã mới còn lỗi.
 \end{itemize}
 
 Không cần chạy lại các baseline của bài hội nghị nếu chỉ cần trích số đã công
@@ -155,6 +165,10 @@ bố. Không ghép thời gian chạy tuần 5 vào bảng hiệu năng của m�
 được sửa sau lần chạy đó. Các cấu hình mới vẫn phải chạy lại để đo thời gian,
 nhưng một chiến dịch bị ngắt có thể tiếp tục từ các instance đã hoàn tất như
 hướng dẫn ở Mục~\ref{sec:logging}.
+
+Khi nhận kết quả baseline, cần kiểm tra đủ 72 tên bài, ba hàm mục tiêu, timeout,
+commit, cấu hình máy và số luồng. Chỉ so sánh trực tiếp thời gian nếu điều kiện
+chạy đủ tương đương; các chi phí tối ưu vẫn có thể dùng làm mốc kiểm tra.
 
 \section{Bài toán và ký hiệu tối thiểu}
 \label{sec:model}
@@ -395,6 +409,8 @@ Không sửa hằng số trong mã nguồn giữa các lần chạy. Dùng các 
 \begin{tabularx}{\textwidth}{@{}p{61mm}X@{}}
 \toprule
 Tùy chọn & Ý nghĩa \\\midrule
+\code{--timeout-seconds} &
+  Giới hạn thời gian bên trong solver; dùng 120 trong chiến dịch chính. \\
 \code{--maxsat-rc2-bound-mode} &
   \code{off}, \code{chain}, \code{chain-cost}, hoặc
   \code{chain-cost-forced}. \\
@@ -421,26 +437,33 @@ Tên & Bound mode & Refinement budget \\\midrule
 \bottomrule
 \end{tabularx}
 
-Lệnh chạy một chiến dịch đầy đủ:
+Lệnh chạy một lượt đầy đủ cho cả bốn cấu hình:
 
 \begin{verbatim}
 cd maxsattrainscheduling
-bash test_improvements.sh RC2+B+R 120 128
+bash run_journal_once.sh 120 128
 \end{verbatim}
 
-Ba đối số lần lượt là tên cấu hình, timeout cho mỗi instance và ngân sách mốc.
-Script tự build, chạy ba hàm mục tiêu và lưu cấu hình vào thư mục kết quả.
+Hai đối số lần lượt là timeout nội bộ cho mỗi instance và ngân sách mốc.
+Script build đúng binary \code{ddd}, rồi chạy 72 instance, ba hàm mục tiêu và
+bốn cấu hình. Script cũng kiểm tra mỗi file tổng hợp có đúng 72 tên bài duy
+nhất.
 
-Nếu chiến dịch bị dừng, chạy lại với đúng thư mục cũ:
+Nếu chiến dịch bị dừng, lấy lại \code{RUN\_ID} đã lưu rồi chạy tiếp:
 
 \begin{verbatim}
-OUT_DIR=results/improvements/<thu_muc_cu> \
-  bash test_improvements.sh RC2+B+R 120 128
+RUN_ID=$(cat results/improvements/journal_once_run_id.txt)
+RUN_ID="$RUN_ID" bash run_journal_once.sh 120 128
 \end{verbatim}
 
-Script sẽ dùng lại JSON của các instance đã hoàn tất. Nếu muốn chạy lại riêng
-các dòng timeout hoặc lỗi, thêm \code{RERUN\_NON\_OK=1}. Không sao chép JSON
-từ một chiến dịch khác vào thư mục này.
+Script sẽ dùng lại mọi JSON đã hoàn tất, kể cả timeout và lỗi. Vì vậy việc tiếp
+tục không tạo lần lặp thứ hai. Không đặt \code{RERUN\_NON\_OK=1} trong chiến
+dịch một lượt này và không sao chép JSON từ chiến dịch khác vào thư mục kết quả.
+
+Timeout nội bộ là 120 giây. Lệnh giới hạn bên ngoài chờ thêm 20 giây để solver
+kịp ghi JSON hoặc bị dừng nếu thư viện con không trả quyền điều khiển. Khoảng
+20 giây này chỉ là thời gian bảo vệ, không được tính thành timeout 140 giây khi
+phân tích kết quả.
 
 \section{Log và khả năng chạy lại}
 \label{sec:logging}
@@ -451,7 +474,9 @@ Mỗi chiến dịch phải giữ các file sau:
 \item File JSON và CSV tổng hợp.
 \item \file{config.txt}: cấu hình ablation đã chọn.
 \item \file{manifest.txt}: commit, trạng thái mã nguồn, hash của binary,
-      phiên bản Rust, timeout và giới hạn RAM.
+      phiên bản Rust, Gurobi, CPU, RAM, timeout và giới hạn RAM của tiến trình.
+\item Commit và hash phần thay đổi của hai thư viện ngoài \code{salvers} và
+      \code{ipamir-rs}, cùng hash của \file{Cargo.lock}.
 \item \file{source.diff}: phần mã chưa commit tại thời điểm chạy.
 \item Một file stdout và một file stderr cho từng instance.
 \end{itemize}
@@ -520,19 +545,20 @@ và chi phí, không yêu cầu toàn bộ thời điểm giống nhau. Số vò
 có thể tăng hoặc giảm. Một phương pháp thêm ít mốc mỗi vòng thường cần nhiều
 vòng hơn; đây không phải lỗi nếu tổng thời gian tốt hơn và kết quả vẫn đúng.
 
-\subsection{Thứ tự chạy để tìm lỗi sớm}
+\subsection{Thứ tự chạy chiến dịch một lượt}
 
 \begin{enumerate}
-\item Chọn một instance nhỏ cho mỗi hàm mục tiêu.
-\item Chạy \code{RC2-Base} và \code{RC2+B} với budget \code{all}.
-\item Chạy \code{RC2+R} và \code{RC2+B+R} với $K=128$.
-\item So sánh trạng thái và chi phí.
-\item Nếu đúng, chạy 12 instance đại diện.
-\item Nếu vẫn đúng, mới chạy đủ 72 instance.
+\item Kiểm tra cây Git sạch và đúng commit đã chọn.
+\item Build bằng \code{Cargo.lock} với tùy chọn \code{--locked}.
+\item Chạy lần lượt \code{RC2-Base}, \code{RC2+B}, \code{RC2+R} và
+      \code{RC2+B+R}.
+\item Với mỗi cấu hình, chạy đủ 72 bài cho \code{finsteps123},
+      \code{infsteps180} và \code{cont}.
+\item Sau khi xong, kiểm tra trạng thái và chi phí giữa các cấu hình.
 \end{enumerate}
 
-Khi có lỗi, dừng chiến dịch và sửa instance lỗi đầu tiên. Không chạy tiếp để
-tạo thêm dữ liệu chưa đáng tin cậy.
+Nếu kết nối bị ngắt, chạy lại với cùng \code{RUN\_ID}. Không đổi binary, timeout
+hoặc cấu hình trong cùng một thư mục kết quả.
 
 \section{Cách đánh giá kết quả}
 \label{sec:evaluation}
@@ -572,18 +598,16 @@ bài thành công của mỗi cấu hình.
 \begin{longtable}{@{}p{16mm}p{69mm}p{67mm}@{}}
 \toprule
 Bước & Việc cần làm & Điều kiện hoàn thành \\\midrule\endhead
-1 & Chạy các kiểm thử đơn vị về cận và refinement. & Tất cả kiểm thử qua. \\
-2 & Chạy pilot với budget \code{all}. & \code{RC2-Base} và \code{RC2+B}
-    có chi phí tối ưu giống nhau trên tập bài chung. \\
-3 & Chạy pilot với $K=128$. & Không panic, không
-    \code{invalid\_solution}, mọi lịch \code{ok} đều hợp lệ. \\
-4 & Chạy đủ 72 instance cho bốn cấu hình. & Có JSON, CSV, manifest và log cho
+1 & Chạy các kiểm thử đơn vị và build bằng \code{--locked}. & Tất cả kiểm thử
+    qua và cây Git sạch. \\
+2 & Chạy đủ 72 instance cho bốn cấu hình, đúng một lần. & Có JSON, CSV,
+    manifest và log cho
     từng hàm mục tiêu. \\
-5 & Chạy thêm $K=32$ cho hai cấu hình có R. & Đủ dữ liệu để giải thích tác động
-    của ngân sách. \\
-6 & Phân tích kết quả. & Có bảng số bài thành công, trung vị trên tập chung,
+3 & Nhận và kiểm tra kết quả baseline hội nghị. & Xác định được phạm vi so sánh
+    thời gian và chi phí. \\
+4 & Phân tích kết quả. & Có bảng số bài thành công, trung vị trên tập chung,
     PAR-2 và bảng lỗi. \\
-7 & Cập nhật bản thảo tạp chí. & Mọi phát biểu trong bài có file kết quả hỗ trợ. \\
+5 & Cập nhật bản thảo tạp chí. & Mọi phát biểu trong bài có file kết quả hỗ trợ. \\
 \bottomrule
 \end{longtable}
 
@@ -606,12 +630,17 @@ File & Vai trò \\\midrule
 \pathref{src/solvers/ddd/shared/common.rs} &
   Kiểm tra một mốc đã có trong \code{Occ} hay chưa. \\
 \pathref{src/main.rs} &
-  Tùy chọn dòng lệnh và trạng thái \code{invalid\_solution}. \\
+  Tùy chọn dòng lệnh, timeout nội bộ và trạng thái \code{invalid\_solution}. \\
 \pathref{quick_scripts/}\newline
 \pathref{run_all_txt_instances_limited.sh} &
   Chuyển tùy chọn vào binary và giữ manifest, stdout, stderr. \\
 \pathref{test_improvements.sh} &
-  Chạy bốn cấu hình và tiếp tục an toàn từ các instance đã hoàn tất. \\
+  Chạy một cấu hình và tiếp tục an toàn từ các instance đã hoàn tất. \\
+\pathref{run_journal_once.sh} &
+  Chạy đủ bốn cấu hình trên toàn bộ dataset, đúng một lần. \\
+\pathref{external_patches/}\newline
+\pathref{salvers-rustsat-compat.patch} &
+  Làm cho dependency \code{salvers} có thể build lại đúng như môi trường phát triển. \\
 \pathref{manuscript/journal/reviews/}\newline
 \pathref{tuan5_doquangvinh_20261013/} &
   Bảng kiểm toán và checksum của 1.296 lượt chạy tuần 5. \\

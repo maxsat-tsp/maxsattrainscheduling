@@ -43,9 +43,10 @@ set -euo pipefail
 CONFIG="${1:-RC2-Base}"
 TIMEOUT_SECS="${2:-120}"
 REFINEMENT_BUDGET="${3:-128}"
+EXTERNAL_TIMEOUT_GRACE_SECS="${EXTERNAL_TIMEOUT_GRACE_SECS:-20}"
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
 OUT_DIR="${OUT_DIR:-results/improvements/${TIMESTAMP}-${CONFIG}}"
-BIN="./target/release/ddd"
+BIN="${BIN:-./target/release/ddd}"
 RUN_SCRIPT="quick_scripts/run_all_txt_instances_limited.sh"
 CSV_BATCH="quick_scripts/analyze/json_to_csv_batch.py"
 
@@ -94,9 +95,17 @@ echo ""
 # ── Bước 1: Build ─────────────────────────────────────────────────────────────
 
 echo "[1/3] Building..."
-if ! cargo build --release 2>&1; then
-    echo "ERROR: Build thất bại."
-    exit 1
+if [[ "${SKIP_BUILD:-0}" == "1" ]]; then
+    if [[ ! -x "$BIN" ]]; then
+        echo "ERROR: SKIP_BUILD=1 nhưng không tìm thấy $BIN" >&2
+        exit 1
+    fi
+    echo "  Dùng binary đã build: $BIN"
+else
+    if ! cargo build --release --locked --bin ddd 2>&1; then
+        echo "ERROR: Build thất bại."
+        exit 1
+    fi
 fi
 echo "  OK: $BIN"
 echo ""
@@ -110,6 +119,7 @@ expected_config_lines=(
     "refinement_budget=$EFFECTIVE_BUDGET"
     "max_wait_iterations=${MAX_WAIT_ITERATIONS:-5}"
     "timeout_seconds=$TIMEOUT_SECS"
+    "external_timeout_grace_seconds=$EXTERNAL_TIMEOUT_GRACE_SECS"
 )
 if [[ -s "$config_file" ]]; then
     for line in "${expected_config_lines[@]}"; do
@@ -151,6 +161,7 @@ for obj in "${OBJECTIVES[@]}"; do
     JSON_OUT="$json_out" \
     RUN_LOG_DIR="${OUT_DIR}/${obj}.logs" \
     INSTANCE_TIMEOUT_SECS="$TIMEOUT_SECS" \
+    EXTERNAL_TIMEOUT_GRACE_SECS="$EXTERNAL_TIMEOUT_GRACE_SECS" \
     RAM_LIMIT_KB="${RAM_LIMIT_KB:-15000000}" \
     MAXSAT_RC2_BOUND_MODE="$BOUND_MODE" \
     MAXSAT_RC2_REFINEMENT_BUDGET="$EFFECTIVE_BUDGET" \
@@ -165,9 +176,14 @@ for obj in "${OBJECTIVES[@]}"; do
     if python3 "$CSV_BATCH" "$json_out" --format compact --overwrite 2>/dev/null; then
         csv="${json_out%.json}.csv"
         n=$(( $(wc -l < "$csv") - 1 ))
+        if [[ "$n" -ne 72 ]]; then
+            echo "ERROR: $csv có $n dòng dữ liệu, cần đúng 72." >&2
+            exit 3
+        fi
         echo "  Done: $((t1 - t0))s | $n instances | $(basename "$csv")"
     else
-        echo "  WARNING: CSV conversion failed"
+        echo "ERROR: Không thể chuyển $json_out sang CSV." >&2
+        exit 3
     fi
     echo ""
 done

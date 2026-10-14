@@ -36,6 +36,17 @@ git clone https://github.com/marekpiotrow/uwrmaxsat.git
 git clone https://github.com/luteberget/ipamir-rs.git ipamir-rs
 ```
 
+Use the `salvers` revision and compatibility patch recorded by this project:
+
+```bash
+cd ~/projects/salvers
+git checkout ac2b30c2570361e1a6a5d63a7ed715505f0bb201
+git apply ../maxsattrainscheduling/external_patches/salvers-rustsat-compat.patch
+```
+
+The patch only exposes the RustSAT literal types through `satcoder`; it does
+not change the SAT algorithm used by `maxsat_rc2`.
+
 ### Step 2: Build External Solvers
 
 ```bash
@@ -84,7 +95,7 @@ rustflags = [
 
 ```bash
 cd ~/projects/maxsattrainscheduling
-cargo build --release
+cargo build --release --locked --bin ddd
 ```
 
 The compiled binary will be located at `target/release/ddd`.

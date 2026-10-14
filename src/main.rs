@@ -59,6 +59,10 @@ struct Opt {
     #[structopt(long)]
     json_output: Option<String>,
 
+    /// Solver time limit in seconds. Default: 120.
+    #[structopt(long)]
+    timeout_seconds: Option<f64>,
+
     /// Default true (lazy).
     #[structopt(long)]
     satddd_use_precedence_graph: Option<bool>,
@@ -379,7 +383,7 @@ enum SolverType {
     MaxsatRc2,
 }
 
-const TIMEOUT: f64 = 120.0;
+const DEFAULT_TIMEOUT_SECONDS: f64 = 120.0;
 
 fn mk_env() -> grb::Env {
     let mut env = grb::Env::new("").unwrap();
@@ -398,6 +402,11 @@ fn main() {
 
     let opt = Opt::from_args();
     println!("{:?}", opt);
+    let timeout = opt.timeout_seconds.unwrap_or(DEFAULT_TIMEOUT_SECONDS);
+    if !timeout.is_finite() || timeout <= 0.0 {
+        panic!("--timeout-seconds must be a finite number greater than zero");
+    }
+    println!("Using solver timeout {timeout} seconds");
     let solvers = opt
         .solvers
         .iter()
@@ -579,6 +588,7 @@ fn main() {
             hprof::start_frame();
             println!("Starting solver {:?}", solver);
             let mut solve_data = serde_json::Map::new();
+            solve_data.insert("timeout_seconds".to_string(), timeout.into());
 
             solution = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 match solver {
@@ -586,7 +596,7 @@ fn main() {
                     // ddd::solvers::cutting::solve_cutting(
                     //     &p.problem,
                     //     delay_cost_type,
-                    //     TIMEOUT,
+                    //     timeout,
                     //     &p.train_names,
                     //     &p.resource_names,
                     //     |k, v| {
@@ -618,7 +628,7 @@ fn main() {
                         &p.problem,
                         delay_cost_type,
                         false,
-                        TIMEOUT,
+                        timeout,
                         &p.train_names,
                         &p.resource_names,
                         |k, v| {
@@ -631,7 +641,7 @@ fn main() {
                         &p.problem,
                         delay_cost_type,
                         true,
-                        TIMEOUT,
+                        timeout,
                         &p.train_names,
                         &p.resource_names,
                         |k, v| {
@@ -644,7 +654,7 @@ fn main() {
                         &p.problem,
                         delay_cost_type,
                         true,
-                        TIMEOUT,
+                        timeout,
                         &p.train_names,
                         &p.resource_names,
                         |k, v| {
@@ -655,7 +665,7 @@ fn main() {
                         maxsatsolver::Incremental::new(),
                         get_env(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         |k, v| {
                             solve_data.insert(k, v);
@@ -667,7 +677,7 @@ fn main() {
                     SolverType::MipTi => milp_ti::solve(
                         get_env(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         |k, v| {
                             solve_data.insert(k, v);
@@ -680,7 +690,7 @@ fn main() {
                         || maxsatsolver::External::new(/* "./uwrmaxsat" */),
                         get_env(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         |k, v| {
                             solve_data.insert(k, v);
@@ -691,7 +701,7 @@ fn main() {
                         || maxsatsolver::Incremental::new(),
                         get_env(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         |k, v| {
                             solve_data.insert(k, v);
@@ -702,7 +712,7 @@ fn main() {
                         || maxsatsolver::Incremental::new(),
                         get_env(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         true,
                         |k, v| {
@@ -714,7 +724,7 @@ fn main() {
                         || maxsatsolver::Incremental::new(),
                         get_env(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         false,
                         |k, v| {
@@ -730,7 +740,7 @@ fn main() {
                         },
                         get_env(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         true,
                         |k, v| {
@@ -746,7 +756,7 @@ fn main() {
                         },
                         get_env(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         false,
                         |k, v| {
@@ -768,7 +778,7 @@ fn main() {
                                 satcoder::solvers::minisat::Solver::new(),
                             ),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             maxsat_ladder_sc_settings,
                             |k, v| {
@@ -785,7 +795,7 @@ fn main() {
                                 satcoder::solvers::minisat::Solver::new(),
                             ),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             |k, v| {
                                 solve_data.insert(k, v);
@@ -798,7 +808,7 @@ fn main() {
                             &mk_env,
                             satcoder::solvers::minisat::Solver::new(),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             maxsat_rc2_settings,
                             |k, v| {
@@ -813,7 +823,7 @@ fn main() {
                             satcoder::solvers::minisat::Solver::new(),
                         ),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         |k, v| {
                             solve_data.insert(k, v);
@@ -824,7 +834,7 @@ fn main() {
                         &mk_env,
                         maxsatsolver::Incremental::new(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         |k, v| {
                             solve_data.insert(k, v);
@@ -833,9 +843,9 @@ fn main() {
                     .map(|(v, _)| v),
                     SolverType::MaxSatDddCadical => maxsat_ladder::solve(
                         &mk_env,
-                        satcoder::solvers::minisat::Solver::new(),
+                        satcoder::solvers::rustsat_glucose::Solver::new(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         |k, v| {
                             solve_data.insert(k, v);
@@ -844,9 +854,9 @@ fn main() {
                     .map(|(v, _)| v),
                     SolverType::SatDdd => ddd_solvers::incremental_sat::solve_with_encoding_and_settings(
                         &mk_env,
-                        satcoder::solvers::rustsat_glucose::Solver::new(),
+                        satcoder::solvers::minisat::Solver::new(),
                         &p.problem,
-                        TIMEOUT,
+                        timeout,
                         delay_cost_type,
                         satddd_objective_encoding,
                         satddd_settings,
@@ -864,7 +874,7 @@ fn main() {
                             &mk_env,
                             satcoder::solvers::rustsat_glucose::Solver::new(),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             satddd_objective_encoding,
                             satddd_settings,
@@ -879,7 +889,7 @@ fn main() {
                             &mk_env,
                             satcoder::solvers::rustsat_glucose::Solver::new(),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             satddd_objective_encoding,
                             satddd_settings,
@@ -894,7 +904,7 @@ fn main() {
                             &mk_env,
                             satcoder::solvers::rustsat_glucose::Solver::new(),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             ddd_solvers::incremental_sat::SatObjectiveEncoding::IncrementalTotalizer,
                             satddd_settings,
@@ -909,7 +919,7 @@ fn main() {
                             &mk_env,
                             satcoder::solvers::rustsat_glucose::Solver::new(),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             satddd_objective_encoding,
                             satddd_settings,
@@ -928,7 +938,7 @@ fn main() {
                             &mk_env,
                             satcoder::solvers::rustsat_glucose::Solver::new(),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             satddd_objective_encoding,
                             satddd_settings,
@@ -973,7 +983,7 @@ fn main() {
                             &mk_env,
                             satcoder::solvers::rustsat_glucose::Solver::new(),
                             &p.problem,
-                            TIMEOUT,
+                            timeout,
                             delay_cost_type,
                             pure_encoding,
                             pure_settings,
@@ -988,7 +998,7 @@ fn main() {
                         get_env(),
                         &p.problem,
                         delay_cost_type,
-                        TIMEOUT,
+                        timeout,
                         |k, v| {
                             solve_data.insert(k, v);
                         },
@@ -1000,7 +1010,7 @@ fn main() {
                             delay_cost_type,
                             false,
                             10,
-                            TIMEOUT,
+                            timeout,
                             &p.train_names,
                             &p.resource_names,
                             |k, v| {
@@ -1015,7 +1025,7 @@ fn main() {
                             delay_cost_type,
                             false,
                             30,
-                            TIMEOUT,
+                            timeout,
                             &p.train_names,
                             &p.resource_names,
                             |k, v| {
@@ -1030,7 +1040,7 @@ fn main() {
                             delay_cost_type,
                             false,
                             60,
-                            TIMEOUT,
+                            timeout,
                             &p.train_names,
                             &p.resource_names,
                             |k, v| {
@@ -1045,7 +1055,7 @@ fn main() {
                             delay_cost_type,
                             true,
                             10,
-                            TIMEOUT,
+                            timeout,
                             &p.train_names,
                             &p.resource_names,
                             |k, v| {
@@ -1060,7 +1070,7 @@ fn main() {
                             delay_cost_type,
                             true,
                             30,
-                            TIMEOUT,
+                            timeout,
                             &p.train_names,
                             &p.resource_names,
                             |k, v| {
@@ -1075,7 +1085,7 @@ fn main() {
                             delay_cost_type,
                             true,
                             60,
-                            TIMEOUT,
+                            timeout,
                             &p.train_names,
                             &p.resource_names,
                             |k, v| {

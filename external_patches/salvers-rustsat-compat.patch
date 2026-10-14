@@ -1,0 +1,55 @@
+diff --git a/satcoder/Cargo.toml b/satcoder/Cargo.toml
+index 07ad4d1..1a102e5 100644
+--- a/satcoder/Cargo.toml
++++ b/satcoder/Cargo.toml
+@@ -7,6 +7,7 @@ edition = "2018"
+ [features]
+ solver_minisat = ["minisat"]
+ solver_cadical = ["cadical"]
++solver_rustsat_glucose = ["solver_minisat", "rustsat"]
+ default = ["solver_minisat", "solver_cadical"]
+ 
+ [dependencies]
+@@ -15,5 +16,4 @@ minisat = { git = "https://github.com/luteberget/minisat-rs.git", rev = "2639613
+ cadical = { version = "0.1", optional = true }
+ dpllt = { path = "../dpllt" }
+ itertools = { version = "0.10" }
+-
+-
++rustsat = { version = "0.7.5", optional = true }
+diff --git a/satcoder/src/solvers/mod.rs b/satcoder/src/solvers/mod.rs
+index ad0e453..0f32a9a 100644
+--- a/satcoder/src/solvers/mod.rs
++++ b/satcoder/src/solvers/mod.rs
+@@ -5,6 +5,31 @@
+ #[cfg(feature = "minisat")]
+ pub mod minisat;
+ 
++// Compatibility alias used by maxsattrainscheduling. Its SAT-DDD routines
++// create their native RustSAT solver internally; the generic argument is not
++// used. Keeping the alias here lets the workspace type-check with upstream
++// salvers.
++#[cfg(feature = "solver_rustsat_glucose")]
++pub mod rustsat_glucose {
++    pub use super::minisat::Solver;
++}
++
++#[cfg(feature = "solver_rustsat_glucose")]
++impl crate::Var for ::rustsat::types::Var {}
++
++#[cfg(feature = "solver_rustsat_glucose")]
++impl crate::Lit for ::rustsat::types::Lit {
++    type Var = ::rustsat::types::Var;
++
++    fn into_var(self) -> (Self::Var, bool) {
++        (self.var(), self.is_neg())
++    }
++
++    fn from_var_sign(variable: Self::Var, sign: bool) -> Self {
++        variable.lit(sign)
++    }
++}
++
+ #[cfg(feature = "cadical")]
+ pub mod cadical;
+ 

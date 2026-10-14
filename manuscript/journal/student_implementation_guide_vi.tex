@@ -36,7 +36,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn triển khai bản tạp chí}
-\fancyhead[R]{\small Phiên bản 4.1}
+\fancyhead[R]{\small Phiên bản 4.2}
 \fancyfoot[C]{\thepage}
 \hypersetup{
   pdftitle={Hướng dẫn triển khai và kiểm tra MaxSAT-DDD cho bản tạp chí},
@@ -60,14 +60,14 @@
 
 Tài liệu này mô tả đúng phiên bản mã hiện tại. Hai phần chính đã được đưa vào
 solver \code{maxsat\_rc2}: suy luận cận thời gian và refinement có giới hạn.
-Việc còn lại của sinh viên là kiểm tra tính đúng, chạy lại thí nghiệm và phân
-tích kết quả.
+Việc còn lại của sinh viên là thống nhất quy tắc kiểm tra nghiệm, bổ sung các
+kiểm thử còn thiếu, chạy thí nghiệm và phân tích kết quả.
 
 Các công thức được giữ lại để sinh viên hiểu mình đang kiểm tra điều gì. Mỗi
 công thức đều có giải thích bằng lời và chỉ ra vị trí tương ứng trong mã.
 
 \vfill
-{\normalsize Phiên bản 4.1, tháng 10 năm 2026\par}
+{\normalsize Phiên bản 4.2, tháng 10 năm 2026\par}
 \vspace{3mm}
 Mã nguồn: \file{maxsattrainscheduling/}.\par
 Bản thảo hội nghị: \file{manuscript/submission/main.tex}.
@@ -95,7 +95,9 @@ Trước mắt chỉ chạy một lần, nhưng phải chạy toàn bộ tập d
 tự sau:
 
 \begin{enumerate}
-\item Chạy kiểm thử đơn vị và build đúng một binary \code{ddd}.
+\item Thống nhất quy tắc kiểm tra thời điểm sớm nhất và chồng lấn tài nguyên.
+\item Bổ sung kiểm thử biên, rồi build đúng một binary \code{ddd}.
+\item Chạy thử một instance cho cả bốn cấu hình và kiểm tra JSON.
 \item Chạy đủ 72 instance cho cả bốn cấu hình, với ba hàm mục tiêu.
 \item Mỗi cặp cấu hình--hàm mục tiêu--instance chỉ chạy một lần.
 \item Phân tích số bài thành công, chi phí, thời gian và loại lỗi.
@@ -205,6 +207,12 @@ F(t) &= \sum_v c_v\!\left(\max(0,t_v-a_v)\right),
 Ở đây $e_v$ là thời điểm tàu rời tài nguyên của hoạt động $v$. Nếu $v$ chưa
 phải hoạt động cuối thì $e_v=t_{s(v)}$. Nếu $v$ là hoạt động cuối thì
 $e_v=t_v+p_v$.
+
+Theo các ràng buộc đang dùng trong DDD và MILP, thời gian là số nguyên và hai
+khoảng chiếm dụng không chồng nhau khi $e_v\leq t_w$ hoặc $e_w\leq t_v$. Tài
+liệu này gọi đó là \emph{quy tắc chính xác}. Nếu nhóm muốn cho phép một dung sai,
+dung sai đó phải xuất hiện giống nhau trong mô hình toán, solver và bộ kiểm tra
+nghiệm.
 
 \section{DDD và cách biểu diễn một mốc}
 \label{sec:ddd}
@@ -387,7 +395,28 @@ Mọi lịch từ heuristic phải được kiểm tra bằng
 \code{Problem::verify\_solution()} trước khi dùng làm cận trên. Chi phí do
 heuristic báo phải bằng chi phí được tính lại.
 
-Trước khi solver trả một lịch cuối, nó kiểm tra lại:
+\textbf{Điểm phải xử lý trước khi chạy chính.} Mã hiện tại của
+\code{verify\_solution()} cho phép $t_v$ sớm hơn \code{earliest} tối đa 10 giây
+và cho phép hai khoảng chiếm dụng chồng nhau 1 giây. Trong khi đó, DDD và MILP
+dùng quy tắc chính xác ở Mục~\ref{sec:model}. Vì vậy chưa được xem việc
+\code{verify\_solution()} trả về thành công là bằng chứng đầy đủ cho tính hợp lệ
+theo mô hình chính xác.
+
+Nhóm phải chọn một trong hai cách và ghi quyết định vào commit chạy thực nghiệm:
+
+\begin{enumerate}
+\item Nếu mô hình không có dung sai, sửa \code{verify\_solution()} để yêu cầu
+      $t_v\geq\code{earliest}$ và $e_v\leq t_w$ hoặc $e_w\leq t_v$.
+\item Nếu dung sai 10 giây và 1 giây là quy ước của benchmark, giữ chúng nhưng
+      phải áp dụng cùng quy tắc trong mọi solver và mô tả trong bản thảo.
+\end{enumerate}
+
+Không chỉ xóa hai hằng số rồi chạy ngay. Trước hết phải thêm kiểm thử tại đúng
+biên, kiểm tra lại một số nghiệm baseline và xác nhận chi phí không thay đổi
+ngoài dự kiến.
+
+Sau khi quy tắc trên đã được thống nhất, trước khi solver trả một lịch cuối, nó
+phải kiểm tra lại:
 
 \begin{enumerate}
 \item Đủ số tàu và đủ số thời điểm cho từng tàu.
@@ -449,6 +478,11 @@ Script build đúng binary \code{ddd}, rồi chạy 72 instance, ba hàm mục t
 bốn cấu hình. Script cũng kiểm tra mỗi file tổng hợp có đúng 72 tên bài duy
 nhất.
 
+Điều kiện đúng 72 bài là hàng rào bảo vệ của chiến dịch submission. Không đổi
+nó thành một biến tùy ý để chạy subset. Khi cần gỡ lỗi nhanh, gọi binary trực
+tiếp với \code{--instance-name-exact} như hướng dẫn ở
+Mục~\ref{sec:smoke-test}.
+
 Nếu chiến dịch bị dừng, lấy lại \code{RUN\_ID} đã lưu rồi chạy tiếp:
 
 \begin{verbatim}
@@ -501,6 +535,14 @@ Các trường thống kê mới trong JSON gồm:
 \item các giá trị cấu hình \code{maxsat\_rc2\_*}.
 \end{itemize}
 
+Có trường trong JSON chưa đủ; trước khi phân tích, script phải đối chiếu giá trị
+thực tế với cấu hình đang chạy. Với kết quả do solver ghi, cần kiểm tra
+\code{maxsat\_rc2\_bound\_mode}, \code{maxsat\_rc2\_refinement\_budget},
+\code{maxsat\_rc2\_full\_scan},
+\code{maxsat\_rc2\_validate\_before\_return} và \code{timeout\_seconds}. Bản
+ghi do timeout ngoài tạo ra được nhận biết bằng \code{external\_status} và không
+có đủ các trường nội bộ này.
+
 \section{Kiểm thử bắt buộc}
 \label{sec:tests}
 
@@ -519,12 +561,49 @@ Các kiểm thử hiện có kiểm tra:
 \item vẫn chọn được một gói khi ngân sách bằng 0.
 \end{itemize}
 
+Trước khi khóa commit chạy thực nghiệm, phải bổ sung các trường hợp sau:
+
+\begin{itemize}
+\item cả hai thứ tự của một cặp xung đột đều bất khả thi;
+\item hoạt động có \code{aimed=None} không bị siết cận trên từ chi phí;
+\item siết cận cho \code{infsteps180};
+\item nhiều thứ tự bắt buộc được lan truyền qua nhiều tàu;
+\item đúng biên \code{earliest} và đúng biên tiếp xúc tài nguyên theo quyết định
+      ở Mục~\ref{sec:validation}.
+\end{itemize}
+
 Trên máy đã cài Gurobi và các thư viện ngoài, chạy:
 
 \begin{verbatim}
 cargo test -p ddd --lib refinement::tests
 cargo test -p ddd --lib precedence::tests
 \end{verbatim}
+
+\subsection{Chạy thử trước chiến dịch}
+\label{sec:smoke-test}
+
+Sau khi các kiểm thử đơn vị đạt, chạy một instance ngắn cho từng cấu hình. Có
+thể dùng \code{origA1}, \code{finsteps123} và timeout 120 giây. Ví dụ với cấu
+hình kết hợp:
+
+\begin{verbatim}
+./target/release/ddd \
+  -s maxsat_rc2 --txt-instances \
+  --instance-name-filter origA1 --instance-name-exact \
+  --objective finsteps123 --timeout-seconds 120 \
+  --maxsat-rc2-bound-mode chain-cost-forced \
+  --maxsat-rc2-refinement-budget 128 \
+  --maxsat-rc2-max-wait-iterations 5 \
+  --maxsat-rc2-full-scan true \
+  --maxsat-rc2-validate-before-return true \
+  --json-output smoke-RC2-B-R.json
+\end{verbatim}
+
+Lặp lại với ba hàng còn lại trong bảng cấu hình ở Mục~\ref{sec:cli}. Mỗi file
+phải có đúng một instance và một kết quả solver. Nếu \code{status=ok}, chi phí
+phải được tính lại thành công. Đồng thời kiểm tra các trường
+\code{maxsat\_rc2\_*} đúng với cấu hình vừa chạy. Chỉ bắt đầu 864 lượt khi cả
+bốn smoke test đạt.
 
 \subsection{Kiểm tra hồi quy trên 72 instance}
 
@@ -548,8 +627,11 @@ vòng hơn; đây không phải lỗi nếu tổng thời gian tốt hơn và k�
 \subsection{Thứ tự chạy chiến dịch một lượt}
 
 \begin{enumerate}
+\item Xác nhận quy tắc kiểm tra nghiệm đã được thống nhất và có kiểm thử biên.
 \item Kiểm tra cây Git sạch và đúng commit đã chọn.
 \item Build bằng \code{Cargo.lock} với tùy chọn \code{--locked}.
+\item Chạy smoke test lần lượt cho \code{RC2-Base}, \code{RC2+B}, \code{RC2+R}
+      và \code{RC2+B+R}; kiểm tra cả trạng thái và trường cấu hình trong JSON.
 \item Chạy lần lượt \code{RC2-Base}, \code{RC2+B}, \code{RC2+R} và
       \code{RC2+B+R}.
 \item Với mỗi cấu hình, chạy đủ 72 bài cho \code{finsteps123},
@@ -598,16 +680,17 @@ bài thành công của mỗi cấu hình.
 \begin{longtable}{@{}p{16mm}p{69mm}p{67mm}@{}}
 \toprule
 Bước & Việc cần làm & Điều kiện hoàn thành \\\midrule\endhead
-1 & Chạy các kiểm thử đơn vị và build bằng \code{--locked}. & Tất cả kiểm thử
-    qua và cây Git sạch. \\
-2 & Chạy đủ 72 instance cho bốn cấu hình, đúng một lần. & Có JSON, CSV,
-    manifest và log cho
-    từng hàm mục tiêu. \\
-3 & Nhận và kiểm tra kết quả baseline hội nghị. & Xác định được phạm vi so sánh
+1 & Thống nhất quy tắc kiểm tra nghiệm. & Validator, solver và mô hình toán dùng
+    cùng điều kiện tại biên. \\
+2 & Bổ sung kiểm thử và kiểm tra cấu hình JSON. & Các trường hợp biên đạt; bốn
+    smoke test có đúng cấu hình. \\
+3 & Build bằng \code{--locked}, khóa commit và chạy đủ 72 instance cho bốn cấu
+    hình, đúng một lần. & Có JSON, CSV, manifest và log cho từng hàm mục tiêu. \\
+4 & Nhận và kiểm tra kết quả baseline hội nghị. & Xác định được phạm vi so sánh
     thời gian và chi phí. \\
-4 & Phân tích kết quả. & Có bảng số bài thành công, trung vị trên tập chung,
+5 & Phân tích kết quả. & Có bảng số bài thành công, trung vị trên tập chung,
     PAR-2 và bảng lỗi. \\
-5 & Cập nhật bản thảo tạp chí. & Mọi phát biểu trong bài có file kết quả hỗ trợ. \\
+6 & Cập nhật bản thảo tạp chí. & Mọi phát biểu trong bài có file kết quả hỗ trợ. \\
 \bottomrule
 \end{longtable}
 
@@ -658,7 +741,6 @@ cp student_implementation_guide_vi.pdf ../../output/pdf/
 
 Trên Overleaf, chọn XeLaTeX.
 
-\clearpage
 \begin{thebibliography}{9}
 \bibitem{croella}
 A.~L. Croella, B.~Luteberget, C.~Mannino và P.~Ventura.

@@ -1,15 +1,17 @@
-# Bản thảo cho *Computers & Operations Research*
+# Khung nghiên cứu cho *Computers & Operations Research*
 
-Thư mục này chứa bản LaTeX đã chuyển từ bài hội nghị sang mẫu của Elsevier dành
-cho *Computers & Operations Research* (COR).
+Thư mục này chứa mẫu Elsevier và khung làm việc cho một bài COR có đóng góp mới.
+Nội dung của bài hội nghị đã được loại khỏi `main.tex` để tránh tạo một bản thảo
+trùng lặp trước khi câu hỏi nghiên cứu mới được chốt.
 
-## Tệp dùng để nộp
+## Tệp làm việc
 
-- `main.tex`: bản thảo chính.
+- `outline_brainstorm_vi.md`: dàn ý nghiên cứu, đối chiếu cấu trúc các bài liên
+  quan và tiêu chí go/no-go. Đây là tệp cần đọc trước.
+- `main.tex`: skeleton LaTeX bám theo dàn ý; chưa phải bản thảo để nộp.
 - `references.bib`: dữ liệu tài liệu tham khảo.
 - `elsarticle.cls`: lớp LaTeX chính thức của Elsevier.
 - `elsarticle-harv.bst`: kiểu tài liệu tham khảo Harvard mà COR sử dụng.
-- `highlights.txt`: bốn điểm nổi bật, mỗi dòng không quá 85 ký tự.
 - `elsarticle-template-harv.tex`: mẫu Harvard trong gói chính thức để đối chiếu.
 
 Các tệp được đặt cùng một cấp vì hệ thống nộp bài của Elsevier xử lý gói nguồn
@@ -31,24 +33,14 @@ latexmk -C main.tex
 
 ## Trạng thái nội dung
 
-`main.tex` hiện chứa đầy đủ nội dung và kết quả của bản hội nghị đã được chấp
-nhận. Việc chuyển mẫu không thay đổi số liệu, kết luận hoặc phạm vi thực nghiệm.
-Bản này biên dịch được và có thể dùng ngay làm nền để viết bài tạp chí, nhưng
-chưa nên nộp như một bài báo mới vì chưa thể hiện đủ phần mở rộng so với bài hội
-nghị.
+`main.tex` chỉ chứa tiêu đề làm việc, front matter và các heading dự kiến. Tóm
+tắt, highlights và mọi phát biểu kết quả đều để trống cho đến khi phương pháp mới
+qua tiêu chí go/no-go trong `outline_brainstorm_vi.md`.
 
-Trước khi nộp COR, cần cập nhật các phần sau sau khi có kết quả thực nghiệm mới:
-
-1. Thay tiêu đề, tóm tắt và danh sách đóng góp để phản ánh đúng phương pháp mở
-   rộng đã được kiểm chứng.
-2. Bổ sung phương pháp tinh chỉnh có chọn lọc, lập luận về tính đúng đắn và độ
-   phức tạp.
-3. Bổ sung thực nghiệm mới, phân tích độ nhạy và so sánh công bằng với bản hội
-   nghị. Các bảng hiện tại chỉ chứa kết quả đã công bố ở hội nghị.
-4. Thêm đoạn nói rõ quan hệ với bài hội nghị và trích dẫn bài đó khi thông tin
-   xuất bản chính thức đã có.
-5. Kiểm tra lại CRediT, nguồn tài trợ, xung đột lợi ích và tuyên bố sử dụng công
-   cụ AI theo thông tin do các tác giả xác nhận.
+Bài hội nghị được xem là prior work của chính nhóm: phải trích dẫn và mô tả rõ
+trong manuscript/cover letter, nhưng không chuyển nguyên văn hoặc dùng lại kết
+quả cũ như đóng góp chính. Baseline hội nghị chỉ được đưa vào bảng sau khi đã
+truy nguyên đúng binary, commit, cấu hình và tiêu chí kiểm tra nghiệm.
 
 ## Nguồn mẫu
 

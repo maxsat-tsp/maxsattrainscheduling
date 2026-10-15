@@ -117,6 +117,32 @@ git_dependency_diff_sha256() {
     'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())'
 }
 
+git_dependency_state_sha256() {
+  if ! git -C "$1" rev-parse --git-dir >/dev/null 2>&1; then
+    printf unavailable
+    return
+  fi
+  python3 - "$1" <<'PY'
+import hashlib
+import pathlib
+import subprocess
+import sys
+
+root = pathlib.Path(sys.argv[1])
+digest = hashlib.sha256()
+digest.update(subprocess.check_output(["git", "-C", str(root), "diff", "--binary"]))
+untracked = subprocess.check_output(
+    ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "-z"]
+).split(b"\0")
+for raw_name in sorted(name for name in untracked if name):
+    digest.update(raw_name)
+    digest.update(b"\0")
+    digest.update((root / raw_name.decode()).read_bytes())
+    digest.update(b"\0")
+print(digest.hexdigest())
+PY
+}
+
 git_dependency_dirty_count() {
   if ! git -C "$1" rev-parse --git-dir >/dev/null 2>&1; then
     printf unavailable
@@ -127,9 +153,11 @@ git_dependency_dirty_count() {
 
 salvers_commit="$(git_dependency_commit ../salvers)"
 salvers_diff_sha256="$(git_dependency_diff_sha256 ../salvers)"
+salvers_state_sha256="$(git_dependency_state_sha256 ../salvers)"
 salvers_dirty_count="$(git_dependency_dirty_count ../salvers)"
 ipamir_commit="$(git_dependency_commit ../ipamir-rs)"
 ipamir_diff_sha256="$(git_dependency_diff_sha256 ../ipamir-rs)"
+ipamir_state_sha256="$(git_dependency_state_sha256 ../ipamir-rs)"
 ipamir_dirty_count="$(git_dependency_dirty_count ../ipamir-rs)"
 cargo_lock_sha256="$(python3 - <<'PY'
 import hashlib
@@ -139,6 +167,33 @@ path = Path("Cargo.lock")
 print(hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else "unavailable")
 PY
 )"
+
+read -r dataset_file_count dataset_sha256 < <(python3 - <<'PY'
+import hashlib
+from pathlib import Path
+
+paths = [
+    directory / f"Instance{line}{number}.txt"
+    for directory in (
+        Path("instances/original"),
+        Path("instances/addtracktime"),
+        Path("instances/addstationtime"),
+    )
+    for line in ("A", "B")
+    for number in range(1, 13)
+]
+missing = [str(path) for path in paths if not path.is_file()]
+if missing:
+    raise SystemExit(f"ERROR: Thiếu file dữ liệu: {missing}")
+digest = hashlib.sha256()
+for path in paths:
+    digest.update(path.as_posix().encode())
+    digest.update(b"\0")
+    digest.update(path.read_bytes())
+    digest.update(b"\0")
+print(len(paths), digest.hexdigest())
+PY
+)
 
 run_fingerprint="$(python3 - \
   "$binary_sha256" "$script_sha256" "$SOLVER" "$OBJECTIVE" \
@@ -159,8 +214,9 @@ run_fingerprint="$(python3 - \
   "${MAXSATDDD_USE_SC_AMO:-default}" \
   "${MAXSATDDD_USE_TOUCHED_CLIQUE_AMO:-default}" \
   "${cpu_model:-unavailable}" "$logical_cpus" "$memory_bytes" "$system_description" \
-  "$cargo_lock_sha256" "$salvers_commit" "$salvers_diff_sha256" "$salvers_dirty_count" \
-  "$ipamir_commit" "$ipamir_diff_sha256" "$ipamir_dirty_count" <<'PY'
+  "$cargo_lock_sha256" "$dataset_file_count" "$dataset_sha256" \
+  "$salvers_commit" "$salvers_diff_sha256" "$salvers_state_sha256" "$salvers_dirty_count" \
+  "$ipamir_commit" "$ipamir_diff_sha256" "$ipamir_state_sha256" "$ipamir_dirty_count" <<'PY'
 import hashlib
 import json
 import sys
@@ -187,12 +243,16 @@ else
     printf 'binary=%s\n' "$BIN"
     printf 'binary_sha256=%s\n' "$binary_sha256"
     printf 'cargo_lock_sha256=%s\n' "$cargo_lock_sha256"
+    printf 'dataset_file_count=%s\n' "$dataset_file_count"
+    printf 'dataset_sha256=%s\n' "$dataset_sha256"
     printf 'run_script_sha256=%s\n' "$script_sha256"
     printf 'salvers_git_commit=%s\n' "$salvers_commit"
     printf 'salvers_diff_sha256=%s\n' "$salvers_diff_sha256"
+    printf 'salvers_state_sha256=%s\n' "$salvers_state_sha256"
     printf 'salvers_git_dirty_count=%s\n' "$salvers_dirty_count"
     printf 'ipamir_git_commit=%s\n' "$ipamir_commit"
     printf 'ipamir_diff_sha256=%s\n' "$ipamir_diff_sha256"
+    printf 'ipamir_state_sha256=%s\n' "$ipamir_state_sha256"
     printf 'ipamir_git_dirty_count=%s\n' "$ipamir_dirty_count"
     printf 'solver=%s\n' "$SOLVER"
     printf 'objective=%s\n' "$OBJECTIVE"

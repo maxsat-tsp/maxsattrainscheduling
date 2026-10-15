@@ -393,9 +393,9 @@ cấu hình, manifest dữ liệu, raw CSV và script tạo bảng/hình.
 
 | Phát biểu dự kiến | Bằng chứng tối thiểu | Trạng thái hiện tại |
 |---|---|---|
-| Phương pháp giữ đúng nghiệm tối ưu | Định lý + exhaustive tests bài nhỏ + verifier độc lập | Chưa đủ; `code_review.md` còn vấn đề tolerance |
+| Phương pháp giữ đúng nghiệm tối ưu | Định lý + exhaustive tests bài nhỏ + verifier độc lập | Đã sửa tolerance, thêm test biên và checker Python độc lập; còn exhaustive tests bài nhỏ |
 | Selection tốt hơn heuristic ít mốc trước | Ablation ghép cặp trên toàn bộ dataset | Chưa chạy |
-| Ngân sách kiểm soát kích thước mô hình | Mốc/biến/clause theo vòng và tổng | Code đã có một số counter; cần kiểm tra schema/output |
+| Ngân sách kiểm soát kích thước mô hình | Mốc/biến/clause theo vòng và tổng | Đã có tổng mốc/biến/clause, thời gian từng pha và LB/UB trace; smoke test schema đã đạt |
 | Nhanh hơn baseline hội nghị | Cùng máy, cùng cutoff, đúng commit/config; hoặc dùng số công bố với giới hạn rõ | Chưa nhận baseline hội nghị |
 | Tổng quát qua objective | Kết quả Step/Round/Cont và phân tích failure | Pilot một lần cho K=8/32/128, chưa đủ |
 | Khác optimal refinement gần đây | Bảng positioning và định nghĩa selection rõ | Có giả thuyết; cần tìm tài liệu bổ sung |
@@ -421,14 +421,16 @@ sót và panic”, chưa phải đóng góp khoa học.
 
 ## 7. Công việc tiếp theo theo thứ tự
 
-1. Sửa correctness gate trong code và test theo `code_review.md`.
-2. Bổ sung log theo từng vòng cho cost/benefit, bundle age, fallback, biến/clause,
-   LB/UB và thời gian từng pha.
-3. Định nghĩa một selection model tối thiểu và giữ heuristic hiện tại làm baseline.
-4. Chạy một smoke test toàn dataset để kiểm tra pipeline, không dùng làm kết quả
-   runtime cuối.
-5. Nhận baseline hội nghị; khóa commit, dữ liệu và cấu hình.
-6. Chạy pilot ablation, rồi mới quyết định công thức/chính sách cuối.
+1. **Đã xong:** sửa correctness gate, thêm test biên, lưu lịch và kiểm tra độc
+   lập bằng Python.
+2. **Đã xong cho chiến dịch đầu:** bổ sung tổng biến/clause, LB/UB trace và thời
+   gian quét, chọn, áp dụng, mã hóa chi phí, kiểm tra nghiệm.
+3. Khóa commit và chạy một lượt 864 lời gọi với K=128 để kiểm tra toàn pipeline.
+4. Nhận baseline hội nghị và kiểm toán provenance.
+5. Định nghĩa/cài đặt selection utility-aware, hoặc giới hạn rõ đóng góp ở
+   heuristic greedy hiện tại.
+6. Chạy sensitivity K=32 chỉ cho hai cấu hình R; sau khi chốt phương pháp mới
+   chạy lặp cho kết luận runtime.
 7. Sau khi qua tiêu chí go/no-go, thay các đoạn planned/pilot trong `main.tex`
    bằng phương pháp đã chốt và kết quả có thể truy nguyên; sau đó mới viết
    Abstract, highlights, contribution list và Conclusion cuối cùng.

@@ -83,17 +83,56 @@ impl Default for JournalSettings {
     }
 }
 
+#[derive(Default)]
+struct JournalStats {
+    refinement_detected_total: usize,
+    refinement_selected_total: usize,
+    refinement_new_points_total: usize,
+    scan_time: std::time::Duration,
+    selection_time: std::time::Duration,
+    apply_time: std::time::Duration,
+    cost_encoding_time: std::time::Duration,
+    validation_time: std::time::Duration,
+}
+
 fn output_journal_stats(
     output_stats: &mut impl FnMut(String, serde_json::Value),
-    detected: usize,
-    selected: usize,
-    new_points: usize,
+    stats: &JournalStats,
     forced_orders: usize,
 ) {
-    output_stats("refinement_detected_total".to_string(), detected.into());
-    output_stats("refinement_selected_total".to_string(), selected.into());
-    output_stats("refinement_new_points_total".to_string(), new_points.into());
+    output_stats(
+        "refinement_detected_total".to_string(),
+        stats.refinement_detected_total.into(),
+    );
+    output_stats(
+        "refinement_selected_total".to_string(),
+        stats.refinement_selected_total.into(),
+    );
+    output_stats(
+        "refinement_new_points_total".to_string(),
+        stats.refinement_new_points_total.into(),
+    );
     output_stats("forced_orders_total".to_string(), forced_orders.into());
+    output_stats(
+        "refinement_scan_time_seconds".to_string(),
+        stats.scan_time.as_secs_f64().into(),
+    );
+    output_stats(
+        "refinement_selection_time_seconds".to_string(),
+        stats.selection_time.as_secs_f64().into(),
+    );
+    output_stats(
+        "refinement_apply_time_seconds".to_string(),
+        stats.apply_time.as_secs_f64().into(),
+    );
+    output_stats(
+        "cost_encoding_time_seconds".to_string(),
+        stats.cost_encoding_time.as_secs_f64().into(),
+    );
+    output_stats(
+        "validation_time_seconds".to_string(),
+        stats.validation_time.as_secs_f64().into(),
+    );
 }
 
 fn candidate_cost_if_valid(
@@ -154,7 +193,11 @@ pub fn solve_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug>(
 
 thread_local! { pub static  WATCH : std::cell::RefCell<Option<(usize,usize)>>  = RefCell::new(None);}
 
-use crate::{debug::DebugInfo, problem::DelayCostType, solvers::util::heuristic};
+use crate::{
+    debug::DebugInfo,
+    problem::DelayCostType,
+    solvers::util::{heuristic, value_trace::ValueTrace},
+};
 
 use super::shared::costtree::CostTree;
 use crate::solvers::SolverError;
@@ -181,6 +224,8 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
     let start_time: Instant = Instant::now();
     let mut solver_time = std::time::Duration::ZERO;
     let mut stats = SolveStats::default();
+    let mut journal_stats = JournalStats::default();
+    let mut value_trace = ValueTrace::default();
 
     output_stats(
         "maxsat_rc2_bound_mode".to_string(),
@@ -301,10 +346,6 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
 
     let mut age_tracker = ViolationAgeTracker::default();
     let mut forced_orders: HashSet<ForcedOrder> = HashSet::new();
-    let mut refinement_detected_total = 0usize;
-    let mut refinement_selected_total = 0usize;
-    let mut refinement_new_points_total = 0usize;
-
     loop {
         if start_time.elapsed().as_secs_f64() > timeout {
             let ub = best_heur.map(|(c, _)| c).unwrap_or(i32::MAX);
@@ -321,13 +362,14 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                 total_cost,
                 ub,
             );
-            output_journal_stats(
-                &mut output_stats,
-                refinement_detected_total,
-                refinement_selected_total,
-                refinement_new_points_total,
-                forced_orders.len(),
+            output_journal_stats(&mut output_stats, &journal_stats, forced_orders.len());
+            value_trace.timeout(
+                start_time,
+                total_cost,
+                (ub < i32::MAX).then_some(ub),
+                Some(iteration as i32),
             );
+            value_trace.emit(&mut output_stats, (ub < i32::MAX).then_some(ub));
             return Err(SolverError::Timeout);
         }
 
@@ -340,7 +382,9 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                 let _ = sol_tx.send(sol);
 
                 while let Ok((ub_cost, ub_sol)) = sol_rx.try_recv() {
+                    let validation_start = Instant::now();
                     let verified_cost = candidate_cost_if_valid(problem, &ub_sol, delay_cost_type);
+                    journal_stats.validation_time += validation_start.elapsed();
                     if verified_cost != Some(ub_cost) {
                         output_stats("invalid_heuristic_solution".to_string(), true.into());
                         continue;
@@ -348,6 +392,26 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                     if ub_cost < total_cost as i32 {
                         output_stats("heuristic_below_lower_bound".to_string(), true.into());
                         continue;
+                    }
+                    let previous_best = best_heur.as_ref().map(|(c, _)| *c);
+                    let is_new_incumbent = previous_best.map_or(true, |cost| ub_cost < cost);
+                    if is_new_incumbent {
+                        if previous_best.is_none() {
+                            value_trace.initial_incumbent(
+                                start_time,
+                                ub_cost,
+                                total_cost,
+                                Some(iteration as i32),
+                            );
+                        } else {
+                            value_trace.incumbent(
+                                start_time,
+                                ub_cost,
+                                total_cost,
+                                Some(iteration as i32),
+                                Some("heuristic"),
+                            );
+                        }
                     }
                     if ub_cost == total_cost as i32 {
                         println!("HEURISTIC UB=LB");
@@ -369,16 +433,16 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                         );
                         output_journal_stats(
                             &mut output_stats,
-                            refinement_detected_total,
-                            refinement_selected_total,
-                            refinement_new_points_total,
+                            &journal_stats,
                             forced_orders.len(),
                         );
+                        value_trace.optimal(start_time, ub_cost, Some(iteration as i32));
+                        value_trace.emit(&mut output_stats, Some(ub_cost));
 
                         return Ok((ub_sol, stats));
                     }
 
-                    if ub_cost < best_heur.as_ref().map(|(c, _)| *c).unwrap_or(i32::MAX) {
+                    if is_new_incumbent {
                         best_heur = Some((ub_cost, ub_sol));
 
                         if settings.bound_mode.uses_cost() {
@@ -465,6 +529,7 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
             let mut found_resource_conflict = false;
             let mut packages: Vec<RefinementPackage<L>> = Vec::new();
             let mut active_violations = HashSet::new();
+            let scan_start = Instant::now();
             let scan_visits: Vec<VisitId> = if settings.full_scan {
                 visits.keys().collect()
             } else {
@@ -665,6 +730,8 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
             }
 
             age_tracker.retain_active(&active_violations);
+            journal_stats.scan_time += scan_start.elapsed();
+            let selection_start = Instant::now();
             let selected_indices: HashSet<usize> = select_packages(
                 &packages,
                 settings.refinement_budget,
@@ -673,8 +740,9 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
             )
             .into_iter()
             .collect();
-            refinement_detected_total += packages.len();
-            refinement_selected_total += selected_indices.len();
+            journal_stats.selection_time += selection_start.elapsed();
+            journal_stats.refinement_detected_total += packages.len();
+            journal_stats.refinement_selected_total += selected_indices.len();
             println!(
                 "    REFINE it={} detected={} selected={} budget={}",
                 iteration,
@@ -684,6 +752,7 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                     .refinement_budget
                     .map_or_else(|| "all".to_string(), |value| value.to_string())
             );
+            let apply_start = Instant::now();
             for (i, pkg) in packages.drain(..).enumerate() {
                 if selected_indices.contains(&i) {
                     let added = apply_package(
@@ -694,12 +763,13 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                         &mut stats.n_conflict,
                         &mut stats.n_travel,
                     );
-                    refinement_new_points_total += added.len();
+                    journal_stats.refinement_new_points_total += added.len();
                     for tp in added {
                         new_time_points.push(tp);
                     }
                 }
             }
+            journal_stats.apply_time += apply_start.elapsed();
             touched_intervals.clear();
 
             let iterationtype = if found_travel_time_conflict && found_resource_conflict {
@@ -731,7 +801,9 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                     panic!()
                 };
 
+                let validation_start = Instant::now();
                 let verified_cost = candidate_cost_if_valid(problem, &trains, delay_cost_type);
+                journal_stats.validation_time += validation_start.elapsed();
                 if settings.validate_before_return && verified_cost != Some(total_cost as i32) {
                     output_stats(
                         "candidate_verified_cost".to_string(),
@@ -794,13 +866,9 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                         total_cost,
                         total_cost,
                     );
-                    output_journal_stats(
-                        &mut output_stats,
-                        refinement_detected_total,
-                        refinement_selected_total,
-                        refinement_new_points_total,
-                        forced_orders.len(),
-                    );
+                    output_journal_stats(&mut output_stats, &journal_stats, forced_orders.len());
+                    value_trace.optimal(start_time, total_cost, Some(iteration as i32));
+                    value_trace.emit(&mut output_stats, Some(total_cost));
 
                     println!("VARSCLAUSES {:?}", solver);
 
@@ -817,6 +885,7 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
             Totalizer(Totalizer<L>, usize),
         }
 
+        let cost_encoding_start = Instant::now();
         for (visit, new_timepoint_var, new_t) in new_time_points.drain(..) {
             n_timepoints += 1;
             let (train_idx, visit_idx) = visits[visit];
@@ -920,6 +989,7 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
             .map(|(k, (_, w, _))| (*k, *w))
             .collect::<Vec<_>>();
         assumptions.sort_by_key(|(_, w)| -(*w as isize));
+        journal_stats.cost_encoding_time += cost_encoding_start.elapsed();
 
         log::info!(
             "solving it{} with {} timepoints {} conflicts",
@@ -1263,6 +1333,13 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
             // );
             total_cost += min_weight as i32;
             println!("    LB={}", total_cost);
+            value_trace.lower_bound(
+                start_time,
+                total_cost,
+                best_heur.as_ref().map(|(cost, _)| *cost),
+                Some(iteration as i32),
+                Some("maxsat_core"),
+            );
 
             if total_cost as i32 == best_heur.as_ref().map(|(c, _)| *c).unwrap_or(i32::MAX) {
                 println!("TERMINATE HEURISTIC");
@@ -1281,13 +1358,9 @@ pub fn solve_debug<L: satcoder::Lit + Copy + std::fmt::Debug>(
                     total_cost,
                     total_cost,
                 );
-                output_journal_stats(
-                    &mut output_stats,
-                    refinement_detected_total,
-                    refinement_selected_total,
-                    refinement_new_points_total,
-                    forced_orders.len(),
-                );
+                output_journal_stats(&mut output_stats, &journal_stats, forced_orders.len());
+                value_trace.optimal(start_time, total_cost, Some(iteration as i32));
+                value_trace.emit(&mut output_stats, Some(total_cost));
 
                 return Ok((best_heur.unwrap().1, stats));
             }

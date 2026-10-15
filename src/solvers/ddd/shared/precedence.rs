@@ -502,4 +502,108 @@ mod tests {
         assert_eq!(ub2[0][0], 140);
         assert_eq!(ub2[1][0], 250);
     }
+
+    #[test]
+    fn test_both_resource_orders_infeasible() {
+        let problem = Problem {
+            name: "both-orders-infeasible".into(),
+            trains: vec![
+                Train {
+                    visits: vec![make_visit(0, 10, 10, 10)],
+                },
+                Train {
+                    visits: vec![make_visit(0, 10, 10, 10)],
+                },
+            ],
+            conflicts: vec![(0, 0)],
+        };
+
+        let (forced, infeasible) =
+            find_forced_orders(&problem, &[vec![10], vec![10]], &[vec![15], vec![15]]);
+        assert!(infeasible);
+        assert!(forced.is_empty());
+    }
+
+    #[test]
+    fn test_tighten_ub_skips_visit_without_aimed_time() {
+        let problem = Problem {
+            name: "no-aimed-time".into(),
+            trains: vec![Train {
+                visits: vec![Visit {
+                    resource_id: 0,
+                    earliest: 100,
+                    aimed: None,
+                    travel_time: 0,
+                }],
+            }],
+            conflicts: vec![],
+        };
+
+        let ub = vec![vec![i32::MAX]];
+        let tightened =
+            tighten_ub_from_cost(&problem, DelayCostType::Continuous, &[vec![100]], ub, 5);
+        assert_eq!(tightened[0][0], i32::MAX);
+    }
+
+    #[test]
+    fn test_tighten_ub_infinite_steps_180() {
+        let problem = Problem {
+            name: "infinite-steps-180".into(),
+            trains: vec![Train {
+                visits: vec![make_visit(0, 100, 100, 0)],
+            }],
+            conflicts: vec![],
+        };
+
+        let tightened = tighten_ub_from_cost(
+            &problem,
+            DelayCostType::InfiniteSteps180,
+            &[vec![100]],
+            vec![vec![i32::MAX]],
+            2,
+        );
+        assert_eq!(tightened[0][0], 460);
+    }
+
+    #[test]
+    fn test_multiple_forced_orders_propagate_across_trains() {
+        let problem = Problem {
+            name: "forced-order-chain".into(),
+            trains: vec![
+                Train {
+                    visits: vec![make_visit(0, 0, 0, 5)],
+                },
+                Train {
+                    visits: vec![make_visit(0, 0, 0, 5)],
+                },
+                Train {
+                    visits: vec![make_visit(0, 0, 0, 0)],
+                },
+            ],
+            conflicts: vec![(0, 0)],
+        };
+        let orders = [
+            ForcedOrder {
+                first: (0, 0),
+                second: (1, 0),
+                gap: 0,
+            },
+            ForcedOrder {
+                first: (1, 0),
+                second: (2, 0),
+                gap: 0,
+            },
+        ];
+
+        let (lb, ub) = propagate_bounds_with_orders(
+            &problem,
+            vec![vec![0], vec![0], vec![0]],
+            vec![vec![i32::MAX], vec![i32::MAX], vec![20]],
+            &orders,
+        );
+        assert_eq!(lb, vec![vec![0], vec![5], vec![10]]);
+        assert_eq!(ub[0][0], 10);
+        assert_eq!(ub[1][0], 15);
+        assert_eq!(ub[2][0], 20);
+    }
 }

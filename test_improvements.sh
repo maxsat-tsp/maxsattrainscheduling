@@ -49,6 +49,7 @@ OUT_DIR="${OUT_DIR:-results/improvements/${TIMESTAMP}-${CONFIG}}"
 BIN="${BIN:-./target/release/ddd}"
 RUN_SCRIPT="quick_scripts/run_all_txt_instances_limited.sh"
 CSV_BATCH="quick_scripts/analyze/json_to_csv_batch.py"
+AUDIT_SCRIPT="quick_scripts/analyze/audit_journal_campaign.py"
 
 SOLVER_NAME="${SOLVER_NAME:-maxsat_rc2}"
 
@@ -172,6 +173,14 @@ for obj in "${OBJECTIVES[@]}"; do
     bash "$RUN_SCRIPT"
 
     t1=$(date +%s)
+
+    python3 "$AUDIT_SCRIPT" \
+        --file "$json_out" \
+        --config "$CONFIG" \
+        --objective "$obj" \
+        --timeout "$TIMEOUT_SECS" \
+        --budget "$REFINEMENT_BUDGET" \
+        --max-wait "${MAX_WAIT_ITERATIONS:-5}"
 
     if python3 "$CSV_BATCH" "$json_out" --format compact --overwrite 2>/dev/null; then
         csv="${json_out%.json}.csv"

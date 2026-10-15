@@ -36,7 +36,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn triển khai bản tạp chí}
-\fancyhead[R]{\small Phiên bản 4.2}
+\fancyhead[R]{\small Phiên bản 4.3}
 \fancyfoot[C]{\thepage}
 \hypersetup{
   pdftitle={Hướng dẫn triển khai và kiểm tra MaxSAT-DDD cho bản tạp chí},
@@ -58,21 +58,25 @@
 \rule{\textwidth}{0.4pt}
 \vspace{5mm}
 
-Tài liệu này mô tả đúng phiên bản mã hiện tại. Hai phần chính đã được đưa vào
-solver \code{maxsat\_rc2}: suy luận cận thời gian và refinement có giới hạn.
-Hai phần này hiện là prototype và baseline cho nghiên cứu tiếp theo; chưa được
-coi là đóng góp cuối của bài tạp chí. Trước khi cài thêm chính sách refinement,
-đọc và chốt dàn ý tại
-\file{manuscript/journal/cor/outline\_brainstorm\_vi.md}. Việc trước mắt của sinh
-viên là thống nhất quy tắc kiểm tra nghiệm và bổ sung các kiểm thử còn thiếu.
-Chỉ chạy thực nghiệm chính thức sau khi câu hỏi nghiên cứu và phương pháp chọn
-xung đột theo ngân sách đã được phê duyệt.
+Tài liệu này mô tả đúng phiên bản mã hiện tại. Hai phần đã có trong solver
+\code{maxsat\_rc2}: suy luận cận thời gian và refinement greedy có giới hạn.
+Bộ kiểm tra nghiệm đã được sửa để dùng đúng điều kiện thời gian của mô hình;
+các kiểm thử biên, số đo cơ chế và script kiểm toán kết quả cũng đã được bổ
+sung. Bốn cấu hình hiện tại vì vậy đã sẵn sàng cho một lượt chạy kiểm tra trên
+toàn bộ dữ liệu.
+
+Lượt chạy này đánh giá B và chính sách R greedy hiện có. Mô hình chọn theo
+utility trong bản thảo COR vẫn chưa được cài đặt. Vì vậy, kết quả mới có thể
+dùng ngay cho kiểm tra tính đúng, ablation B/R và phân tích cơ chế; chưa được
+gọi là kết quả của phương pháp utility-aware. Trước khi chốt đóng góp cuối,
+đọc Mục~\ref{sec:submission-use} và dàn ý tại
+\file{manuscript/journal/cor/outline\_brainstorm\_vi.md}.
 
 Các công thức được giữ lại để sinh viên hiểu mình đang kiểm tra điều gì. Mỗi
 công thức đều có giải thích bằng lời và chỉ ra vị trí tương ứng trong mã.
 
 \vfill
-{\normalsize Phiên bản 4.2, tháng 10 năm 2026\par}
+{\normalsize Phiên bản 4.3, tháng 10 năm 2026\par}
 \vspace{3mm}
 Mã nguồn: \file{maxsattrainscheduling/}.\par
 Bản thảo hội nghị: \file{manuscript/submission/main.tex}.
@@ -96,16 +100,17 @@ Mục tiêu trước mắt là trả lời hai câu hỏi:
       trong cùng giới hạn thời gian và bộ nhớ?
 \end{enumerate}
 
-Trước mắt chỉ chạy một lần, nhưng phải chạy toàn bộ tập dữ liệu. Làm theo thứ
-tự sau:
+Trước mắt chỉ chạy một lần, nhưng phải chạy toàn bộ tập dữ liệu. Các sửa đổi về
+tính đúng và đo lường đã hoàn thành trong mã hiện tại. Trên máy thực nghiệm,
+làm theo thứ tự sau:
 
 \begin{enumerate}
-\item Thống nhất quy tắc kiểm tra thời điểm sớm nhất và chồng lấn tài nguyên.
-\item Bổ sung kiểm thử biên, rồi build đúng một binary \code{ddd}.
-\item Chạy thử một instance cho cả bốn cấu hình và kiểm tra JSON.
+\item Chạy toàn bộ unit test và build đúng một binary \code{ddd}.
+\item Chạy script smoke test cho một instance ở cả bốn cấu hình.
 \item Chạy đủ 72 instance cho cả bốn cấu hình, với ba hàm mục tiêu.
 \item Mỗi cặp cấu hình--hàm mục tiêu--instance chỉ chạy một lần.
-\item Phân tích số bài thành công, chi phí, thời gian và loại lỗi.
+\item Dùng script kiểm toán để tạo bảng số bài thành công, chi phí, thời gian
+      và loại lỗi.
 \end{enumerate}
 
 Trên môi trường mới, phải checkout \code{salvers} đúng commit và áp dụng bản
@@ -400,25 +405,19 @@ Mọi lịch từ heuristic phải được kiểm tra bằng
 \code{Problem::verify\_solution()} trước khi dùng làm cận trên. Chi phí do
 heuristic báo phải bằng chi phí được tính lại.
 
-\textbf{Điểm phải xử lý trước khi chạy chính.} Mã hiện tại của
-\code{verify\_solution()} cho phép $t_v$ sớm hơn \code{earliest} tối đa 10 giây
-và cho phép hai khoảng chiếm dụng chồng nhau 1 giây. Trong khi đó, DDD và MILP
-dùng quy tắc chính xác ở Mục~\ref{sec:model}. Vì vậy chưa được xem việc
-\code{verify\_solution()} trả về thành công là bằng chứng đầy đủ cho tính hợp lệ
-theo mô hình chính xác.
+Quy tắc đã được chốt theo mô hình DDD và MILP: hoạt động không được bắt đầu sớm
+hơn \code{earliest}; hai khoảng nửa kín chỉ hợp lệ khi chúng không chồng nhau.
+Do đó, \code{verify\_solution()} hiện yêu cầu
 
-Nhóm phải chọn một trong hai cách và ghi quyết định vào commit chạy thực nghiệm:
+\begin{equation}
+t_v\geq \code{earliest}_v,
+\qquad e_v\leq t_w\ \text{hoặc}\ e_w\leq t_v.
+\end{equation}
 
-\begin{enumerate}
-\item Nếu mô hình không có dung sai, sửa \code{verify\_solution()} để yêu cầu
-      $t_v\geq\code{earliest}$ và $e_v\leq t_w$ hoặc $e_w\leq t_v$.
-\item Nếu dung sai 10 giây và 1 giây là quy ước của benchmark, giữ chúng nhưng
-      phải áp dụng cùng quy tắc trong mọi solver và mô tả trong bản thảo.
-\end{enumerate}
-
-Không chỉ xóa hai hằng số rồi chạy ngay. Trước hết phải thêm kiểm thử tại đúng
-biên, kiểm tra lại một số nghiệm baseline và xác nhận chi phí không thay đổi
-ngoài dự kiến.
+Không còn dung sai 10 giây cho thời điểm sớm nhất hoặc dung sai 1 giây cho xung
+đột tài nguyên. Bốn kiểm thử mới xác nhận: vào sớm một giây bị từ chối; vào đúng
+\code{earliest} được chấp nhận; hai khoảng vừa chạm nhau được chấp nhận; chồng
+nhau một giây bị từ chối.
 
 Sau khi quy tắc trên đã được thống nhất, trước khi solver trả một lịch cuối, nó
 phải kiểm tra lại:
@@ -471,7 +470,14 @@ Tên & Bound mode & Refinement budget \\\midrule
 \bottomrule
 \end{tabularx}
 
-Lệnh chạy một lượt đầy đủ cho cả bốn cấu hình:
+Trước tiên chạy smoke test tự động:
+
+\begin{verbatim}
+cd maxsattrainscheduling
+bash run_journal_smoke.sh 120 128 origA1 finsteps123
+\end{verbatim}
+
+Nếu smoke test đạt, chạy một lượt đầy đủ cho cả bốn cấu hình:
 
 \begin{verbatim}
 cd maxsattrainscheduling
@@ -480,8 +486,11 @@ bash run_journal_once.sh 120 128
 
 Hai đối số lần lượt là timeout nội bộ cho mỗi instance và ngân sách mốc.
 Script build đúng binary \code{ddd}, rồi chạy 72 instance, ba hàm mục tiêu và
-bốn cấu hình. Script cũng kiểm tra mỗi file tổng hợp có đúng 72 tên bài duy
-nhất.
+bốn cấu hình. Sau mỗi objective, script kiểm tra tên bài, cấu hình, telemetry,
+\code{cost=lb=ub} cho các dòng \code{ok} và diễn biến cận trong
+\code{value\_trace}. Sau đủ 12 file, script tạo
+\code{journal\_summary.csv}, \code{journal\_paired\_comparisons.csv} và
+\code{journal\_audit.json}.
 
 Điều kiện đúng 72 bài là hàng rào bảo vệ của chiến dịch submission. Không đổi
 nó thành một biến tùy ý để chạy subset. Khi cần gỡ lỗi nhanh, gọi binary trực
@@ -516,6 +525,7 @@ Mỗi chiến dịch phải giữ các file sau:
       phiên bản Rust, Gurobi, CPU, RAM, timeout và giới hạn RAM của tiến trình.
 \item Commit và hash phần thay đổi của hai thư viện ngoài \code{salvers} và
       \code{ipamir-rs}, cùng hash của \file{Cargo.lock}.
+\item Số lượng và hash nội dung của đúng 72 file dữ liệu.
 \item \file{source.diff}: phần mã chưa commit tại thời điểm chạy.
 \item Một file stdout và một file stderr cho từng instance.
 \end{itemize}
@@ -525,9 +535,10 @@ trí lỗi. Không xóa log sau khi JSON đã được tạo.
 
 Mỗi instance có một JSON riêng trong thư mục \pathref{<objective>.logs/instances/}.
 Trước khi dùng lại, script so sánh dấu vân tay của lần chạy. Dấu vân tay gồm
-hash của binary, hash của script, solver, hàm mục tiêu, timeout, RAM và toàn bộ
-tùy chọn liên quan. Nếu một giá trị khác, script dừng và yêu cầu dùng thư mục
-mới. Cách này cho phép tiếp tục một lần chạy dở mà không trộn kết quả từ hai
+hash của binary, script, dataset, dependency, solver, hàm mục tiêu, timeout, RAM
+và toàn bộ tùy chọn liên quan. Cả file chưa được Git theo dõi trong dependency
+cũng được đưa vào hash. Nếu một giá trị khác, script dừng và yêu cầu dùng thư
+mục mới. Cách này cho phép tiếp tục một lần chạy dở mà không trộn kết quả từ hai
 phiên bản mã.
 
 Các trường thống kê mới trong JSON gồm:
@@ -537,6 +548,11 @@ Các trường thống kê mới trong JSON gồm:
 \item \code{refinement\_selected\_total};
 \item \code{refinement\_new\_points\_total};
 \item \code{forced\_orders\_total};
+\item \code{num\_vars\_total} và \code{num\_clauses\_total};
+\item thời gian quét, chọn, áp dụng refinement, mã hóa chi phí và kiểm tra nghiệm;
+\item \code{value\_trace}, thời gian tìm nghiệm đầu, đạt giá trị tốt nhất và
+      chứng minh tối ưu;
+\item \code{solution}: toàn bộ lịch để checker Python đọc lại độc lập;
 \item các giá trị cấu hình \code{maxsat\_rc2\_*}.
 \end{itemize}
 
@@ -548,12 +564,17 @@ thực tế với cấu hình đang chạy. Với kết quả do solver ghi, c�
 ghi do timeout ngoài tạo ra được nhận biết bằng \code{external\_status} và không
 có đủ các trường nội bộ này.
 
+Với mọi dòng \code{ok}, checker Python đọc lại file TXT, dựng lại hành trình và
+tài nguyên, rồi kiểm tra lịch trong \code{solution}. Checker này không gọi
+\code{Problem::verify\_solution()}, nên có thể phát hiện sai khác giữa dữ liệu,
+parser, validator Rust và chi phí đã ghi.
+
 \section{Kiểm thử bắt buộc}
 \label{sec:tests}
 
 \subsection{Kiểm thử đơn vị}
 
-Các kiểm thử hiện có kiểm tra:
+Các kiểm thử hiện có đã kiểm tra:
 
 \begin{itemize}
 \item lan truyền cận dưới theo hành trình;
@@ -564,17 +585,11 @@ Các kiểm thử hiện có kiểm tra:
 \item ngân sách đếm các mốc phân biệt;
 \item gói cũ không bị bỏ đói;
 \item vẫn chọn được một gói khi ngân sách bằng 0.
-\end{itemize}
-
-Trước khi khóa commit chạy thực nghiệm, phải bổ sung các trường hợp sau:
-
-\begin{itemize}
 \item cả hai thứ tự của một cặp xung đột đều bất khả thi;
 \item hoạt động có \code{aimed=None} không bị siết cận trên từ chi phí;
 \item siết cận cho \code{infsteps180};
 \item nhiều thứ tự bắt buộc được lan truyền qua nhiều tàu;
-\item đúng biên \code{earliest} và đúng biên tiếp xúc tài nguyên theo quyết định
-      ở Mục~\ref{sec:validation}.
+\item đúng biên \code{earliest} và đúng biên tiếp xúc tài nguyên.
 \end{itemize}
 
 Trên máy đã cài Gurobi và các thư viện ngoài, chạy:
@@ -582,33 +597,20 @@ Trên máy đã cài Gurobi và các thư viện ngoài, chạy:
 \begin{verbatim}
 cargo test -p ddd --lib refinement::tests
 cargo test -p ddd --lib precedence::tests
+cargo test -p ddd --lib problem::tests
 \end{verbatim}
 
 \subsection{Chạy thử trước chiến dịch}
 \label{sec:smoke-test}
 
-Sau khi các kiểm thử đơn vị đạt, chạy một instance ngắn cho từng cấu hình. Có
-thể dùng \code{origA1}, \code{finsteps123} và timeout 120 giây. Ví dụ với cấu
-hình kết hợp:
+Sau khi các kiểm thử đơn vị đạt, chạy một instance ngắn cho cả bốn cấu hình:
 
 \begin{verbatim}
-./target/release/ddd \
-  -s maxsat_rc2 --txt-instances \
-  --instance-name-filter origA1 --instance-name-exact \
-  --objective finsteps123 --timeout-seconds 120 \
-  --maxsat-rc2-bound-mode chain-cost-forced \
-  --maxsat-rc2-refinement-budget 128 \
-  --maxsat-rc2-max-wait-iterations 5 \
-  --maxsat-rc2-full-scan true \
-  --maxsat-rc2-validate-before-return true \
-  --json-output smoke-RC2-B-R.json
+bash run_journal_smoke.sh 120 128 origA1 finsteps123
 \end{verbatim}
 
-Lặp lại với ba hàng còn lại trong bảng cấu hình ở Mục~\ref{sec:cli}. Mỗi file
-phải có đúng một instance và một kết quả solver. Nếu \code{status=ok}, chi phí
-phải được tính lại thành công. Đồng thời kiểm tra các trường
-\code{maxsat\_rc2\_*} đúng với cấu hình vừa chạy. Chỉ bắt đầu 864 lượt khi cả
-bốn smoke test đạt.
+Script yêu cầu cả bốn lần đều có \code{status=ok}, cùng chi phí tối ưu, đúng cấu
+hình và đủ telemetry. Chỉ bắt đầu 864 lượt khi script kết thúc thành công.
 
 \subsection{Kiểm tra hồi quy trên 72 instance}
 
@@ -659,7 +661,9 @@ Mỗi cấu hình cần báo cáo ít nhất:
 \item trung vị thời gian trên tập bài chung mà hai cấu hình đều giải được;
 \item PAR-2 trên toàn bộ 72 instance;
 \item tổng số gói phát hiện, gói được chọn và mốc mới thực sự;
-\item số thứ tự bắt buộc đã tìm thấy.
+\item số thứ tự bắt buộc đã tìm thấy;
+\item số biến, số mệnh đề và thời gian của từng pha;
+\item thời gian tìm nghiệm đầu, đạt giá trị tốt nhất và chứng minh tối ưu.
 \end{itemize}
 
 Với timeout $T$ và $N$ instance:
@@ -679,23 +683,64 @@ Không so sánh hai số trung vị nếu chúng được tính trên hai tập 
 nhau. Hãy dùng giao của hai tập bài thành công, đồng thời báo cáo riêng tổng số
 bài thành công của mỗi cấu hình.
 
+\section{Kết quả nào dùng được cho submission?}
+\label{sec:submission-use}
+
+Lượt $K=128$ sắp chạy có thể dùng ngay cho bốn loại bằng chứng:
+
+\begin{enumerate}
+\item tính đúng: nghiệm hợp lệ, \code{cost=lb=ub} và cùng optimum giữa các cấu
+      hình hoàn thành;
+\item độ bao phủ: số bài chứng minh tối ưu, timeout và lỗi;
+\item ablation B/R greedy: so sánh bốn cấu hình hiện tại;
+\item cơ chế: số mốc, biến, mệnh đề, thứ tự bắt buộc, diễn biến cận và thời gian
+      từng pha.
+\end{enumerate}
+
+Chưa dùng một lượt này để viết phát biểu mạnh về chênh lệch thời gian ở mức vài
+chục mili giây. Sau khi chốt phương pháp cuối, cần chạy lặp trong cùng môi
+trường và xem mỗi instance là một đơn vị so sánh ghép cặp. Các lần lặp trên
+cùng instance là phép đo kỹ thuật, không phải các mẫu độc lập mới.
+
+Chính sách R hiện tại chọn greedily gói cần ít mốc mới nhất và có chống bỏ đói.
+Nó chưa phải mô hình utility-aware ở bản thảo COR. Nhóm phải chọn một trong hai
+hướng trước chiến dịch cuối: cài đặt và đánh giá utility-aware; hoặc sửa phạm vi
+bài báo để đóng góp được phát biểu đúng là bound-guided DDD với budgeted greedy
+refinement. Không được dùng số của R greedy dưới tên utility-aware.
+
+Sau lượt chính $K=128$, nếu cần sensitivity $K=32$, chỉ chạy hai cấu hình có R;
+không chạy lại \code{RC2-Base} và \code{RC2+B} vì chúng dùng
+\code{budget=all}:
+
+\begin{verbatim}
+JOURNAL_CONFIGS="RC2+R RC2+B+R" \
+RUN_ID="journal-k32-$(date +%Y-%m-%d_%H-%M-%S)" \
+bash run_journal_once.sh 120 32
+\end{verbatim}
+
+Khi nhận baseline hội nghị, giữ nguyên file gốc và đối chiếu tên instance, hàm
+mục tiêu, timeout, commit, máy và số luồng. Có thể dùng chi phí tối ưu làm mốc
+tính đúng. Chỉ ghép thời gian vào cùng bảng nếu điều kiện đo đủ tương đương.
+
 \section{Kế hoạch triển khai tiếp theo}
 \label{sec:next}
 
 \begin{longtable}{@{}p{16mm}p{69mm}p{67mm}@{}}
 \toprule
 Bước & Việc cần làm & Điều kiện hoàn thành \\\midrule\endhead
-1 & Thống nhất quy tắc kiểm tra nghiệm. & Validator, solver và mô hình toán dùng
-    cùng điều kiện tại biên. \\
-2 & Bổ sung kiểm thử và kiểm tra cấu hình JSON. & Các trường hợp biên đạt; bốn
-    smoke test có đúng cấu hình. \\
-3 & Build bằng \code{--locked}, khóa commit và chạy đủ 72 instance cho bốn cấu
+1 & Tính đúng và đo lường (đã xong). & Validator, kiểm thử biên, telemetry và
+    bốn smoke test đạt. \\
+2 & Khóa commit và chạy đủ 72 instance cho bốn cấu
     hình, đúng một lần. & Có JSON, CSV, manifest và log cho từng hàm mục tiêu. \\
-4 & Nhận và kiểm tra kết quả baseline hội nghị. & Xác định được phạm vi so sánh
+3 & Nhận và kiểm tra kết quả baseline hội nghị. & Xác định được phạm vi so sánh
     thời gian và chi phí. \\
-5 & Phân tích kết quả. & Có bảng số bài thành công, trung vị trên tập chung,
+4 & Phân tích kết quả. & Có bảng số bài thành công, trung vị trên tập chung,
     PAR-2 và bảng lỗi. \\
-6 & Cập nhật bản thảo tạp chí. & Mọi phát biểu trong bài có file kết quả hỗ trợ. \\
+5 & Chốt utility-aware hoặc phạm vi greedy. & Tên phương pháp và thí nghiệm
+    khớp chính xác với mã đã chạy. \\
+6 & Chạy sensitivity và lặp thời gian cần thiết. & Không chạy lại cấu hình không
+    phụ thuộc $K$; mọi lần lặp dùng cùng môi trường. \\
+7 & Cập nhật bản thảo tạp chí. & Mọi phát biểu trong bài có file kết quả hỗ trợ. \\
 \bottomrule
 \end{longtable}
 
@@ -717,15 +762,21 @@ File & Vai trò \\\midrule
   Biểu diễn gói, chọn theo ngân sách và chống bỏ đói. \\
 \pathref{src/solvers/ddd/shared/common.rs} &
   Kiểm tra một mốc đã có trong \code{Occ} hay chưa. \\
+\pathref{src/problem.rs} &
+  Kiểm tra nghiệm theo đúng biên thời gian và tài nguyên của mô hình. \\
 \pathref{src/main.rs} &
-  Tùy chọn dòng lệnh, timeout nội bộ và trạng thái \code{invalid\_solution}. \\
+  Tùy chọn dòng lệnh, timeout, trạng thái lỗi và số biến/mệnh đề. \\
 \pathref{quick_scripts/}\newline
 \pathref{run_all_txt_instances_limited.sh} &
   Chuyển tùy chọn vào binary và giữ manifest, stdout, stderr. \\
 \pathref{test_improvements.sh} &
   Chạy một cấu hình và tiếp tục an toàn từ các instance đã hoàn tất. \\
+\pathref{run_journal_smoke.sh} &
+  Kiểm tra nhanh bốn cấu hình, telemetry và chi phí trên một instance. \\
 \pathref{run_journal_once.sh} &
-  Chạy đủ bốn cấu hình trên toàn bộ dataset, đúng một lần. \\
+  Chạy toàn bộ dataset đúng một lần; có thể chỉ chọn hai cấu hình R cho $K=32$. \\
+\pathref{quick_scripts/analyze/audit\_journal\_campaign.py} &
+  Kiểm tra dữ liệu, cấu hình, manifest, chi phí và tạo bảng tổng hợp. \\
 \pathref{external_patches/}\newline
 \pathref{salvers-rustsat-compat.patch} &
   Làm cho dependency \code{salvers} có thể build lại đúng như môi trường phát triển. \\

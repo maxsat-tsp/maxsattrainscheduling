@@ -804,9 +804,12 @@ fn main() {
                         .map(|(v, _)| v)
                     }
                     SolverType::MaxsatRc2 => {
-                        maxsat_rc2::solve_with_settings(
+                        counting_solver::reset_counts();
+                        let result = maxsat_rc2::solve_with_settings(
                             &mk_env,
-                            satcoder::solvers::minisat::Solver::new(),
+                            counting_solver::CountingSolver::new(
+                                satcoder::solvers::minisat::Solver::new(),
+                            ),
                             &p.problem,
                             timeout,
                             delay_cost_type,
@@ -815,7 +818,15 @@ fn main() {
                                 solve_data.insert(k, v);
                             },
                         )
-                        .map(|(v, _)| v)
+                        .map(|(v, _)| v);
+                        let (num_vars_total, num_clauses_total) =
+                            counting_solver::get_counts();
+                        solve_data.insert("num_vars_total".to_string(), num_vars_total.into());
+                        solve_data.insert(
+                            "num_clauses_total".to_string(),
+                            num_clauses_total.into(),
+                        );
+                        result
                     }
                     SolverType::MaxSatDddLadderRC2Abstract => maxsat_ladder_abstract::solve(
                         &mk_env,
@@ -1137,6 +1148,7 @@ fn main() {
                     .problem
                     .verify_solution(solution, delay_cost_type)
                     .unwrap();
+                solve_data.insert("solution".to_string(), serde_json::json!(solution));
 
                 let other_cost =
                     other_delay_cost_type.map(|c| p.problem.verify_solution(solution, c).unwrap());

@@ -113,7 +113,7 @@ impl Problem {
                 let t1_in = solution[train_idx][visit_idx];
                 let t1_out = solution[train_idx][visit_idx + 1];
 
-                if t1_in < *earliest - 10 {
+                if t1_in < *earliest {
                     println!("Earliest entry conflict t{} v{}", train_idx, visit_idx);
                     println!("train {}: {:?}", train_idx, train);
                     println!("  train solution: {:?}", solution[train_idx]);
@@ -162,7 +162,7 @@ impl Problem {
                             let t2_in = solution[train_idx2][visit_idx2];
                             let t2_out = solution[train_idx2][visit_idx2 + 1];
 
-                            let ok = t1_in >= t2_out - 1 || t2_in >= t1_out - 1;
+                            let ok = t1_in >= t2_out || t2_in >= t1_out;
                             if !ok {
                                 println!(
                                     "Resource conflict {}-{} in t{} v{} {}-{} t{} v{} {}-{}",
@@ -217,15 +217,18 @@ impl Train {
             DelayCostType::FiniteSteps123 => DelayCostThresholds::f123().step_delays(),
             DelayCostType::FiniteSteps12345 => DelayCostThresholds::f12345().step_delays(),
             DelayCostType::FiniteSteps139 => DelayCostThresholds::f139().step_delays(),
-            DelayCostType::InfiniteSteps60 => {
-                iter_infinite_staircase(60).map(|(d, _)| d).take(100).collect()
-            }
-            DelayCostType::InfiniteSteps180 => {
-                iter_infinite_staircase(180).map(|(d, _)| d).take(100).collect()
-            }
-            DelayCostType::InfiniteSteps360 => {
-                iter_infinite_staircase(360).map(|(d, _)| d).take(100).collect()
-            }
+            DelayCostType::InfiniteSteps60 => iter_infinite_staircase(60)
+                .map(|(d, _)| d)
+                .take(100)
+                .collect(),
+            DelayCostType::InfiniteSteps180 => iter_infinite_staircase(180)
+                .map(|(d, _)| d)
+                .take(100)
+                .collect(),
+            DelayCostType::InfiniteSteps360 => iter_infinite_staircase(360)
+                .map(|(d, _)| d)
+                .take(100)
+                .collect(),
             DelayCostType::Continuous => vec![],
         };
 
@@ -417,5 +420,85 @@ pub fn problem1() -> Problem {
         ],
 
         conflicts: (0..=6).map(|i| (i, i)).collect(), // resources only conflict with themselves.
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn single_visit_problem(earliest: i32) -> Problem {
+        Problem {
+            name: "validator-boundary".to_string(),
+            trains: vec![Train {
+                visits: vec![Visit {
+                    resource_id: 0,
+                    earliest,
+                    travel_time: 0,
+                    aimed: Some(earliest),
+                }],
+            }],
+            conflicts: vec![(0, 0)],
+        }
+    }
+
+    fn two_train_resource_problem() -> Problem {
+        Problem {
+            name: "validator-resource-boundary".to_string(),
+            trains: vec![
+                Train {
+                    visits: vec![Visit {
+                        resource_id: 0,
+                        earliest: 0,
+                        travel_time: 5,
+                        aimed: Some(0),
+                    }],
+                },
+                Train {
+                    visits: vec![Visit {
+                        resource_id: 0,
+                        earliest: 0,
+                        travel_time: 5,
+                        aimed: Some(0),
+                    }],
+                },
+            ],
+            conflicts: vec![(0, 0)],
+        }
+    }
+
+    #[test]
+    fn verify_solution_rejects_entry_before_earliest() {
+        let problem = single_visit_problem(100);
+        assert_eq!(
+            problem.verify_solution(&[vec![99, 99]], DelayCostType::Continuous),
+            None
+        );
+    }
+
+    #[test]
+    fn verify_solution_accepts_entry_at_earliest() {
+        let problem = single_visit_problem(100);
+        assert_eq!(
+            problem.verify_solution(&[vec![100, 100]], DelayCostType::Continuous),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn verify_solution_accepts_touching_half_open_intervals() {
+        let problem = two_train_resource_problem();
+        assert!(problem
+            .verify_solution(&[vec![0, 5], vec![5, 10]], DelayCostType::Continuous)
+            .is_some());
+    }
+
+    #[test]
+    fn verify_solution_rejects_one_second_resource_overlap() {
+        let problem = two_train_resource_problem();
+        assert_eq!(
+            problem.verify_solution(&[vec![0, 5], vec![4, 9]], DelayCostType::Continuous),
+            None
+        );
     }
 }

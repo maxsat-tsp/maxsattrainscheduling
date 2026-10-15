@@ -548,15 +548,16 @@ problem whose practical overhead must be reported separately.
 \subsection{Correctness and reproducibility gate}
 \label{sec:correctness-gate}
 
-The current verifier accepts an entry up to 10 seconds earlier than its declared
-earliest time and permits a one-second resource overlap, whereas the DDD and
-MILP conflict checks use the exact rules in
-Equations~\eqref{eq:earliest}--\eqref{eq:resource-disjunction}. This discrepancy
-must be resolved before a run can support a journal claim. The final convention
-must be identical in the mathematical model, every solver, and the independent
-validator, with tests at both boundaries.
+The verifier now uses the exact rules in
+Equations~\eqref{eq:earliest}--\eqref{eq:resource-disjunction}: an event cannot
+start before its earliest time, and half-open resource occupations may touch
+but may not overlap. Tests cover entry one second before and exactly at the
+earliest time, as well as touching intervals and a one-second overlap. Successful
+runs also store the complete schedule. A separate Python audit reconstructs the
+instance from its text file and checks route times, resource occupations, and
+objective value without calling the Rust verifier.
 
-Before the main campaign, the following conditions are required:
+The campaign is accepted only when the following conditions hold:
 \begin{enumerate}
 \item tests cover infeasible order pairs, visits without target times, the
 180-second infinite-step objective, propagation through multiple forced orders,
@@ -734,17 +735,17 @@ selection during DDD refinement. The accepted conference contributions are
 retained as a cited baseline. The current code implements the route-bound rules
 analysed above, incumbent-based bounds for unbounded delay objectives, forced
 resource orders, full violation packages, a distinct-point budget, and an
-anti-starvation fallback. These components remain subject to the validation
-gate before their outputs can be treated as evidence. The code also supplies
-the instrumentation required for an initial B/R ablation.
+anti-starvation fallback. The temporal-boundary discrepancy has been removed,
+the missing unit tests pass, and an independent result audit now checks the
+stored schedules. The code also supplies the instrumentation required for an
+initial B/R ablation.
 
 Three steps remain before this section can become a submission conclusion.
-First, the validator and solver must use the same temporal boundary rules and
-the missing tests must pass. Second, the utility-aware selection rule must be
+First, the utility-aware selection rule must be
 implemented or the paper must explicitly limit its contribution to the
-implemented greedy policy. Third, the 864-run campaign and the conference
+implemented greedy policy. Second, the 864-run campaign and the conference
 baseline audit must be completed, followed by repeated timing where millisecond
-runs make a single measurement unreliable. The abstract, highlights, final
+runs make a single measurement unreliable. Third, the abstract, highlights, final
 contribution list, and performance conclusions will be written from those
 results.
 

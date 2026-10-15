@@ -1,0 +1,460 @@
+%% COR working manuscript based on the accepted conference paper.
+%% Replace the title, abstract, contributions, and results only after the
+%% journal-extension experiments have been completed and checked.
+\documentclass[preprint,12pt,authoryear]{elsarticle}
+
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
+\usepackage{float}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\SetAlgoNlRelativeSize{0}
+\emergencystretch=1em
+
+\journal{Computers \& Operations Research}
+\biboptions{authoryear,round}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{An Efficient MaxSAT-DDD Approach for Train Rescheduling via Precedence Propagation and Hybrid AMO Encodings}
+
+\author[vnu]{Tuyen Van Kieu}
+\ead{tuyenkv@vnu.edu.vn}
+
+\author[vnu]{Tan Huu Nguyen}
+\ead{22028102@vnu.edu.vn}
+
+\author[vnu]{Khanh Van To\corref{cor1}}
+\ead{khanhtv@vnu.edu.vn}
+\cortext[cor1]{Corresponding author.}
+
+\affiliation[vnu]{organization={Faculty of Information Technology, VNU University of Engineering and Technology},
+                  city={Hanoi},
+                  country={Vietnam}}
+
+\begin{abstract}
+Dynamic Discretization Discovery (DDD) solves fixed-route train rescheduling without enumerating a full time grid. The existing MaxSAT-DDD formulation uses independent local bounds and pairwise clauses for mutually incompatible resource occupations. We formulate and integrate two established refinements at these construction points. Standard forward bound propagation makes the initial bounds route-consistent. A hybrid at-most-one policy encodes small resource-time conflict cliques pairwise and large cliques with a sequential counter. Both refinements preserve the feasible schedules and optimality logic of DDD\@. We evaluate their individual and combined effects against SAT, MILP, and constraint-programming baselines on 72 Norwegian railway benchmark instances under stepwise, rounded, and continuous delay objectives. MaxSAT-Default proves all stepwise cases in 23\,ms on average and reduces the rounded-cost mean solve time from 794 to 479\,ms while proving the same 68 cases. Aggregate performance remains objective-dependent, with the clearest improvement on rounded delay costs.
+\end{abstract}
+
+\begin{keyword}
+Train rescheduling \sep Dynamic Discretization Discovery \sep MaxSAT \sep Cardinality encoding \sep Bound propagation
+\end{keyword}
+
+\end{frontmatter}
+
+\section{Introduction and Related Work}
+
+Railway traffic management must react to delays, disrupted rolling stock, or temporary capacity reductions while keeping the resulting plan safe and close to the published timetable. In fixed-route train rescheduling, the dispatcher chooses entry times for resources such as block sections, tracks, and stations. The fixed-route model targets short-term delay recovery without train rerouting, cancellations, or short-turning. The model contains train-path precedence and disjunctive safety constraints, which makes exact optimization difficult under real-time limits~\citep{FangYao2015,Cacchiani2014,Lamorgese2018}.
+
+MILP formulations are the most common exact modeling tool for train rescheduling. Big-$M$ formulations keep continuous time variables, but their linear relaxations are often weak. Time-indexed formulations replace temporal disjunctions with binary choices over a discretized horizon and usually provide stronger combinatorial structure. A full discretization can be too large, while a coarse discretization can introduce modeling errors. Dynamic Discretization Discovery (DDD) addresses this tension by solving restricted time-indexed models and refining only time points that violate the continuous-time constraints~\citep{Boland2017}.
+
+Surveys distinguish real-time dispatching from broader recovery under uncertain disruptions~\citep{FangYao2015,Cacchiani2014,Zhan2024Handling}. Exact railway optimization includes continuous-time MILP and decomposition~\citep{LamorgeseMannino2015,ManninoNakkerud2023}, time-indexed models~\citep{Caimi2012}, and formulations that extend the recovery scope to large-network disruptions~\citep{Zhang2023Train}. Logic-based approaches have used SAT for periodic timetabling, hybrid answer-set programming for train scheduling, and logic-based Benders decomposition~\citep{Matos2021,Abels2021,LeutwilerCorman2022}. Complementary real-time approaches use neighborhood search or dedicated conflict-resolution procedures to obtain feasible schedules quickly~\citep{Sama2017,Bettinelli2017}. Among the exact logic-based methods, the MaxSAT-DDD model of Croella et al.\ is the direct basis of our formulation.
+
+\citet{Croella2024} encoded restricted DDD subproblems as weighted partial MaxSAT\@. The MaxSAT-DDD configuration evaluated in that study starts each time partition from the corresponding local lower bound and enforces incompatible interval choices through binary clauses. We retain the restricted model, lower-bound argument, refinement logic, and stopping criterion, while modifying these two construction steps. Forward propagation makes route bounds consistent before the first restricted model, and sequential counters give linear clause growth for large conflict cliques.
+
+Our encoding choices draw on established Boolean-optimization tools. Weighted partial MaxSAT separates hard feasibility clauses from soft objective clauses~\citep{LiManya2021}, and the experiments use the RC2 optimization algorithm~\citep{Ignatiev2019}. Cardinality encodings trade clauses for auxiliary variables~\citep{RousselManquinho2021}. Sequential counters are standard cardinality encodings~\citep{Sinz2005}, and forward bound propagation is standard for precedence chains. Related work extends sequential counters to families of overlapping staircase AMO constraints~\citep{Truong2025SCL}. Here, each resource-time clique is encoded independently with the standard Sinz counter, without sharing counter variables across cliques. Our contribution is to formulate and integrate these components at the interface between train-resource constraints and DDD, and to evaluate them separately across the three benchmark variants. The AMO policy controls how resource conflicts are encoded as time points are added, while propagation raises the initial lower bounds to values implied by train-route precedence. The contributions are as follows.
+
+\begin{itemize}
+\item We derive time-indexed occupation literals from DDD lower-bound variables and use train-resource and headway constraints to form resource-time conflict cliques of pairwise-incompatible operations. Each clique is encoded with a hybrid pairwise/sequential-counter AMO scheme.
+\item Before constructing the first restricted MaxSAT model, we apply standard forward bound propagation to the initial event-time bounds of each train route. This linear-time pass initializes the DDD time partitions with route-consistent bounds that are valid for every feasible schedule.
+\item We compare four MaxSAT variants, two SAT-based optimization strategies, MILP models solved by Gurobi and CPLEX, and a CPLEX CP model. A component-wise ablation separates the effects of the two refinements.
+\end{itemize}
+
+Across the three objectives, the combined formulation matches the baseline on stepwise delay and lowers the mean runtime for rounded delay. For continuous delay, it reduces the common-set mean on the track-time variant, while Big-$M$ MILP proves more optima overall.
+
+\section{Train Rescheduling Problem Formulation}
+
+Let $I$ be the set of trains. Each train $i\in I$ follows a fixed ordered route $R_i=\langle r^i_1,\ldots,r^i_{|R_i|}\rangle$ through railway resources. The decision variable $t^{ir}$ is the time at which train $i$ enters resource $r\in R_i$. The input provides an earliest local time $\underline t^{ir}$, a minimum traversal or dwell time $l_i^r$, and safety separations $l_{ij}^{rq}$ for pairs of operations that cannot overlap. The planning horizon $H$ bounds all entry times. Let $a_i$ be the scheduled arrival time of train $i$ at its destination $r_i^{\mathrm{dest}}$, and define $\delta_i=\max\{0,t^{i r_i^{\mathrm{dest}}}-a_i\}$.
+
+A schedule is feasible when it satisfies the following constraints:
+\begin{align}
+t^{ir} &\ge \underline t^{ir},
+&& i\in I,\ r\in R_i, \label{eq:lb}\\
+t^{iq} &\ge t^{ir}+l_i^r,
+&& r \prec_i q, \label{eq:path}\\
+t^{jq} &\ge t^{ir}+l_{ij}^{rq}
+\quad \text{or}\quad
+t^{ir}\ge t^{jq}+l_{ji}^{qr},
+&& (r,q)\in\mathcal D_{ij}. \label{eq:conflict}
+\end{align}
+Constraints~\eqref{eq:lb},~\eqref{eq:path}, and~\eqref{eq:conflict} enforce release times, train-path order, and inter-train resource safety, respectively. The separations $l_{ij}^{rq}$ follow the signaling rules. Under fixed-block signaling, headway limits prevent train $j$ from entering block $q$ until train $i$ has cleared $r$ and the safety margin has elapsed. At stations, the separations represent route locking and release times. The traversal times $l_i^r$ depend on speed limits and train dynamics.
+
+For example, if two fixed routes share consecutive resources $c$ and $d$, Equation~\eqref{eq:conflict} orders their entries whenever the required separations would otherwise be violated. Delaying one train until the applicable separation has elapsed resolves the conflict without changing either route.
+
+The objective is $\min \sum_i c_i(\delta_i)$, with three delay-cost functions:
+\begin{itemize}
+\item \emph{Stepwise}: $c_i(\delta)=\sum_k w_{ik}\mathbf 1[\delta>\eta_{ik}]$.
+\item \emph{Rounded}: $c_i(\delta)=w_i\lceil\delta/180\rceil$, where 180 seconds
+(three minutes) is the interval used by the benchmark introduced by \citet{Croella2024}.
+\item \emph{Continuous}: $c_i(\delta)=w_i\delta$.
+\end{itemize}
+
+\section{Baseline MaxSAT-DDD Formulation}
+
+DDD stores a time partition $\Lambda^{ir}$ for each operation $(i,r)$ and solves a restricted interval assignment problem. The selected interval left-endpoints define a lower-bound schedule. Violated path or resource constraints trigger interval refinement. If the decoded schedule is feasible and has the same cost as the restricted model, optimality is certified.
+
+Each restricted MaxSAT-DDD model is a weighted partial MaxSAT instance. Hard clauses enforce interval assignment, monotonicity, and discovered incompatibilities. Soft clauses encode delay costs. Lower-bound literals $d^{ir}(\tau)$ represent $t^{ir}\ge\tau$ and form a monotone sequence for each operation. At initialization, the baseline uses $\underline t^{ir}$ as the first point of $\Lambda^{ir}$. It encodes each incompatibility between interval selections as a binary hard clause. Path and resource violations add time points and clauses during DDD\@. For each destination-delay breakpoint $\tau$, the soft literal $\neg d^{i r_i^{\mathrm{dest}}}(a_i+\tau)$ carries the marginal cost increase $c_i(\tau)-c_i(\tau^-)$. Step and rounded objectives have few breakpoints, whereas the continuous objective can create many unit-weight levels.
+
+\section{Proposed MaxSAT-DDD Encoding}
+
+\subsection{Solver Architecture and Refinement Workflow}
+
+The solver first applies forward bound propagation to initialize its time partitions. During each restricted-model construction, it applies the hybrid AMO policy to resource-time conflict cliques. The DDD loop then alternates between optimizing the restricted MaxSAT model and adding path, resource, or cost-refinement clauses until feasibility and objective consistency certify optimality. Both components preserve the objective, feasibility test, interval-refinement rule, and termination criterion of MaxSAT-DDD while changing the initial lower bounds and the CNF representation of resource conflicts.
+
+\subsection{Train-Path Precedence Propagation}
+
+Before constructing the first restricted model, we use standard forward bound propagation to make the input bounds consistent along each precedence chain. For $R_i=\langle r^i_1,\ldots,r^i_{|R_i|}\rangle$, we compute effective earliest times by
+\begin{align}
+\underline t^{i r^i_1}_{\mathrm{eff}} &=
+\underline t^{i r^i_1}, \label{eq:effbase}\\
+\underline t^{i r^i_{k+1}}_{\mathrm{eff}} &=
+\max\left\{\underline t^{i r^i_{k+1}},
+\underline t^{i r^i_k}_{\mathrm{eff}}+l_i^{r^i_k}\right\}.
+\label{eq:effrec}
+\end{align}
+For example, local bounds $(0,1,2,4)$ and successive durations $(3,2,4)$ are propagated to $(0,3,5,9)$. This forward pass costs $O(\sum_i |R_i|)$. Its validity follows by induction along the route. The first bound follows from~\eqref{eq:lb}. If the bound for $r^i_k$ is valid, then~\eqref{eq:path} implies $t^{i r^i_{k+1}}\ge\underline t^{i r^i_k}_{\mathrm{eff}}+l_i^{r^i_k}$, while Equation~\eqref{eq:lb} supplies the other term in~\eqref{eq:effrec}. Thus every feasible schedule satisfies the propagated bounds. Using them as the first time point of each partition initializes the first restricted MaxSAT model with route-consistent earliest times and preserves all feasible schedules.
+
+\subsection{Hybrid AMO Encoding of Resource-Time Conflict Cliques}
+
+Fix a refined time point $\tau$ and consider a conflict graph whose vertices are train operations that may be active at $\tau$. Two vertices are adjacent when their resources and separation times in $\mathcal D_{ij}$ make simultaneous activation unsafe. Let $X_{r,\tau}=\{v_1,\ldots,v_n\}$ be a clique in this graph. Because every pair of its operations is mutually incompatible, safety requires
+\begin{equation}
+\mathrm{AMO}(x_{v_1},\ldots,x_{v_n}).
+\label{eq:amo}
+\end{equation}
+The graph captures train-rescheduling structure through route events, resource incompatibilities, and asymmetric separation times. Once a clique has been formed, its AMO encoding is a standard Boolean cardinality constraint.
+
+Each indicator $x_v$ is linked to the lower-bound literals defining occupation at $\tau$. For a nonterminal operation, let $e_v(\tau)=d^{i_v r_v^{\mathrm{succ}}}(\tau+1)$, which states that the train has not entered its successor by time $\tau$. For a final operation of duration $l_v$, use $e_v(\tau)=d^{i_v r_v}(\tau-l_v+1)$. In both cases, $\neg d^{i_v r_v}(\tau+1)$ states that the train has entered $r_v$ by $\tau$, and
+\[
+\mathrm{occ}(v,\tau)
+=e_v(\tau)\wedge\neg d^{i_v r_v}(\tau+1)
+\]
+is the corresponding time-indexed occupation event. The implication
+\[
+\mathrm{occ}(v,\tau)\rightarrow x_v
+\]
+is encoded by
+\begin{equation}
+x_v \vee \neg e_v(\tau) \vee d^{i_v r_v}(\tau+1).
+\label{eq:occind}
+\end{equation}
+For a general disjunctive pair $(r,q)\in\mathcal D_{ij}$, the asymmetric separation times determine the unsafe windows. Operations are placed in the same clique only when every pair is incompatible at the refined time point. Encoding all edges of a clique separately adds $\binom n2$ binary clauses $\neg x_{v_a}\vee \neg x_{v_b}$. We use this pairwise encoding for small cliques and the sequential-counter encoding of Sinz~\citep{Sinz2005} for large cliques. With auxiliary variables $s_1,\ldots,s_{n-1}$, the clauses are
+\begin{align}
+\neg x_{v_1} \vee s_1, & \label{eq:sc} \\
+\neg x_{v_j} \vee s_j, & \qquad (1 < j < n), \notag \\
+\neg s_{j-1} \vee s_j, & \qquad (1 < j < n), \notag \\
+\neg x_{v_j} \vee \neg s_{j-1}, & \qquad (1 < j < n), \notag \\
+\neg x_{v_n} \vee \neg s_{n-1}. & \notag
+\end{align}
+Pairwise AMO uses $n(n-1)/2$ clauses and no auxiliary variables, whereas the counter uses $3n-4$ clauses and $n-1$ auxiliaries. We use pairwise clauses when $n<\theta$ and the counter otherwise. At $n=6$, the counter first becomes smaller than the pairwise encoding (14 instead of 15 clauses). The hybrid policy therefore keeps an auxiliary-free representation for small cliques and linear clause growth for large cliques. Since clause and variable counts alone do not determine solver runtime, Section~\ref{subsec:threshold} compares the main setting $\theta=6$ with $\theta\in\{4,11\}$. After the auxiliary variables are projected out, both encodings admit the same assignments to the occupation indicators, so the choice changes the CNF representation but not the feasible schedules.
+
+\subsection{MaxSAT Optimization Strategy}
+
+MaxSAT-Default combines precedence propagation with the hybrid AMO policy. Algorithm~\ref{alg:maxsat-default} gives the full DDD loop. The SAT backends use the same refinement layer; only the optimization oracle changes.
+
+\begin{algorithm}[H]
+\caption{MaxSAT-Default DDD for Train Rescheduling}
+\label{alg:maxsat-default}
+\footnotesize
+\KwIn{TRP instance $P$, timeout $T$, AMO threshold $\theta=6$}
+\KwOut{Optimal schedule $\tau^*$, or final bounds $(\mathrm{LB},\mathrm{UB})$}
+$\underline t_{\mathrm{eff}} \gets \textsc{PrecedencePropagation}(P)$\;
+$\Lambda \gets \textsc{InitialTimePartitions}(P,\underline t_{\mathrm{eff}})$\;
+$(\phi_h,\phi_s) \gets \textsc{EncodeRestrictedModel}(P,\Lambda,\theta)$\;
+$\mathrm{UB} \gets \textsc{GreedyHeuristic}(P)$;\ $\mathrm{LB}\gets0$;\ $\tau^*\gets\bot$\;
+\While{elapsed time $<T$}{
+    $(x,\ell) \gets \textsc{SolveWeightedPartialMaxSAT}(\phi_h,\phi_s)$\;
+    \If{$x=\bot$}{\Return $(\mathrm{LB},\mathrm{UB})$\;}
+    $\tau \gets \textsc{DecodeSchedule}(x,\Lambda)$;\quad
+    $\mathcal V \gets \textsc{FindViolations}(P,\tau)$\;
+    \If{$\mathcal V=\emptyset$ \textbf{\normalfont and} $\textsc{Cost}(\tau)=\ell$}{\Return $\tau$\;}
+    \If{$\mathcal V=\emptyset$ \textbf{\normalfont and} $\textsc{Cost}(\tau)<\mathrm{UB}$}{
+        $\mathrm{UB}\gets\textsc{Cost}(\tau)$;\quad $\tau^*\gets\tau$\;}
+    \If{$\mathcal V=\emptyset$}{$\mathcal V\gets\textsc{CostRefinement}(\tau,\ell)$\;}
+    $\Lambda \gets \textsc{RefineIntervals}(\Lambda,\mathcal V,\tau)$\;
+    $\phi_h \gets \phi_h \cup \textsc{EncodeNewPathClauses}(P,\Lambda)
+        \cup \textsc{EncodeResourceCliques}(P,\Lambda,\theta)$\;
+    $\phi_s \gets \textsc{UpdateSoftCostClauses}(P,\Lambda)$;\quad
+    $(\mathrm{LB},\mathrm{UB}) \gets \textsc{UpdateBounds}(\ell,\tau^*,\mathrm{UB})$\;
+}
+\textbf{return} $\tau^*$ if $\mathrm{LB}=\mathrm{UB}$, else $(\mathrm{LB},\mathrm{UB})$\;
+\end{algorithm}
+
+\section{Computational Results and Experimental Analysis}
+\label{sec:results}
+
+\subsection{Benchmark Instances and Variants}
+
+The benchmark introduced by \citet{Croella2024} contains 24 base
+instances from two single-track networks of the Norwegian railway, denoted
+Line A and Line B (A1--A12 and B1--B12). Line A is the larger network and
+typically contains more trains, whereas Line B is smaller; delays are introduced
+at route boundaries. Each base instance appears in three variants:
+\begin{itemize}
+\item \emph{original}: the original running and dwell times;
+\item \emph{track}: increased running times on track sections;
+\item \emph{station}: the increased running times plus increased station dwell
+times.
+\end{itemize}
+This gives 72 related instances per objective. Table~\ref{tab:instance-stats} summarizes their static structure.
+
+\begin{table}[H]
+\centering
+\caption{Static characteristics of the 72 benchmark variants. Route length is
+the number of visits per train.}
+\label{tab:instance-stats}
+\footnotesize
+\setlength{\tabcolsep}{9pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{lccc}
+\toprule
+Characteristic & Min. & Median & Max. \\
+\midrule
+Trains & 5 & 15 & 30 \\
+Total route visits & 139 & 593.5 & 1\,244 \\
+Mean route length & 23.8 & 36.1 & 45.8 \\
+Exclusive resources & 20 & 29 & 33 \\
+Potential conflicting visit pairs & 72 & 1\,404 & 6\,393 \\
+Conflict density (\%) & 0.69 & 0.87 & 1.16 \\
+Max.\ trains sharing one conflicting resource & 4 & 13.5 & 27 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The row labeled \emph{Total route visits} counts all train-resource operations, and an exclusive resource admits at most one train at a time. Conflict density is the number of potentially conflicting inter-train visit pairs divided by all inter-train visit pairs. The last row is a static upper bound on a time-specific clique: an actual resource-time clique can contain only a subset of the trains sharing that resource.
+
+\subsection{Solver Configurations and Experimental Protocol}
+
+Table~\ref{tab:methods} summarizes the compared configurations; MaxSAT-Base and the MILP formulations follow the earlier comparison~\citep{Croella2024}.
+\begin{table}[H]
+\centering
+\caption{Solver configurations used in the comparison.}
+\label{tab:methods}
+\scriptsize
+\setlength{\tabcolsep}{4.5pt}
+\renewcommand{\arraystretch}{1.02}
+\begin{tabular}{lll}
+\toprule
+Configuration & Backend & Role \\
+\midrule
+Big-$M$ MILP & Gurobi/CPLEX & Continuous-time MILP baseline \\
+TI-MILP & Gurobi/CPLEX & DDD time-indexed MILP baseline \\
+CP & CPLEX CP Optimizer & Constraint-programming baseline \\
+MaxSAT-Base & RC2 & Earlier MaxSAT-DDD formulation \\
+MaxSAT-SC & RC2 & Hybrid AMO encoding only \\
+MaxSAT-Prec & RC2 & Precedence propagation only \\
+MaxSAT-Default & RC2 & Both refinements \\
+IncSAT-Default & Glucose 4.2 & Incremental SAT optimization \\
+PureSAT-Default & Glucose 4.2 & Non-incremental SAT optimization \\
+\bottomrule
+\end{tabular}
+\end{table}
+GRB and CPLX abbreviate Gurobi and CPLEX in the result tables.
+
+All runs use a 120-second timeout and a 32 GB memory limit. The DDD solvers are implemented in Rust. Experiments use Ubuntu 22.04 and an Intel Core i7-13700K CPU\@. The reported times come from one run per configuration and instance. We classify a run as \emph{Opt.} when it returns a valid incumbent and its final bounds satisfy $|\mathrm{UB}-\mathrm{LB}|\leq10^{-6}\max\{1,|\mathrm{UB}|\}$. This bound test is applied uniformly to every backend. \emph{Avg.}\ is the mean solver wall time over the runs classified as \emph{Opt.} All times are reported in milliseconds.
+
+\subsection{Aggregate Performance and Commercial Baselines}
+\label{subsec:aggregate}
+
+Table~\ref{tab:overall-main} gives the primary cross-formulation comparison. It includes MaxSAT-Base; MaxSAT-Default, IncSAT-Default, and PureSAT-Default; the Gurobi Big-$M$ and TI-MILP baselines; and the CPLEX Big-$M$ result. The two single-component RC2 variants are examined in the ablation, while Table~\ref{tab:commercial-solvers} reports every MILP and CP backend.
+
+\begin{table}[H]
+\centering
+\caption{Primary comparison on all 72 instances per objective. \emph{Opt.}\ uses
+the bound criterion defined above; \emph{Avg.} is mean solve time (ms) over
+those runs.}
+\label{tab:overall-main}
+\scriptsize
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{lcccccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{2}{c}{Stepwise} & \multicolumn{2}{c}{Rounded} & \multicolumn{2}{c}{Continuous} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+& Opt. & Avg.~(ms) & Opt. & Avg.~(ms) & Opt. & Avg.~(ms) \\
+\midrule
+Big-$M$ (GRB) & \textbf{72} & 373 & 67 & 1\,745 & \textbf{67} & \textbf{762} \\
+Big-$M$ (CPLX) & \textbf{72} & 357 & \textbf{68} & 2\,095 & 47 & 94 \\
+TI-MILP (GRB) & \textbf{72} & 1\,526 & 66 & 3\,422 & 66 & 5\,902 \\
+\addlinespace[2pt]
+MaxSAT-Base & \textbf{72} & \textbf{23} & \textbf{68} & 794 & 59 & 5\,181 \\
+MaxSAT-Default & \textbf{72} & 23 & \textbf{68} & \textbf{479} & 60 & 4\,881 \\
+IncSAT-Default & \textbf{72} & 134 & \textbf{68} & 1\,872 & 51 & 8\,473 \\
+PureSAT-Default & 68 & 2\,766 & 57 & 9\,169 & 27 & 16\,706 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:overall-main} shows an objective-dependent pattern. MaxSAT-Default proves all 72 stepwise instances in 23\,ms on average and the same 68 rounded instances as the baseline, while reducing the rounded mean from 794 to 479\,ms. For continuous delay, Gurobi Big-$M$ closes 67 gaps versus 60 for MaxSAT-Default. The 94\,ms CPLEX mean covers its 47 closed gaps.
+
+\begin{table}[H]
+\centering
+\caption{Commercial-solver and CP results for the three 72-instance objective
+sets. \emph{Opt.}\ uses the bound criterion above; \emph{Feas.}\ counts valid
+incumbents; \emph{Gap} is the mean remaining gap over feasible non-Opt.\ runs.}
+\label{tab:commercial-solvers}
+\scriptsize
+\setlength{\tabcolsep}{3.8pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{lccccccccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{3}{c}{Stepwise} & \multicolumn{3}{c}{Rounded} & \multicolumn{3}{c}{Continuous} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+& Opt. & Feas. & Gap~(\%) & Opt. & Feas. & Gap~(\%) & Opt. & Feas. & Gap~(\%) \\
+\midrule
+CP (CPLX) & 30 & \textbf{72} & 33.8 & 33 & \textbf{72} & 28.3 & 32 & \textbf{72} & 26.0 \\
+Big-$M$ (CPLX) & \textbf{72} & \textbf{72} & -- & \textbf{68} & \textbf{72} & 27.5 & 47 & \textbf{72} & 4.3 \\
+Big-$M$ (GRB) & \textbf{72} & \textbf{72} & -- & 67 & \textbf{72} & 26.1 & 67 & \textbf{72} & 25.4 \\
+TI-MILP (CPLX) & 11 & 26 & 31.2 & 8 & 24 & 36.2 & 6 & 23 & 35.0 \\
+TI-MILP (GRB) & \textbf{72} & \textbf{72} & -- & 66 & \textbf{72} & 28.2 & 66 & \textbf{72} & 32.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:commercial-solvers} separates feasible incumbents from closed gaps. CP (CPLX) returns an incumbent for every instance but closes 30, 33, and 32 gaps. Big-$M$ (CPLX) also returns an incumbent for every instance and meets the bound criterion on 72, 68, and 47 instances, while Big-$M$ (GRB) meets it on 72, 67, and 67 instances. TI-MILP (GRB) closes 72, 66, and 66 gaps; TI-MILP (CPLX) returns fewer incumbents and closes 11, 8, and 6 gaps.
+
+\subsection{Ablation of Sequential-Counter AMO and Precedence Propagation}
+\label{subsec:results-ablation}
+
+Table~\ref{tab:ablation-runtime} isolates the two components. The stepwise objective changes little, but MaxSAT-Default reduces rounded runtime by about 40\% on both track and station variants and reduces continuous track runtime by 79.6\% on the 20 instances solved by all four variants. MaxSAT-SC is slightly slower than the baseline on the continuous station subset ($11\,502.7 \to 11\,827.1$~ms), showing that the counter can increase runtime on some subsets despite its linear clause growth. The effect therefore depends on the objective and instance variant.
+
+\begin{table}[H]
+\centering
+\caption{Ablation: average solve time (ms) on track and station subsets solved
+by all four MaxSAT variants within 120\,s. Parentheses give sample sizes; means
+are reported to 0.1\,ms.}
+\label{tab:ablation-runtime}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{lcccccc}
+\toprule
+\multirow{2}{*}{Variant} & \multicolumn{2}{c}{Stepwise} & \multicolumn{2}{c}{Rounded} & \multicolumn{2}{c}{Continuous} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+& Track (24) & Station (24) & Track (22) & Station (22) & Track (20) & Station (17) \\
+\midrule
+MaxSAT-Base & \textbf{27.5} & 30.7 & 658.8 & 1\,775.9 & 4\,385.9 & 11\,502.7 \\
+MaxSAT-SC & 27.8 & \textbf{29.0} & 418.7 & 1\,669.2 & 2\,026.8 & 11\,827.1 \\
+MaxSAT-Prec & 30.4 & 33.6 & 747.5 & 1\,517.1 & 1\,957.0 & 9\,343.5 \\
+MaxSAT-Default & 27.8 & 31.9 & \textbf{395.1} & \textbf{1\,065.0} & \textbf{895.6} & \textbf{8\,368.2} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{CNF structure per MaxSAT variant. Averages use the instances solved by
+all four variants: $n=72$, 68, and 59 for Stepwise, Rounded, and Continuous.
+$\bar{V}$, $\bar{C}$, and $\bar{I}$ denote variables, clauses, and DDD iterations,
+respectively.}
+\label{tab:ablation-cnf}
+\scriptsize
+\setlength{\tabcolsep}{3.8pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{lccccccccc}
+\toprule
+\multirow{2}{*}{Variant} & \multicolumn{3}{c}{Stepwise} & \multicolumn{3}{c}{Rounded} & \multicolumn{3}{c}{Continuous} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+& $\bar{V}$ & $\bar{C}$ & $\bar{I}$ & $\bar{V}$ & $\bar{C}$ & $\bar{I}$ & $\bar{V}$ & $\bar{C}$ & $\bar{I}$ \\
+\midrule
+MaxSAT-Base & 1\,798 & \textbf{5\,323} & \textbf{108} & 2\,093 & 6\,141 & 143 & 7\,845 & 23\,130 & 216 \\
+MaxSAT-SC & \textbf{1\,787} & 5\,335 & 112 & 2\,071 & 6\,119 & \textbf{140} & 7\,778 & 22\,835 & 214 \\
+MaxSAT-Prec & 1\,843 & 5\,519 & 112 & \textbf{2\,063} & \textbf{6\,101} & 145 & \textbf{7\,382} & \textbf{21\,772} & \textbf{212} \\
+MaxSAT-Default & 1\,833 & 5\,476 & 110 & 2\,100 & 6\,212 & 142 & 7\,551 & 22\,015 & 213 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ablation-cnf} reports CNF size and DDD iterations. Rounded-cost speedups occur with similar formula sizes. For continuous objectives, precedence propagation reduces the average from 7\,845 variables and 23\,130 clauses to 7\,382 variables and 21\,772 clauses, while the average iteration count changes from 216 to 212. MaxSAT-Default averages 22\,015 clauses and 213 iterations. Thus aggregate CNF size and DDD iteration count alone do not explain the runtime ranking.
+
+To relate the runtime differences to static instance structure, we use the sets solved by both MaxSAT-Base and MaxSAT-Default ($n=72$, 68, and 59). Spearman's rank coefficient $\rho$ between the number of potential conflicting pairs and $\log(t_{\mathrm{Base}}/t_{\mathrm{Default}})$ is 0.71, 0.49, and 0.29 for the stepwise, rounded, and continuous objectives, respectively. The corresponding coefficients for conflict density are $-0.23$, $-0.01$, and $0.04$. The observed Base-to-Default speedup therefore tends to increase with the absolute number of potential conflicts, most clearly for the stepwise objective, whereas conflict density shows no comparable pattern. The stepwise coefficient describes how the relative speedup varies across instances. It is compatible with the nearly equal aggregate means because rank correlation measures rank ordering rather than average speedup magnitude. Because the 72 variants come from 24 related base instances, we interpret these associations as descriptive rather than causal.
+
+\subsection{Sensitivity to the AMO Threshold}
+\label{subsec:threshold}
+
+Table~\ref{tab:threshold-sensitivity} compares the first counter-encoded clique sizes $\theta\in\{4,6,11\}$. Solved counts use all 72 instances, whereas means use the common set solved by all three thresholds.
+
+\begin{table}[H]
+\centering
+\caption{Threshold sensitivity. Common-set sizes are 72, 68, and 59 for the
+Stepwise, Rounded, and Continuous objectives, respectively.}
+\label{tab:threshold-sensitivity}
+\scriptsize
+\setlength{\tabcolsep}{5.5pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{lcccccc}
+\toprule
+\multirow{2}{*}{$\theta$} & \multicolumn{2}{c}{Stepwise} & \multicolumn{2}{c}{Rounded} & \multicolumn{2}{c}{Continuous} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+& Opt. & Avg.~(ms) & Opt. & Avg.~(ms) & Opt. & Avg.~(ms) \\
+\midrule
+4  & 72 & \textbf{21.8} & 68 & 1\,032 & 59 & 4\,517 \\
+6  & 72 & 23.5 & 68 & \textbf{479} & \textbf{60} & \textbf{3\,139} \\
+11 & 72 & 21.9 & 68 & 1\,179 & 59 & 4\,327 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All three thresholds solve the 72 stepwise instances, with shared-set means between 21.8 and 23.5~ms. For rounded and continuous delay, $\theta=6$ gives the lowest shared-set mean and also solves one additional continuous instance.
+
+\subsection{Optimality Gaps for Unsolved SAT and MaxSAT Runs}
+\label{subsec:results-gap}
+
+\begin{table}[H]
+\centering
+\caption{Optimality gaps (\%) for instances not solved by any of the four
+SAT/MaxSAT methods. OOM denotes out of memory; `--' denotes no feasible bound.}
+\label{tab:gap}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{0.95}
+\begin{tabular}{llcccc}
+\toprule
+Objective & Instance & MaxSAT-Base & MaxSAT-Default & IncSAT-Default & PureSAT-Default \\
+\midrule
+\multirow{4}{*}{Rounded} & stationA11 & \textbf{75.3} & \textbf{75.3} & 100.0 & 100.0 \\
+& stationA12 & 81.1 & \textbf{80.8} & 100.0 & 100.0 \\
+& trackA11 & 77.3 & 77.1 & \textbf{31.7} & 100.0 \\
+& trackA12 & 82.6 & \textbf{82.4} & 100.0 & 100.0 \\
+\midrule
+\multirow{11}{*}{Continuous} & origA8 & 39.5 & \textbf{39.3} & 50.0 & 100.0 \\
+& origB11 & 9.0 & \textbf{8.9} & OOM & -- \\
+& stationA1 & \textbf{62.4} & 63.0 & -- & 100.0 \\
+& stationA2 & 57.5 & 58.7 & \textbf{50.0} & 100.0 \\
+& stationA8 & 79.0 & \textbf{78.0} & OOM & OOM \\
+& stationA11 & 92.1 & \textbf{90.7} & OOM & -- \\
+& stationA12 & 93.6 & \textbf{92.7} & OOM & OOM \\
+& trackA8 & 69.5 & \textbf{69.1} & OOM & OOM \\
+& trackA11 & \textbf{90.4} & 91.1 & OOM & OOM \\
+& trackA12 & \textbf{91.7} & 91.7 & OOM & OOM \\
+& trackB12 & 46.1 & 45.8 & \textbf{0.1} & 100.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:gap} lists instances unsolved by all SAT/MaxSAT methods. The optimality gap is $(\text{UB}-\text{LB})/\text{UB}\times100\%$, where $\text{UB}$ is the best feasible objective value and $\text{LB}$ is the final lower bound. MaxSAT-Base and MaxSAT-Default have similar gaps on most rows, consistent with their shared DDD lower-bound logic. Continuous delay remains the most difficult objective for the SAT and MaxSAT configurations and favors Big-$M$ MILP in this benchmark.
+
+\section{Conclusions and Future Work}
+
+We integrated two encoding and preprocessing components into MaxSAT-DDD\@. The first constructs resource-time conflict cliques from train occupation literals and applies a hybrid pairwise/sequential-counter AMO encoding. The second uses standard forward bound propagation to initialize DDD time partitions with route-consistent earliest times.
+
+The component-wise evaluation shows that MaxSAT-Default preserves the baseline's stepwise performance, reduces the mean rounded-cost runtime, and performs better on the 20 continuous track instances solved by all four MaxSAT variants. These results come from single runs on 72 variants of 24 base instances in one benchmark family. The fixed-route model excludes rerouting, cancellations, passenger connections, and uncertainty. Future work should test broader benchmark families and strengthen the continuous-cost lower bounds.
+
+\section*{Data and code availability}
+The complete source code, benchmark datasets, and experimental artifacts used in this study are publicly available at \url{https://github.com/maxsat-tsp/maxsattrainscheduling}.
+
+\section*{Acknowledgements}
+The authors thank the Faculty of Information Technology, VNU University of Engineering and Technology, for supporting this research environment.
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references}
+
+\end{document}

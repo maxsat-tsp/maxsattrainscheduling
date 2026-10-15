@@ -9,6 +9,8 @@ không chuyển nguyên văn hay dùng lại bảng kết quả hội nghị là
 
 - `outline_brainstorm_vi.md`: dàn ý nghiên cứu, đối chiếu cấu trúc các bài liên
   quan và tiêu chí go/no-go. Đây là tệp cần đọc trước.
+- `content_review_vi.md`: rà soát bản thảo hiện tại theo mức ưu tiên, gồm lập
+  luận, mô hình toán, thực nghiệm, tính dễ đọc và thuật ngữ.
 - `main.tex`: bản thảo brainstorming bằng tiếng Anh; đã có nội dung để tiếp tục
   phát triển nhưng chưa phải bản sẵn nộp.
 - `references.bib`: dữ liệu tài liệu tham khảo.

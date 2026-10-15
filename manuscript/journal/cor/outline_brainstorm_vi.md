@@ -1,6 +1,7 @@
 # Dàn ý brainstorming cho bài tạp chí COR
 
-**Trạng thái:** tài liệu định hướng nghiên cứu, chưa phải bản thảo để nộp.
+**Trạng thái:** tài liệu định hướng nghiên cứu. Nội dung đã được chuyển thành bản
+thảo brainstorming trong `main.tex`, nhưng chưa phải bản thảo để nộp.
 
 **Cập nhật:** 15-10-2026.
 
@@ -401,7 +402,8 @@ cấu hình, manifest dữ liệu, raw CSV và script tạo bảng/hình.
 
 ## 6. Tiêu chí go/no-go cho hướng bài báo
 
-Chỉ chuyển từ brainstorming sang viết bản thảo khi đồng thời đạt:
+Chỉ chuyển từ bản thảo brainstorming hiện tại sang bản có các phát biểu kết quả
+dùng cho submission khi đồng thời đạt:
 
 1. verifier và tolerance đã thống nhất;
 2. bài nhỏ xác nhận mọi cấu hình cho cùng optimum;
@@ -427,13 +429,18 @@ sót và panic”, chưa phải đóng góp khoa học.
    runtime cuối.
 5. Nhận baseline hội nghị; khóa commit, dữ liệu và cấu hình.
 6. Chạy pilot ablation, rồi mới quyết định công thức/chính sách cuối.
-7. Sau khi qua tiêu chí go/no-go, viết lần lượt Mục 3--5, Mục 6--7, rồi mới viết
-   Introduction, Abstract và Conclusion.
+7. Sau khi qua tiêu chí go/no-go, thay các đoạn planned/pilot trong `main.tex`
+   bằng phương pháp đã chốt và kết quả có thể truy nguyên; sau đó mới viết
+   Abstract, highlights, contribution list và Conclusion cuối cùng.
 
 ## 8. Ghi chú thư mục và tài liệu tham khảo
 
-- `main.tex` trong thư mục này chỉ là skeleton tương ứng với dàn ý, không chứa
-  văn bản của bài hội nghị.
+- `main.tex` trong thư mục này đã có phần đặt vấn đề, related work, mô hình,
+  phương pháp, nghĩa vụ chứng minh, thiết kế thực nghiệm, bảng pilot và
+  discussion sơ bộ. Nội dung hội nghị chỉ được tóm tắt và trích dẫn như prior
+  work; các kết quả cũ không được trình bày như đóng góp của bài tạp chí.
+- Abstract và highlights vẫn để trống. Các phát biểu kết quả trong bản thảo đều
+  được đánh dấu là pilot, planned evaluation hoặc claim cần bằng chứng.
 - `student_implementation_guide_vi.tex` là hướng dẫn cài đặt hiện tại; cần cập
   nhật sau khi selection model được chốt.
 - `upgrade_plan_vi.md` ghi audit và kế hoạch trước đó; dàn ý này thay thế phần

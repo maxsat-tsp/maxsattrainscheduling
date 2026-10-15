@@ -1,15 +1,26 @@
-%% Working skeleton for a possible Computers & Operations Research submission.
-%% Do not copy prose, tables, or conclusions from the accepted conference paper.
-%% The research argument must first be approved in outline_brainstorm_vi.md.
+%% Internal brainstorming manuscript for a possible COR submission.
+%% Status of statements:
+%%   (i) Croella et al. and the accepted conference paper are prior work;
+%%  (ii) components B and R describe the current implementation;
+%% (iii) the utility-aware selection model and the main experiments are planned;
+%%  (iv) the week-5 table is diagnostic evidence and must not be used as a
+%%       submission result.
 \documentclass[preprint,12pt,authoryear]{elsarticle}
 
 \usepackage[T1]{fontenc}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{amsthm}
 \usepackage{booktabs}
-\usepackage{url}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xurl}
 \usepackage[linesnumbered,ruled,vlined]{algorithm2e}
 \emergencystretch=1em
+
+\newtheorem{proposition}{Proposition}
+\newcommand{\method}{MaxSAT-DDD-BR}
 
 \journal{Computers \& Operations Research}
 \biboptions{authoryear,round}
@@ -18,7 +29,7 @@
 
 \begin{frontmatter}
 
-%% Working title. Revise only after the contribution has passed the go/no-go gate.
+%% Working title. Revise after the selection model and main experiments are fixed.
 \title{Budgeted Conflict Selection in MaxSAT-DDD for Exact Train Rescheduling}
 
 \author[vnu]{Tuyen Van Kieu}
@@ -36,89 +47,728 @@
                   country={Vietnam}}
 
 \begin{abstract}
-%% Write this last. It must state the new problem, method, verified results, and
-%% insight without repeating the accepted conference abstract.
+%% Write this section only after the correctness gate and main experiments have
+%% been completed. Do not reuse the accepted conference abstract.
 \end{abstract}
 
 \begin{keyword}
-%% Select keywords after the contribution and terminology have been fixed.
+train rescheduling \sep dynamic discretization discovery \sep MaxSAT
+\sep selective refinement \sep exact optimization
 \end{keyword}
 
 \end{frontmatter}
 
 \section{Introduction}
-%% Context; accepted conference paper as prior work; exact gap; research
-%% questions; only the new contributions supported by the journal experiments.
+\label{sec:introduction}
+
+Real-time railway control requires a dispatcher to repair a timetable after
+delays or temporary capacity losses while preserving route order and resource
+safety. Even when the route of every train is fixed, choosing event times
+remains difficult because two trains that need incompatible resources must be
+ordered. Exact methods must therefore make two kinds of progress within a
+short computation time: they must find a feasible schedule and they must
+produce a lower bound that certifies its quality
+\citep{Cacchiani2014,Lamorgese2018}.
+
+Time-indexed formulations expose the temporal choices explicitly, but a model
+containing every admissible time point can be prohibitively large. Dynamic
+Discretization Discovery (DDD) addresses this problem by solving a relaxation
+on a partial time discretization, checking the resulting schedule in the
+original model, and adding time points only when they are needed
+\citep{Boland2017}. Croella et al.\ adapted this framework to fixed-route train
+rescheduling and used weighted partial MaxSAT as the optimization engine
+\citep{Croella2024}.
+
+Our accepted conference paper extended that MaxSAT-DDD implementation with
+route-precedence preprocessing and a hybrid encoding for at-most-one
+constraints \citep{KieuEtAl2026Conference}. Those components and their reported
+experiments constitute prior work. In this manuscript they are used only as a
+baseline. The journal study starts from a different bottleneck: after a
+restricted MaxSAT solution has been decoded, a DDD iteration may reveal many
+travel-time and resource violations. Repairing all of them can enlarge the
+Boolean model quickly, whereas repairing too few can require many expensive
+MaxSAT calls.
+
+Recent DDD research confirms that refinement size is a substantive algorithmic
+choice. Arc-dependent discretizations reduce unnecessary copies in service
+network design \citep{VanDykKoenemann2024}; application-specific strategies
+have improved refinement and feasible-solution construction in vehicle
+scheduling \citep{VanLieshoutVanderSchaft2025}. More recent work selects a small
+set of time points that jointly removes a collection of infeasible patterns
+\citep{ShuXuBaldacci2026}, or selects fixes that repair all observed conflicts
+while minimizing the resulting relaxation \citep{HelberEtAl2026}. These
+developments make adding fewer time points insufficient as a novelty claim.
+They also expose a more specific question that remains relevant to the MaxSAT
+setting: when an iteration can afford only a limited increase in model size,
+which conflicts should be repaired immediately and which can safely be
+postponed?
+
+This working manuscript investigates the following questions.
+
+\begin{description}
+\item[RQ1.] Can temporal bounds and selective refinement be integrated without
+changing the feasible schedules or the optimality certificate of MaxSAT-DDD?
+\item[RQ2.] Does a refinement budget improve the number of instances proved
+optimal and the end-to-end runtime relative to the accepted conference
+baseline?
+\item[RQ3.] Is any improvement explained by fewer time points and clauses,
+fewer DDD iterations, faster bound progress, or a combination of these effects?
+\item[RQ4.] How sensitive is the method to the delay objective, the refinement
+budget, and the structure of the benchmark instance?
+\end{description}
+
+The current implementation provides two components for studying these
+questions. Component B propagates lower and upper temporal bounds, uses a
+verified incumbent to derive objective-dependent upper bounds, and detects
+resource orders that have become mandatory. Component R groups detected
+violations into refinement packages and selects packages under a budget on
+distinct new time points. An age rule and a fallback prevent a violation from
+being postponed indefinitely. The present selector is deliberately simple: it
+prefers the package with the smallest marginal number of new points. A
+utility-aware selection model is formulated in Section~\ref{sec:selection-model}
+as the candidate journal extension. Its implementation and evaluation remain
+open work.
 
 \section{Related Work and Positioning}
+\label{sec:related}
 
-\subsection{Exact Train Rescheduling}
+\subsection{Exact train rescheduling}
 
-\subsection{Dynamic Discretization Discovery}
+Exact train rescheduling has been modeled with continuous-time mixed-integer
+programming, time-indexed formulations, constraint programming, and
+decomposition. Continuous-time formulations avoid a fixed time grid but often
+rely on disjunctive big-$M$ constraints. Time-indexed formulations make resource
+choices combinatorial and can give strong relaxations at the price of model
+size. Logic-based Benders decomposition exploits the spatial structure of
+railway networks \citep{LamorgeseMannino2015,LeutwilerCorman2022}, while
+dedicated algorithms target the short response times required in operations
+\citep{Sama2017,Bettinelli2017}. Realistic station studies also show that the
+choice of formulation and operational scope strongly affects practical
+performance \citep{ManninoNakkerud2023}.
 
-\subsection{Constraint Selection in Iterative Exact Methods}
+The direct baseline for this study is the MaxSAT-DDD model of
+\citet{Croella2024}. A restricted interval-assignment problem is encoded as
+weighted partial MaxSAT: hard clauses describe temporal feasibility in the
+current discretization, and soft clauses encode the delay objective. The
+accepted conference study added preprocessing and Boolean-encoding components
+to this baseline \citep{KieuEtAl2026Conference}. The present paper does not
+claim those components again.
 
-\subsection{Positioning of the Proposed Method}
-%% Include the comparison table planned in outline_brainstorm_vi.md.
+\subsection{Dynamic discretization and refinement}
+
+The original DDD framework alternates between a lower-bounding partial
+time-expanded model and a refinement step \citep{Boland2017}. Later work has
+made the discretization more expressive, for example by maintaining
+arc-dependent rather than node-dependent time sets
+\citep{VanDykKoenemann2024}. In a multi-depot vehicle-scheduling application,
+\citet{VanLieshoutVanderSchaft2025} separate the construction of the partial
+network, duty refinement, feasible-solution recovery, adaptive tolerance, and
+post-processing, and evaluate these components individually.
+
+Two recent studies are particularly close to the present question.
+\citet{ShuXuBaldacci2026} collect minimal infeasible patterns and solve a joint
+refinement problem that removes them with a small set of time points.
+\citet{HelberEtAl2026} formalize an optimal refinement problem in which a subset
+of candidate fixes must repair all observed conflicts while minimizing
+relaxation size. The latter study explicitly separates this task from deciding
+which subset of conflicts should be repaired. Our proposed selection model
+targets that decision in a MaxSAT-DDD algorithm for train rescheduling.
+
+\subsection{Selection in iterative exact methods}
+
+An iterative exact method can become slower when it retains too much
+information. In railway rescheduling, \citet{LeutwilerBonetCorman2023} show that
+reusing Benders cuts can reduce the number of iterations but that excessive cut
+reuse enlarges the optimization problems and creates a competing slowdown.
+Their lazy-selection mechanism motivates measuring both sides of the same
+trade-off here: a refinement can prevent a conflict from recurring, but its
+time points, variables, and clauses remain in subsequent MaxSAT instances.
+
+\subsection{Positioning}
+
+Table~\ref{tab:positioning} distinguishes the accepted work, the current
+implementation, and the planned journal contribution. The final row is a
+research target and must not be presented as a completed method until the
+selection model has been implemented and evaluated.
+
+\begin{table}[htbp]
+\centering
+\caption{Positioning of the working journal study. All observed means that the
+refinement optimization is required to repair every conflict or pattern passed
+to it.}
+\label{tab:positioning}
+\footnotesize
+\begin{tabularx}{\textwidth}{@{}p{30mm}p{25mm}p{45mm}X@{}}
+\toprule
+Method & Application & Refinement decision & Role in this study \\
+\midrule
+Croella et al. & Train rescheduling & Add repairs from the current solution &
+Original MaxSAT-DDD baseline \\
+Accepted conference paper & Train rescheduling & Same refinement layer; new
+preprocessing and encoding & Prior-work baseline \\
+Shu et al. & Service network design & Jointly minimize points for collected
+patterns & Closest joint-refinement work \\
+Helber et al. & Service network design & Minimize fixes for all observed
+conflicts & Closest optimal-refinement work \\
+Current B+R implementation & Train rescheduling & Select packages under a
+point budget with a greedy rule & Implemented experimental baseline \\
+Utility-aware selection & Train rescheduling & Select conflicts and shared
+repair points by value and cost & Planned journal method \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \section{Problem Definition and Journal Baseline}
-%% Give only the notation required by the new method. Cite the Croella et al.
-%% paper and the accepted conference paper instead of reproducing their text.
+\label{sec:problem}
 
-\subsection{Fixed-Route Train Rescheduling}
+\subsection{Fixed-route train rescheduling}
 
-\subsection{MaxSAT-DDD Loop and Optimality Certificate}
+Let $\mathcal I$ be the set of trains. Train $i$ follows an ordered sequence of
+visits $V_i=(v^i_1,\ldots,v^i_{m_i})$. A visit represents the use of one railway
+resource, and $t_v\in\mathbb Z$ is its entry time. For a nonterminal visit $v$,
+$s(v)$ denotes its successor and $p_v$ is the minimum time to reach that
+successor. The exit time is
+\begin{equation}
+e_v(t)=
+\begin{cases}
+t_{s(v)}, & \text{if }s(v)\text{ exists},\\
+t_v+p_v, & \text{if }v\text{ is terminal}.
+\end{cases}
+\label{eq:exit-time}
+\end{equation}
 
-\subsection{Computational Bottleneck}
+Each visit has an earliest entry $\underline t_v$. A subset
+$\mathcal A\subseteq \bigcup_i V_i$ also has a target time $a_v$ used by the
+delay objective. Let $\mathcal C$ contain pairs of visits whose resources are
+incompatible. A schedule is feasible when
+\begin{align}
+t_v &\ge \underline t_v,
+&& v\in \bigcup_i V_i, \label{eq:earliest}\\
+t_{s(v)} &\ge t_v+p_v,
+&& v\text{ with a successor}, \label{eq:route-precedence}\\
+e_v(t)\le t_w\quad &\text{or}\quad e_w(t)\le t_v,
+&& \{v,w\}\in\mathcal C. \label{eq:resource-disjunction}
+\end{align}
+Equation~\eqref{eq:resource-disjunction} treats an occupation interval as
+$[t_v,e_v)$, so two trains may touch at an endpoint without overlapping.
+
+For delay $\delta_v(t)=\max\{0,t_v-a_v\}$, the implementation minimizes
+\begin{equation}
+F(t)=\sum_{v\in\mathcal A} c_v\bigl(\delta_v(t)\bigr).
+\label{eq:objective}
+\end{equation}
+The experiments use three objective families. The finite-step objective
+(\texttt{finsteps123}) has a bounded sequence of delay penalties. The infinite
+staircase objective (\texttt{infsteps180}) increases by one unit for every
+$\Delta=180$ seconds of delay. The continuous objective (\texttt{cont}) charges
+one unit per second. This definition follows the current implementation, which
+sums costs over visits with a target time; it must be kept synchronized with the
+data parser, all solver backends, and the independent validator.
+
+\subsection{Restricted MaxSAT-DDD model}
+
+For each visit $v$, DDD maintains a finite ordered set of time points
+$\Lambda_v$. A Boolean literal $d_v(\tau)$ represents $t_v\ge\tau$. Monotonicity
+is enforced by
+\begin{equation}
+d_v(\tau_2)\Rightarrow d_v(\tau_1)
+\qquad(\tau_1<\tau_2).
+\label{eq:ladder}
+\end{equation}
+The left endpoint selected in each partial partition gives a relaxed schedule
+and a lower bound. Hard clauses encode the temporal information discovered so
+far, while weighted soft clauses encode the marginal delay cost
+\citep{Croella2024,LiManya2021}. The implementation uses RC2 as its MaxSAT
+optimizer \citep{Ignatiev2019}.
+
+Suppose a restricted solution has $t_a=\alpha$ but violates a known precedence
+$t_b\ge t_a+h$. Adding the point $\alpha+h$ to $\Lambda_b$ permits the hard
+implication
+\begin{equation}
+\neg d_a(\alpha)\lor d_b(\alpha+h).
+\label{eq:refinement-implication}
+\end{equation}
+Resource violations generate an analogous disjunctive refinement. The loop
+terminates when the decoded schedule is feasible in
+Equations~\eqref{eq:earliest}--\eqref{eq:resource-disjunction} and its verified
+cost equals the lower bound of the restricted MaxSAT model.
+
+\subsection{Conference baseline and new bottleneck}
+
+The accepted conference paper propagated earliest times along each fixed route
+before building the initial discretization and used a hybrid pairwise/sequential
+counter encoding for suitable at-most-one constraints
+\citep{KieuEtAl2026Conference,Sinz2005}. These are fixed characteristics of the
+conference baseline in the journal comparison.
+
+The new study changes the refinement layer. Let $\mathcal B_k$ be the set of
+violations found after solving iteration $k$. Adding all associated points can
+reduce future recurrence but can also increase the number of Boolean variables
+and clauses passed to every later RC2 call. Conversely, a small refinement
+budget can leave important conflicts unresolved and cause many iterations.
+The journal experiments therefore record not only total runtime but also the
+number of DDD iterations, detected and selected packages, new time points,
+forced orders, variables, clauses, and time spent in encoding, MaxSAT,
+validation, and selection.
 
 \section{Budgeted Bound-Guided Refinement}
+\label{sec:method}
 
-\subsection{Violation Bundles and Valid Repair Plans}
+\subsection{Temporal bound propagation}
 
-\subsection{Safe Temporal Bounds and Forced Precedence}
+Component B maintains a window $[L_v,U_v]$ for every visit. For a route
+precedence $t_b\ge t_a+h$, the safe updates are
+\begin{align}
+L_b &\leftarrow \max\{L_b,L_a+h\}, \label{eq:lb-prop}\\
+U_a &\leftarrow \min\{U_a,U_b-h\}. \label{eq:ub-prop}
+\end{align}
+Forward and backward passes are repeated until no bound changes. The initial
+$L_v$ values are also used as the first elements of $\Lambda_v$; otherwise the
+propagation would not reduce the initial temporal domain seen by MaxSAT.
 
-\subsection{Cost and Benefit of Refinement Actions}
+The implementation can tighten upper bounds after a feasible incumbent with
+cost $B$ has been independently verified. Let
+\[
+m_u=c_u\bigl(\max\{0,L_u-a_u\}\bigr)
+\]
+be the minimum currently implied cost for a visit with a target time, and let
+\begin{equation}
+R_v=B-\sum_{u\in\mathcal A\setminus\{v\}}m_u
+\label{eq:remaining-budget}
+\end{equation}
+be the cost left for visit $v$. For continuous cost and an infinite staircase
+of width $\Delta$, respectively, the implementation uses
+\begin{align}
+U_v &\leftarrow \min\{U_v,a_v+R_v\}, \label{eq:continuous-ub}\\
+U_v &\leftarrow \min\{U_v,a_v+\Delta R_v\}.
+\label{eq:staircase-ub}
+\end{align}
+No such update is made for a finite-step objective because its bounded penalty
+does not imply a finite upper bound on time. A visit without $a_v$ is also
+skipped.
 
-\subsection{Conflict Selection under a Budget}
+\subsection{Forced resource orders}
 
-\subsection{Anti-Starvation and Fallback}
+Consider conflicting visits $v$ and $w$. The ordering $v$ before $w$ is
+impossible if even the earliest exit of $v$ is later than the latest entry of
+$w$:
+\begin{equation}
+L_{e_v}>U_w.
+\label{eq:reject-vw}
+\end{equation}
+Similarly, $L_{e_w}>U_v$ rejects the reverse ordering. If exactly one ordering
+is rejected, the other becomes mandatory and is propagated with the route
+constraints. If both are rejected, the current bounds are inconsistent. The
+strict inequality in Equation~\eqref{eq:reject-vw} follows from the half-open
+occupation convention: equality is feasible.
 
-\subsection{Complete Algorithm}
+A forced order is encoded as a precedence implication of the form
+\eqref{eq:refinement-implication}. It is not encoded as a unit decision at one
+absolute time, because the exit time of the first visit may move in later DDD
+iterations.
+
+\subsection{Violation packages}
+
+After each restricted solution, a full scan checks route precedences and all
+inter-train resource conflicts independently. Each concrete violation produces
+a package $b$ containing:
+\begin{enumerate}
+\item a stable identifier that includes the visits and their current times;
+\item a set $P_b$ of time points absent from the current discretization; and
+\item a hard-clause action for a travel-time violation, a resource conflict, or
+a forced precedence.
+\end{enumerate}
+Including the current times in the identifier distinguishes a repeated pair of
+visits at a new incumbent from the same concrete violation at the same times.
+
+\subsection{Implemented budget rule}
+
+Let $P_{\mathrm{sel}}$ be the set of distinct points already selected in the
+current iteration. The marginal point cost of package $b$ is
+\begin{equation}
+q(b)=|P_b\setminus P_{\mathrm{sel}}|.
+\label{eq:marginal-point-cost}
+\end{equation}
+The implemented selector first inserts packages that have waited at least $W$
+iterations. These mandatory packages may exceed the nominal budget $K$. It then
+repeatedly chooses the remaining package with the smallest $q(b)$ that fits,
+using its input position as a deterministic tie breaker. If no package has
+been selected, the oldest package is chosen even when $K=0$. Setting
+$K=\texttt{all}$ applies every package and supplies the unrestricted refinement
+baseline.
+
+This rule is appropriate as a transparent baseline, but it values all
+violations equally and uses the number of new points as only a proxy for the
+increase in MaxSAT difficulty. In particular, it does not distinguish a point
+that covers several recurring conflicts from one that resolves a single
+low-impact violation.
+
+\subsection{Utility-aware conflict selection}
+\label{sec:selection-model}
+
+The candidate journal extension separates the choice of conflicts from the
+choice of their repair points. For each detected conflict $b\in\mathcal B_k$,
+let $R_b$ be a set of valid repair plans. Plan $r\in R_b$ requires the new-point
+set $A_{br}\setminus D_k$, where $D_k$ is the current discretization. Binary
+variables $y_b$, $z_{br}$, and $x_p$ indicate whether conflict $b$, repair plan
+$r$, and time point $p$ are selected. A preliminary model is
+\begin{align}
+\max\quad
+&\sum_{b\in\mathcal B_k} w_b y_b
+-\lambda\sum_{p}c_p x_p, \label{eq:selection-objective}\\
+\text{s.t.}\quad
+&\sum_{r\in R_b}z_{br}=y_b,
+&&b\in\mathcal B_k, \label{eq:one-plan}\\
+&x_p\ge z_{br},
+&&b\in\mathcal B_k,\ r\in R_b,\ p\in A_{br}\setminus D_k,
+\label{eq:point-link}\\
+&\sum_p c_p x_p\le K, \label{eq:selection-budget}\\
+&\sum_{b\in\mathcal B_k}y_b\ge1, \label{eq:selection-progress}\\
+&x_p,y_b,z_{br}\in\{0,1\}. \notag
+\end{align}
+Here, $c_p$ estimates the increase in variables and clauses caused by point
+$p$. The weight $w_b$ may combine violation age, recurrence, objective-level
+relevance, and the number of other violations covered by the same points.
+Every term must be computable before the test outcome is observed. If no repair
+plan fits $K$, the fallback relaxes the budget and applies at least one valid
+plan.
+
+Equations~\eqref{eq:selection-objective}--\eqref{eq:selection-progress} are a
+research specification, not a description of the current Rust selector. The
+main experiments must compare this model or a clearly derived approximation
+against the implemented smallest-marginal-cost rule.
+
+\subsection{Complete DDD loop}
+
+Algorithm~\ref{alg:ddd-br} shows how the implemented B and R components fit
+around the MaxSAT oracle. The utility-aware selector can replace
+\textsc{SelectPackages} without changing the other stages, provided that it
+obeys the progress and fallback requirements.
+
+\begin{algorithm}[htbp]
+\caption{Bound-guided MaxSAT-DDD with budgeted refinement}
+\label{alg:ddd-br}
+\footnotesize
+\KwIn{Train-rescheduling instance, point budget $K$, maximum wait $W$}
+\KwOut{Verified optimum, or valid incumbent and bounds at timeout}
+Initialize route-consistent lower bounds $L$, upper bounds $U$, and
+discretization $D$\;
+Initialize the MaxSAT model and an empty age table\;
+\While{time remains}{
+  Solve the current weighted partial MaxSAT model and obtain lower bound
+  $\mathrm{LB}$\;
+  Decode its event times and perform a full feasibility scan\;
+  \If{a new feasible incumbent is found}{
+    Verify it in the original model and recompute its cost $\mathrm{UB}$\;
+    Tighten objective-dependent upper bounds and propagate forced orders\;
+  }
+  Register missing objective levels required by the decoded schedule\;
+  \If{the schedule is feasible and its verified cost equals $\mathrm{LB}$}{
+    \Return the schedule as optimal\;
+  }
+  Create packages for every detected route, resource, and forced-order
+  violation\;
+  Update package ages and select packages under $(K,W)$\;
+  Apply their points and hard clauses; update the MaxSAT objective encoding\;
+}
+\Return the best verified incumbent and final $(\mathrm{LB},\mathrm{UB})$\;
+\end{algorithm}
 
 \section{Correctness and Complexity}
-%% Prove safety, LB--UB invariants, progress, finite termination on the stated
-%% time domain, and the complexity of candidate generation and selection.
+\label{sec:correctness}
+
+The statements in this section concern the mathematical rules above. Their
+connection to the experimental binary is accepted only after the validation
+rule and unit tests in Section~\ref{sec:correctness-gate} have been fixed.
+
+\begin{proposition}[Route-bound safety]
+Updates~\eqref{eq:lb-prop}--\eqref{eq:ub-prop} preserve every schedule that
+satisfies the corresponding route precedence.
+\end{proposition}
+\begin{proof}
+For any feasible schedule, $t_b\ge t_a+h\ge L_a+h$, so raising $L_b$ to
+$L_a+h$ cannot remove it. The same constraint gives $t_a\le t_b-h\le U_b-h$,
+so lowering $U_a$ to $U_b-h$ is also safe. Repeated application preserves the
+intersection of these valid bounds.
+\end{proof}
+
+\begin{proposition}[Incumbent-based upper-bound safety]
+Assume the incumbent is feasible and has recomputed cost $B$. For the
+continuous and infinite-staircase objectives, every schedule with cost at most
+$B$ satisfies Equations~\eqref{eq:continuous-ub} and
+\eqref{eq:staircase-ub}, respectively.
+\end{proposition}
+\begin{proof}
+Every other cost term is at least its value at the propagated lower bound.
+Consequently, visit $v$ can contribute at most $R_v$ in
+Equation~\eqref{eq:remaining-budget}. Continuous unit cost permits at most
+$R_v$ seconds of delay. An infinite staircase of width $\Delta$ permits at most
+$\Delta R_v$ seconds at cost at most $R_v$. The argument does not apply to a
+bounded finite-step cost, which is why that case is excluded.
+\end{proof}
+
+\begin{proposition}[Forced-order safety]
+If $L_{e_v}>U_w$, then no feasible schedule can place $v$ before $w$. If the
+reverse order remains feasible, $w$ before $v$ is mandatory.
+\end{proposition}
+\begin{proof}
+Placing $v$ before $w$ requires $e_v(t)\le t_w$. The bounds imply
+$e_v(t)\ge L_{e_v}>U_w\ge t_w$, a contradiction. The resource disjunction then
+leaves only the reverse ordering.
+\end{proof}
+
+\begin{proposition}[Selector progress]
+If at least one violation package exists, the implemented selector returns at
+least one package.
+\end{proposition}
+\begin{proof}
+Packages older than $W$ are selected first. If none is mandatory, every package
+that fits is considered by the greedy phase. If no package fits, the fallback
+selects the oldest package, including when the nominal budget is zero.
+\end{proof}
+
+Finite termination additionally requires every applied package to add a new
+time point or a hard clause that excludes the current violating assignment, and
+the admissible integer-time domain to be finite. This proof obligation must be
+checked for all three package actions and for missing cost levels. The
+utility-aware model inherits progress only when
+Equation~\eqref{eq:selection-progress} and the over-budget fallback are enforced.
+
+For $n$ visits and $m$ conflicting visit pairs, one full scan costs
+$O(n+m)$ when the conflict relation and resource-to-visit lists are indexed.
+Route propagation is linear in the number of route arcs per forward/backward
+pass. The current package selector performs repeated scans of the package list;
+its worst-case cost is quadratic in the number of detected packages. The
+selection model~\eqref{eq:selection-objective} is a small 0--1 optimization
+problem whose practical overhead must be reported separately.
 
 \section{Computational Study}
+\label{sec:experiments}
 
-\subsection{Reproducibility and Correctness Gate}
+\subsection{Correctness and reproducibility gate}
+\label{sec:correctness-gate}
 
-\subsection{Instances and Experimental Protocol}
+The current verifier accepts an entry up to 10 seconds earlier than its declared
+earliest time and permits a one-second resource overlap, whereas the DDD and
+MILP conflict checks use the exact rules in
+Equations~\eqref{eq:earliest}--\eqref{eq:resource-disjunction}. This discrepancy
+must be resolved before a run can support a journal claim. The final convention
+must be identical in the mathematical model, every solver, and the independent
+validator, with tests at both boundaries.
 
-\subsection{Compared Methods and Evaluation Measures}
+Before the main campaign, the following conditions are required:
+\begin{enumerate}
+\item tests cover infeasible order pairs, visits without target times, the
+180-second infinite-step objective, propagation through multiple forced orders,
+and the chosen feasibility boundaries;
+\item every \texttt{status=ok} schedule passes the corrected validator and its
+cost is recomputed;
+\item JSON metadata match the intended bound mode, budget, full-scan flag,
+validation flag, timeout, and binary;
+\item the commit, source diff, \texttt{Cargo.lock}, dependency patches, compiler,
+CPU, memory limits, seeds, data checksums, stdout, and stderr are retained; and
+\item tables and figures are generated from raw CSV files rather than copied
+manually into this manuscript.
+\end{enumerate}
 
-\subsection{Overall Performance}
+\subsection{Instances and objectives}
 
-\subsection{Ablation and Mechanism Analysis}
+The benchmark introduced by \citet{Croella2024} has 24 base instances from two
+Norwegian single-track networks. Each base case is provided as an original
+instance, a variant with increased track running times, and a variant that also
+increases station dwell times. This gives 72 instances for each objective. The
+journal campaign uses the complete set for \texttt{finsteps123},
+\texttt{infsteps180}, and \texttt{cont}.
 
-\subsection{Budget Sensitivity}
+The accepted conference results will be included as a prior-work baseline after
+their binary, commit, configuration, and CSV provenance have been recovered.
+They are not rerun merely to fill the journal tables. The Croella implementation
+and a strong continuous-time MILP baseline are included when their validation
+rules and resource limits can be made comparable.
 
-\subsection{Failure Cases and Objective Dependence}
+\subsection{Ablation configurations}
+
+Table~\ref{tab:ablation-configurations} defines the four implemented
+configurations. All main runs use a full violation scan and validation before
+return. The initial campaign uses $K=128$ and retains $K=32$ for sensitivity.
+
+\begin{table}[htbp]
+\centering
+\caption{Implemented ablation configurations.}
+\label{tab:ablation-configurations}
+\begin{tabular}{lll}
+\toprule
+Configuration & Bound mode & Refinement budget \\
+\midrule
+RC2-Base & off & all packages \\
+RC2+B & chain-cost-forced & all packages \\
+RC2+R & off & $K$ distinct points \\
+RC2+B+R & chain-cost-forced & $K$ distinct points \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+With 72 instances, three objectives, and four configurations, the one-run
+campaign contains $72\times3\times4=864$ solver calls. A single run is useful
+for checking coverage and large performance differences. Since many completed
+runs take only tens of milliseconds, repeated measurements will be required
+for stable runtime claims in the final submission.
+
+\subsection{Evaluation measures}
+
+Primary measures are the number of valid feasible schedules, the number of
+proved optima, timeout and error counts, solved-over-time, and PAR-2. For a
+cutoff $T$ and $N$ instances,
+\begin{equation}
+\mathrm{PAR2}=\frac1N\sum_{i=1}^{N}p_i,\qquad
+p_i=
+\begin{cases}
+t_i,&\text{if instance }i\text{ is completed within }T,\\
+2T,&\text{otherwise}.
+\end{cases}
+\label{eq:par2}
+\end{equation}
+Runtime medians and speedups are computed on paired instances. A median over a
+different solved set is not used to establish that one method is faster.
+
+Mechanism measures include the number of detected and selected packages,
+distinct new points, forced orders, DDD iterations, variables, clauses, cost
+levels, and time spent in selection, encoding, MaxSAT, and validation. LB and UB
+traces are retained for timeout cases.
+
+\subsection{Diagnostic pilot}
+\label{sec:pilot}
+
+Table~\ref{tab:week5-pilot} records the existing week-5 run of RC2+B+R. It is
+included here to preserve the decision trail and to motivate the next
+experiment. These data were produced before the full-scan repair and final
+validation gate were added. They therefore cannot support a submission claim
+or a speedup comparison with the conference baseline.
+
+\begin{table}[htbp]
+\centering
+\caption{Diagnostic one-run results for RC2+B+R at three point budgets.
+Completed is the number of runs recorded as successful by the then-current
+pipeline. These values are excluded from the final journal analysis.}
+\label{tab:week5-pilot}
+\footnotesize
+\begin{tabular}{llrrl}
+\toprule
+Objective & $K$ & Completed & Median time (ms) & Non-completed status \\
+\midrule
+\multirow{3}{*}{\texttt{finsteps123}}
+ & 8   & 37/72 & 41.57 & 35 panic \\
+ & 32  & 61/72 & 43.89 & 11 panic \\
+ & 128 & 72/72 & 17.48 & none recorded \\
+\midrule
+\multirow{3}{*}{\texttt{infsteps180}}
+ & 8   & 36/72 & 35.31 & 35 panic, 1 timeout \\
+ & 32  & 61/72 & 50.05 & 7 panic, 4 timeout \\
+ & 128 & 67/72 & 16.79 & 5 timeout \\
+\midrule
+\multirow{3}{*}{\texttt{cont}}
+ & 8   & 35/72 & 37.70 & 24 panic, 13 timeout \\
+ & 32  & 50/72 & 56.57 & 6 panic, 16 timeout \\
+ & 128 & 56/72 & 16.72 & 16 timeout \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The only justified reading of this pilot is that very small budgets were
+associated with many failures in that implementation and that $K=128$ is the
+safer value for the next correctness-controlled run. The table does not show
+that budgeted refinement is faster than RC2-Base, and the low medians exclude
+failed cases.
+
+\subsection{Planned result structure}
+
+The final analysis will answer the research questions in the following order:
+\begin{enumerate}
+\item establish objective equality and schedule validity across configurations;
+\item compare total coverage, PAR-2, and solved-over-time against the accepted
+conference baseline;
+\item use the B/R ablation to isolate each component;
+\item explain performance through point, clause, iteration, and bound traces;
+\item study $K\in\{32,128,\texttt{all}\}$ and at least one adaptive policy; and
+\item report objective-specific regressions and failure cases.
+\end{enumerate}
+No numerical statement will be moved to the abstract or conclusion until the
+corresponding raw results and generation script are archived.
 
 \section{Discussion}
+\label{sec:discussion}
 
-\section{Conclusions}
+The current design separates three questions that can otherwise be conflated.
+Bound propagation asks what temporal information is already implied by the
+model and a verified incumbent. Package construction asks which additions
+validly remove a concrete violation. Package selection asks which valid
+additions should be paid for in the current iteration. Only the third question
+is controlled by the budget.
+
+The likely benefit of selective refinement is also its main risk. A small
+selection keeps the MaxSAT instance compact, but repeated postponement can
+increase the number of solver calls. The age rule prevents indefinite
+postponement; it does not guarantee that the chosen package is computationally
+valuable. The proposed utility model must therefore be assessed through
+mechanism measures rather than runtime alone.
+
+The three objectives may react differently. Finite-step costs do not provide
+finite time upper bounds, so Component B has less information for
+\texttt{finsteps123}. Continuous costs provide the strongest direct link
+between cost and time, but their many objective levels can enlarge the Boolean
+model. Infinite-step costs lie between these cases. This distinction supplies a
+testable explanation for objective-dependent performance.
+
+External validity remains limited by the fixed-route model and by 72 variants
+derived from 24 base cases in two networks. The model does not currently cover
+rerouting, cancellation, passenger connections, rolling-stock recovery, or
+uncertain running times. A favorable result on the current benchmark should be
+reported as evidence for this setting rather than a universal advantage of
+budgeted refinement.
+
+\section{Conclusions and Next Steps}
+\label{sec:conclusion}
+
+This working manuscript reframes the journal extension around conflict
+selection during DDD refinement. The accepted conference contributions are
+retained as a cited baseline. The current code implements the route-bound rules
+analysed above, incumbent-based bounds for unbounded delay objectives, forced
+resource orders, full violation packages, a distinct-point budget, and an
+anti-starvation fallback. These components remain subject to the validation
+gate before their outputs can be treated as evidence. The code also supplies
+the instrumentation required for an initial B/R ablation.
+
+Three steps remain before this section can become a submission conclusion.
+First, the validator and solver must use the same temporal boundary rules and
+the missing tests must pass. Second, the utility-aware selection rule must be
+implemented or the paper must explicitly limit its contribution to the
+implemented greedy policy. Third, the 864-run campaign and the conference
+baseline audit must be completed, followed by repeated timing where millisecond
+runs make a single measurement unreliable. The abstract, highlights, final
+contribution list, and performance conclusions will be written from those
+results.
 
 \section*{Data and Code Availability}
 
+The evolving implementation, scripts, and benchmark interfaces are maintained
+at \url{https://github.com/maxsat-tsp/maxsattrainscheduling}. The submission
+artifact will identify the exact commit and provide raw JSON/CSV results,
+configuration manifests, data checksums, dependency patches, and scripts that
+generate every reported table and figure.
+
 \section*{CRediT Authorship Contribution Statement}
+
+%% Complete only after all authors confirm their roles.
 
 \section*{Declaration of Competing Interest}
 
+%% Replace this comment with the authors' confirmed declaration.
+
 \section*{Acknowledgements}
 
-%% Enable these lines after the first citations are added.
-%% \bibliographystyle{elsarticle-harv}
-%% \bibliography{references}
+%% Add only confirmed funding and acknowledgements.
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references}
 
 \end{document}

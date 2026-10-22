@@ -1,0 +1,982 @@
+[
+  {
+    "avg_tracks": 21.714284896850586,
+    "conflicting_visit_pairs": 6393,
+    "conflicts": 33,
+    "delay_cost_type": "InfiniteSteps180",
+    "index": 0,
+    "name": "trackA12",
+    "solves": [
+      {
+        "algorithm_time": 10.514187644999993,
+        "avg_time_points": 21.128617363344052,
+        "cost_encoding_time_seconds": 0.003700001,
+        "delay_cost_type": "InfiniteSteps180",
+        "forced_orders_total": 1,
+        "iterations": 267,
+        "lb": 100,
+        "max_time_points": 181,
+        "maxsat_rc2_bound_mode": "chain-cost-forced",
+        "maxsat_rc2_full_scan": true,
+        "maxsat_rc2_max_wait_iterations": 5,
+        "maxsat_rc2_refinement_budget": "128",
+        "maxsat_rc2_validate_before_return": true,
+        "num_clauses_total": 78747,
+        "num_conflicts": 3703,
+        "num_time_points": 26284,
+        "num_traveltime": 14504,
+        "num_vars_total": 27286,
+        "objective_iters": 100,
+        "refinement_apply_time_seconds": 0.033397603,
+        "refinement_detected_total": 19976,
+        "refinement_new_points_total": 20176,
+        "refinement_scan_time_seconds": 0.191543425,
+        "refinement_selected_total": 18207,
+        "refinement_selection_time_seconds": 0.138888014,
+        "resource_iters": 1,
+        "sol_time": 124038.49833,
+        "solver_name": "MaxsatRc2",
+        "solver_time": 113.517071086,
+        "status": "timeout",
+        "time_to_best_value_ms": 88773.190508,
+        "time_to_first_solution_ms": 102.97631799999999,
+        "timeout_seconds": 120.0,
+        "total_time": 124.031258131,
+        "travel_and_resource_iters": 165,
+        "travel_iters": 0,
+        "ub": 157,
+        "validation_time_seconds": 9.552129652,
+        "value_trace": [
+          {
+            "elapsed_ms": 7.341401,
+            "event": "lower_bound",
+            "iteration": 1,
+            "lower_bound": 1,
+            "note": "maxsat_core",
+            "value": 0
+          },
+          {
+            "elapsed_ms": 8.338702,
+            "event": "lower_bound",
+            "iteration": 2,
+            "lower_bound": 2,
+            "note": "maxsat_core",
+            "value": 1
+          },
+          {
+            "elapsed_ms": 9.205402,
+            "event": "lower_bound",
+            "iteration": 3,
+            "lower_bound": 3,
+            "note": "maxsat_core",
+            "value": 2
+          },
+          {
+            "elapsed_ms": 10.132402,
+            "event": "lower_bound",
+            "iteration": 4,
+            "lower_bound": 4,
+            "note": "maxsat_core",
+            "value": 3
+          },
+          {
+            "elapsed_ms": 10.943002,
+            "event": "lower_bound",
+            "iteration": 5,
+            "lower_bound": 5,
+            "note": "maxsat_core",
+            "value": 4
+          },
+          {
+            "elapsed_ms": 11.817102,
+            "event": "lower_bound",
+            "iteration": 6,
+            "lower_bound": 6,
+            "note": "maxsat_core",
+            "value": 5
+          },
+          {
+            "elapsed_ms": 12.829102,
+            "event": "lower_bound",
+            "iteration": 7,
+            "lower_bound": 7,
+            "note": "maxsat_core",
+            "value": 6
+          },
+          {
+            "elapsed_ms": 13.590802,
+            "event": "lower_bound",
+            "iteration": 8,
+            "lower_bound": 8,
+            "note": "maxsat_core",
+            "value": 7
+          },
+          {
+            "elapsed_ms": 14.379902999999999,
+            "event": "lower_bound",
+            "iteration": 9,
+            "lower_bound": 9,
+            "note": "maxsat_core",
+            "value": 8
+          },
+          {
+            "elapsed_ms": 15.166502999999999,
+            "event": "lower_bound",
+            "iteration": 10,
+            "lower_bound": 10,
+            "note": "maxsat_core",
+            "value": 9
+          },
+          {
+            "elapsed_ms": 15.931303000000002,
+            "event": "lower_bound",
+            "iteration": 11,
+            "lower_bound": 11,
+            "note": "maxsat_core",
+            "value": 10
+          },
+          {
+            "elapsed_ms": 16.807503,
+            "event": "lower_bound",
+            "iteration": 12,
+            "lower_bound": 12,
+            "note": "maxsat_core",
+            "value": 11
+          },
+          {
+            "elapsed_ms": 35.891606,
+            "event": "lower_bound",
+            "iteration": 21,
+            "lower_bound": 13,
+            "note": "maxsat_core",
+            "value": 12
+          },
+          {
+            "elapsed_ms": 37.013807,
+            "event": "lower_bound",
+            "iteration": 22,
+            "lower_bound": 14,
+            "note": "maxsat_core",
+            "value": 13
+          },
+          {
+            "elapsed_ms": 38.947607000000005,
+            "event": "lower_bound",
+            "iteration": 23,
+            "lower_bound": 15,
+            "note": "maxsat_core",
+            "value": 14
+          },
+          {
+            "elapsed_ms": 41.303607,
+            "event": "lower_bound",
+            "iteration": 24,
+            "lower_bound": 16,
+            "note": "maxsat_core",
+            "value": 15
+          },
+          {
+            "elapsed_ms": 102.97631799999999,
+            "event": "initial_incumbent",
+            "incumbent": 175,
+            "iteration": 29,
+            "lower_bound": 16,
+            "value": 175
+          },
+          {
+            "elapsed_ms": 240.971043,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 35,
+            "lower_bound": 17,
+            "note": "maxsat_core",
+            "value": 16
+          },
+          {
+            "elapsed_ms": 241.913243,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 36,
+            "lower_bound": 18,
+            "note": "maxsat_core",
+            "value": 17
+          },
+          {
+            "elapsed_ms": 243.073743,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 37,
+            "lower_bound": 19,
+            "note": "maxsat_core",
+            "value": 18
+          },
+          {
+            "elapsed_ms": 264.10094699999996,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 42,
+            "lower_bound": 20,
+            "note": "maxsat_core",
+            "value": 19
+          },
+          {
+            "elapsed_ms": 346.264161,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 44,
+            "lower_bound": 21,
+            "note": "maxsat_core",
+            "value": 20
+          },
+          {
+            "elapsed_ms": 347.58336099999997,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 45,
+            "lower_bound": 22,
+            "note": "maxsat_core",
+            "value": 21
+          },
+          {
+            "elapsed_ms": 349.739562,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 46,
+            "lower_bound": 23,
+            "note": "maxsat_core",
+            "value": 22
+          },
+          {
+            "elapsed_ms": 395.19897,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 48,
+            "lower_bound": 24,
+            "note": "maxsat_core",
+            "value": 23
+          },
+          {
+            "elapsed_ms": 442.34067799999997,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 50,
+            "lower_bound": 25,
+            "note": "maxsat_core",
+            "value": 24
+          },
+          {
+            "elapsed_ms": 443.836778,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 51,
+            "lower_bound": 26,
+            "note": "maxsat_core",
+            "value": 25
+          },
+          {
+            "elapsed_ms": 527.6017929999999,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 53,
+            "lower_bound": 27,
+            "note": "maxsat_core",
+            "value": 26
+          },
+          {
+            "elapsed_ms": 574.322201,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 55,
+            "lower_bound": 28,
+            "note": "maxsat_core",
+            "value": 27
+          },
+          {
+            "elapsed_ms": 707.602425,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 59,
+            "lower_bound": 29,
+            "note": "maxsat_core",
+            "value": 28
+          },
+          {
+            "elapsed_ms": 713.877026,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 61,
+            "lower_bound": 30,
+            "note": "maxsat_core",
+            "value": 29
+          },
+          {
+            "elapsed_ms": 715.2522260000001,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 62,
+            "lower_bound": 31,
+            "note": "maxsat_core",
+            "value": 30
+          },
+          {
+            "elapsed_ms": 716.713127,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 63,
+            "lower_bound": 32,
+            "note": "maxsat_core",
+            "value": 31
+          },
+          {
+            "elapsed_ms": 718.4382270000001,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 64,
+            "lower_bound": 33,
+            "note": "maxsat_core",
+            "value": 32
+          },
+          {
+            "elapsed_ms": 843.310749,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 67,
+            "lower_bound": 34,
+            "note": "maxsat_core",
+            "value": 33
+          },
+          {
+            "elapsed_ms": 926.100864,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 69,
+            "lower_bound": 35,
+            "note": "maxsat_core",
+            "value": 34
+          },
+          {
+            "elapsed_ms": 968.585271,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 71,
+            "lower_bound": 36,
+            "note": "maxsat_core",
+            "value": 35
+          },
+          {
+            "elapsed_ms": 1088.958992,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 73,
+            "lower_bound": 37,
+            "note": "maxsat_core",
+            "value": 36
+          },
+          {
+            "elapsed_ms": 1090.706293,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 74,
+            "lower_bound": 38,
+            "note": "maxsat_core",
+            "value": 37
+          },
+          {
+            "elapsed_ms": 1218.797915,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 77,
+            "lower_bound": 39,
+            "note": "maxsat_core",
+            "value": 38
+          },
+          {
+            "elapsed_ms": 1220.725716,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 78,
+            "lower_bound": 40,
+            "note": "maxsat_core",
+            "value": 39
+          },
+          {
+            "elapsed_ms": 1227.1449169999999,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 80,
+            "lower_bound": 41,
+            "note": "maxsat_core",
+            "value": 40
+          },
+          {
+            "elapsed_ms": 1400.208247,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 84,
+            "lower_bound": 42,
+            "note": "maxsat_core",
+            "value": 41
+          },
+          {
+            "elapsed_ms": 1401.868548,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 85,
+            "lower_bound": 43,
+            "note": "maxsat_core",
+            "value": 42
+          },
+          {
+            "elapsed_ms": 1485.378662,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 87,
+            "lower_bound": 44,
+            "note": "maxsat_core",
+            "value": 43
+          },
+          {
+            "elapsed_ms": 1488.937663,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 88,
+            "lower_bound": 45,
+            "note": "maxsat_core",
+            "value": 44
+          },
+          {
+            "elapsed_ms": 1491.421063,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 89,
+            "lower_bound": 46,
+            "note": "maxsat_core",
+            "value": 45
+          },
+          {
+            "elapsed_ms": 1493.5679639999998,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 90,
+            "lower_bound": 47,
+            "note": "maxsat_core",
+            "value": 46
+          },
+          {
+            "elapsed_ms": 1661.421893,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 93,
+            "lower_bound": 48,
+            "note": "maxsat_core",
+            "value": 47
+          },
+          {
+            "elapsed_ms": 1672.296295,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 95,
+            "lower_bound": 49,
+            "note": "maxsat_core",
+            "value": 48
+          },
+          {
+            "elapsed_ms": 1674.4541960000001,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 96,
+            "lower_bound": 50,
+            "note": "maxsat_core",
+            "value": 49
+          },
+          {
+            "elapsed_ms": 1676.390796,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 97,
+            "lower_bound": 51,
+            "note": "maxsat_core",
+            "value": 50
+          },
+          {
+            "elapsed_ms": 1807.044319,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 99,
+            "lower_bound": 52,
+            "note": "maxsat_core",
+            "value": 51
+          },
+          {
+            "elapsed_ms": 1811.33662,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 100,
+            "lower_bound": 53,
+            "note": "maxsat_core",
+            "value": 52
+          },
+          {
+            "elapsed_ms": 1991.8186520000002,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 104,
+            "lower_bound": 54,
+            "note": "maxsat_core",
+            "value": 53
+          },
+          {
+            "elapsed_ms": 1996.141953,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 105,
+            "lower_bound": 55,
+            "note": "maxsat_core",
+            "value": 54
+          },
+          {
+            "elapsed_ms": 2173.814084,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 108,
+            "lower_bound": 56,
+            "note": "maxsat_core",
+            "value": 55
+          },
+          {
+            "elapsed_ms": 2231.415294,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 110,
+            "lower_bound": 57,
+            "note": "maxsat_core",
+            "value": 56
+          },
+          {
+            "elapsed_ms": 2404.416325,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 113,
+            "lower_bound": 58,
+            "note": "maxsat_core",
+            "value": 57
+          },
+          {
+            "elapsed_ms": 2548.88585,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 115,
+            "lower_bound": 59,
+            "note": "maxsat_core",
+            "value": 58
+          },
+          {
+            "elapsed_ms": 3075.8769429999998,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 119,
+            "lower_bound": 60,
+            "note": "maxsat_core",
+            "value": 59
+          },
+          {
+            "elapsed_ms": 3104.671848,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 121,
+            "lower_bound": 61,
+            "note": "maxsat_core",
+            "value": 60
+          },
+          {
+            "elapsed_ms": 3265.141377,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 123,
+            "lower_bound": 62,
+            "note": "maxsat_core",
+            "value": 61
+          },
+          {
+            "elapsed_ms": 3282.86178,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 124,
+            "lower_bound": 63,
+            "note": "maxsat_core",
+            "value": 62
+          },
+          {
+            "elapsed_ms": 3381.602097,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 126,
+            "lower_bound": 64,
+            "note": "maxsat_core",
+            "value": 63
+          },
+          {
+            "elapsed_ms": 3418.3421040000003,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 127,
+            "lower_bound": 65,
+            "note": "maxsat_core",
+            "value": 64
+          },
+          {
+            "elapsed_ms": 3640.062843,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 129,
+            "lower_bound": 66,
+            "note": "maxsat_core",
+            "value": 65
+          },
+          {
+            "elapsed_ms": 3749.0563620000003,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 134,
+            "lower_bound": 67,
+            "note": "maxsat_core",
+            "value": 66
+          },
+          {
+            "elapsed_ms": 4020.7583099999997,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 136,
+            "lower_bound": 68,
+            "note": "maxsat_core",
+            "value": 67
+          },
+          {
+            "elapsed_ms": 4077.12202,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 138,
+            "lower_bound": 69,
+            "note": "maxsat_core",
+            "value": 68
+          },
+          {
+            "elapsed_ms": 4481.992591,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 142,
+            "lower_bound": 70,
+            "note": "maxsat_core",
+            "value": 69
+          },
+          {
+            "elapsed_ms": 4743.488338,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 144,
+            "lower_bound": 71,
+            "note": "maxsat_core",
+            "value": 70
+          },
+          {
+            "elapsed_ms": 4994.793082,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 147,
+            "lower_bound": 72,
+            "note": "maxsat_core",
+            "value": 71
+          },
+          {
+            "elapsed_ms": 5255.114228,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 151,
+            "lower_bound": 73,
+            "note": "maxsat_core",
+            "value": 72
+          },
+          {
+            "elapsed_ms": 5543.241078999999,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 153,
+            "lower_bound": 74,
+            "note": "maxsat_core",
+            "value": 73
+          },
+          {
+            "elapsed_ms": 5873.115337,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 157,
+            "lower_bound": 75,
+            "note": "maxsat_core",
+            "value": 74
+          },
+          {
+            "elapsed_ms": 6228.0607,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 158,
+            "lower_bound": 76,
+            "note": "maxsat_core",
+            "value": 75
+          },
+          {
+            "elapsed_ms": 6653.216981,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 161,
+            "lower_bound": 77,
+            "note": "maxsat_core",
+            "value": 76
+          },
+          {
+            "elapsed_ms": 6974.657749,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 164,
+            "lower_bound": 78,
+            "note": "maxsat_core",
+            "value": 77
+          },
+          {
+            "elapsed_ms": 7511.871463,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 167,
+            "lower_bound": 79,
+            "note": "maxsat_core",
+            "value": 78
+          },
+          {
+            "elapsed_ms": 7886.350642,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 170,
+            "lower_bound": 80,
+            "note": "maxsat_core",
+            "value": 79
+          },
+          {
+            "elapsed_ms": 8384.551648,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 173,
+            "lower_bound": 81,
+            "note": "maxsat_core",
+            "value": 80
+          },
+          {
+            "elapsed_ms": 8851.079747,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 175,
+            "lower_bound": 82,
+            "note": "maxsat_core",
+            "value": 81
+          },
+          {
+            "elapsed_ms": 9433.253770000001,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 179,
+            "lower_bound": 83,
+            "note": "maxsat_core",
+            "value": 82
+          },
+          {
+            "elapsed_ms": 10305.169155,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 182,
+            "lower_bound": 84,
+            "note": "maxsat_core",
+            "value": 83
+          },
+          {
+            "elapsed_ms": 11286.112261999999,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 186,
+            "lower_bound": 85,
+            "note": "maxsat_core",
+            "value": 84
+          },
+          {
+            "elapsed_ms": 11833.121878,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 188,
+            "lower_bound": 86,
+            "note": "maxsat_core",
+            "value": 85
+          },
+          {
+            "elapsed_ms": 12856.463395,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 191,
+            "lower_bound": 87,
+            "note": "maxsat_core",
+            "value": 86
+          },
+          {
+            "elapsed_ms": 14229.343786,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 194,
+            "lower_bound": 88,
+            "note": "maxsat_core",
+            "value": 87
+          },
+          {
+            "elapsed_ms": 16304.256713,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 199,
+            "lower_bound": 89,
+            "note": "maxsat_core",
+            "value": 88
+          },
+          {
+            "elapsed_ms": 19362.942365,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 205,
+            "lower_bound": 90,
+            "note": "maxsat_core",
+            "value": 89
+          },
+          {
+            "elapsed_ms": 21304.047334,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 208,
+            "lower_bound": 91,
+            "note": "maxsat_core",
+            "value": 90
+          },
+          {
+            "elapsed_ms": 23430.112973,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 210,
+            "lower_bound": 92,
+            "note": "maxsat_core",
+            "value": 91
+          },
+          {
+            "elapsed_ms": 26490.303531999998,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 221,
+            "lower_bound": 93,
+            "note": "maxsat_core",
+            "value": 92
+          },
+          {
+            "elapsed_ms": 30495.085047,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 224,
+            "lower_bound": 94,
+            "note": "maxsat_core",
+            "value": 93
+          },
+          {
+            "elapsed_ms": 36210.689979,
+            "event": "lower_bound",
+            "incumbent": 175,
+            "iteration": 228,
+            "lower_bound": 95,
+            "note": "maxsat_core",
+            "value": 94
+          },
+          {
+            "elapsed_ms": 41222.226366,
+            "event": "incumbent",
+            "incumbent": 166,
+            "iteration": 233,
+            "lower_bound": 95,
+            "note": "heuristic",
+            "value": 166
+          },
+          {
+            "elapsed_ms": 42674.569732,
+            "event": "lower_bound",
+            "incumbent": 166,
+            "iteration": 233,
+            "lower_bound": 96,
+            "note": "maxsat_core",
+            "value": 95
+          },
+          {
+            "elapsed_ms": 50800.390125,
+            "event": "lower_bound",
+            "incumbent": 166,
+            "iteration": 240,
+            "lower_bound": 97,
+            "note": "maxsat_core",
+            "value": 96
+          },
+          {
+            "elapsed_ms": 64640.68182600001,
+            "event": "lower_bound",
+            "incumbent": 166,
+            "iteration": 244,
+            "lower_bound": 98,
+            "note": "maxsat_core",
+            "value": 97
+          },
+          {
+            "elapsed_ms": 72587.44996,
+            "event": "incumbent",
+            "incumbent": 161,
+            "iteration": 250,
+            "lower_bound": 98,
+            "note": "heuristic",
+            "value": 161
+          },
+          {
+            "elapsed_ms": 82387.06987800001,
+            "event": "lower_bound",
+            "incumbent": 161,
+            "iteration": 253,
+            "lower_bound": 99,
+            "note": "maxsat_core",
+            "value": 98
+          },
+          {
+            "elapsed_ms": 88773.190508,
+            "event": "incumbent",
+            "incumbent": 157,
+            "iteration": 257,
+            "lower_bound": 99,
+            "note": "heuristic",
+            "value": 157
+          },
+          {
+            "elapsed_ms": 101300.62938099999,
+            "event": "lower_bound",
+            "incumbent": 157,
+            "iteration": 260,
+            "lower_bound": 100,
+            "note": "maxsat_core",
+            "value": 99
+          },
+          {
+            "elapsed_ms": 124031.774031,
+            "event": "timeout",
+            "incumbent": 157,
+            "iteration": 267,
+            "lower_bound": 100
+          }
+        ],
+        "value_trace_version": 1
+      }
+    ],
+    "trains": 28
+  }
+]

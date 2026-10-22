@@ -1,0 +1,47 @@
+{
+  "campaign": {
+    "run_id": "journal-once-2026-10-20_22-28-54",
+    "git_commit": "9ccc630a550a851f280236fd596c3ac53ab8d156",
+    "timeout_seconds": "120",
+    "external_timeout_grace_seconds": "20",
+    "refinement_budget": "128",
+    "repetitions": "1",
+    "instances_per_objective": "72",
+    "objectives": "finsteps123,infsteps180,cont",
+    "configs": "RC2-Base,RC2+B,RC2+R,RC2+B+R",
+    "started_at": "2026-10-20T15:28:55Z"
+  },
+  "files_sha256": {
+    "RC2-Base/RC2-Base_finsteps123.json": "aa6360a2180fa0976ac251a6e5d8720bf8fbf96e281934c8390e6a8efb0c2927",
+    "RC2-Base/RC2-Base_infsteps180.json": "a21c6917802ae090d7a978bf7860dd7216688f37e7a47e42f5d454acadddfb8c",
+    "RC2-Base/RC2-Base_cont.json": "74775eb8277c05317b8c0592521b39689316b1f693118c0992f4a419306b45bc",
+    "RC2+B/RC2+B_finsteps123.json": "9206a4fa5537096dd016846fffb612510152edbfea687d0736a9b91c96b34f4f",
+    "RC2+B/RC2+B_infsteps180.json": "a813a3fd15c497650d68413dc6c8d3770ceecd5460cbe4ca92bc22bfd33f2f9b",
+    "RC2+B/RC2+B_cont.json": "1b8e68580a083ea42ab307acc6549e535c3c5f89c0d7b303d8445c5a59c9cf39",
+    "RC2+R/RC2+R_finsteps123.json": "85d128bd69c20887d08546401ffd6dc85f65fef99a079c2f5e2fbd007a9a6319",
+    "RC2+R/RC2+R_infsteps180.json": "fe531993bb6d79d1957050382d0b642b8e02a7c5ba0d89519d021073dc51aee5",
+    "RC2+R/RC2+R_cont.json": "5ef7f23d020409719a2f3ef738c1adba3acadfb109b07b5c0de6e52d814554a0",
+    "RC2+B+R/RC2+B+R_finsteps123.json": "a774911265f189c7b6ee7ef7006ce3e661a3e75c44d0f4d4e6d02c25de737bb5",
+    "RC2+B+R/RC2+B+R_infsteps180.json": "d30535073e21f774fdd485cb382af81799834d0306140a989c6374afb7e1b36e",
+    "RC2+B+R/RC2+B+R_cont.json": "57be8c9eef16e325255e91ef30fdf89a02c1480656ecbd4c414f2a85908b0dfa"
+  },
+  "manifests_sha256": {
+    "RC2-Base/finsteps123.logs/manifest.txt": "9def9abb47cd30f623f70015fd895f8ff05b19e4342eb33ab91faa8dd788e0bb",
+    "RC2-Base/infsteps180.logs/manifest.txt": "03f3efeced19e666194ee476e76df876115f94a5bc9f9ab43abb967ebf09f1eb",
+    "RC2-Base/cont.logs/manifest.txt": "c730a0444c4394ee504dc8a4765dacf57da310373a1d48c8ac23b243c6dcf900",
+    "RC2+B/finsteps123.logs/manifest.txt": "abb7580fa33af949927c9505d6ab3ac88119e3aeea84a9b628f29ae454fe1151",
+    "RC2+B/infsteps180.logs/manifest.txt": "86f0110ccaebdf2d469223f275bac7e89a3252a8f1842655b31c77b7b71e2615",
+    "RC2+B/cont.logs/manifest.txt": "c60f0b2be2e0f958317dd8ead304224c599ab7627e9411f145efffa561d096dd",
+    "RC2+R/finsteps123.logs/manifest.txt": "d1a0098a426b9ca47fbafc78b315d36ba4ec2875c7e16facaddd801d24611908",
+    "RC2+R/infsteps180.logs/manifest.txt": "66c39065e3f49f37075bef0922520ffe5e9556fe7c64c6b65ebcf7e106a29a5f",
+    "RC2+R/cont.logs/manifest.txt": "9b1316dba3ecc95753fb222c7692c17d3a32a8f0fb3ed716650ac69c46f5d0ef",
+    "RC2+B+R/finsteps123.logs/manifest.txt": "1bd075f1fe40576562840cc8de376beebc6f4c4fc7ed6fddda23afaea5ff99ad",
+    "RC2+B+R/infsteps180.logs/manifest.txt": "84d2785712a835d0e0b63ae6dccbb5e1342e7804a4fc4b9d5d5d5614f5287a9e",
+    "RC2+B+R/cont.logs/manifest.txt": "93469e7fec5b80c0cdb02be2a8a5991f3717890c366da54b535fc1c57044960a"
+  },
+  "errors": [],
+  "cost_mismatches": [],
+  "par2_definition": "ok runtime if <= T; 2T for every other outcome",
+  "runtime_field": "sol_time milliseconds, converted to seconds",
+  "independent_solution_verification": "every ok schedule was reconstructed from the TXT instance and checked in Python"
+}

@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.0}
+\fancyhead[R]{\small Phiên bản 5.1}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -52,19 +52,97 @@ Kết quả RC2+B+R trước đây chỉ còn vai trò chẩn đoán. Cấu hìn
 RC2-Base một ít với \code{finsteps123}, nhưng kém hơn ở hai objective còn lại.
 Không dùng các số đó làm kết quả chính của bài tạp chí.
 
-Mã, kiểm thử và script cho AGLR đã được chuẩn bị. Sinh viên chạy thí nghiệm trên
-máy có Gurobi và CPLEX. Không sửa Abstract, Results hoặc Conclusion của bài báo
+Mã, kiểm thử và script cho AGLR đã được chuẩn bị. Giai đoạn đầu cần Gurobi;
+lượt so sánh đầy đủ cần thêm kết quả CPLEX đã kiểm tra. Không sửa Abstract,
+Results hoặc Conclusion của bài báo
 cho đến khi bộ kiểm toán báo rằng kết quả đã qua cổng chất lượng.
 
 \vfill
-{\normalsize Phiên bản 5.0, tháng 10 năm 2026\par}
+{\normalsize Phiên bản 5.1, tháng 10 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
 \tableofcontents
 \newpage
 
-\section{Việc cần làm}
+\section{Sinh viên đọc phần này trước}
+
+Phương pháp AGLR đã được cài. Nhiệm vụ trước mắt của sinh viên là kiểm tra môi
+trường và chạy thí nghiệm, không phải viết lại thuật toán. Chỉ sửa mã khi kết
+quả và telemetry chỉ ra một vấn đề cụ thể, và mỗi lần chỉ sửa một thành phần.
+
+Lần làm việc đầu tiên chỉ gồm các bước sau:
+
+\begin{enumerate}
+\item Chuyển sang nhánh \code{journal-aglr}, cập nhật mã và ghi lại commit.
+\item Kiểm tra rằng cây Git sạch, dependencies đúng vị trí và Gurobi hoạt động.
+\item Chạy toàn bộ test AGLR trên máy Linux.
+\item Chạy giai đoạn \code{screen} đúng một lần cho mỗi cấu hình.
+\item Gửi lại thư mục kết quả và các file tóm tắt; chưa tự đổi tham số và chưa
+      chạy \code{full}.
+\end{enumerate}
+
+Các lệnh chuẩn bị là:
+
+\begin{verbatim}
+git fetch origin
+git checkout journal-aglr
+git pull --ff-only
+git rev-parse HEAD
+git status --short
+
+command -v timeout
+gurobi_cl --version
+cargo check --manifest-path Cargo.toml -p ddd --all-targets
+cargo test --manifest-path Cargo.toml -p ddd aglr --lib
+\end{verbatim}
+
+Lệnh \code{git status --short} phải không in gì. Hai repository
+\file{salvers} và \file{ipamir-rs} phải nằm cạnh repository chính. Giai đoạn
+\code{screen} và \code{promote} cần Gurobi nhưng chưa cần CPLEX. Kết quả CPLEX
+chỉ được chuẩn bị trước giai đoạn \code{full}.
+
+Sau \code{screen}, sinh viên gửi lại đường dẫn thư mục chiến dịch và năm file:
+
+\begin{itemize}
+\item \file{campaign.txt};
+\item \file{aglr_ranking.csv};
+\item \file{aglr_summary.csv};
+\item \file{aglr_audit.json};
+\item \file{latest_screen.txt}.
+\end{itemize}
+
+Nếu auditor báo lỗi, gửi thêm file \code{*.stderr.log} của instance liên quan.
+Không sửa CSV hoặc JSON bằng tay. Toàn bộ thư mục \file{results/aglr/} phải được
+giữ nguyên và sao lưu, dù thư mục này không được commit lên Git.
+
+\section{Những phần đã thay đổi trong mã}
+
+Sinh viên cần biết vị trí của thay đổi để đọc log và xử lý lỗi:
+
+\begin{tabularx}{\textwidth}{@{}p{59mm}X@{}}
+\toprule
+Tệp & Nội dung mới \\
+\midrule
+\file{maxsat_ladder_sc/aglr.rs} & Công thức chi phí, mức ưu tiên, tuổi chờ và
+bộ chọn xác định. \\
+\file{maxsat_ladder_sc/solve.rs} & Quét toàn bộ xung đột, áp dụng ứng viên đã
+chọn, bước cứu, telemetry và kiểm tra nghiệm cuối. \\
+\file{solvers/util/heuristic.rs} & Bỏ sớm nghiệm không cải thiện và không kiểm
+tra lại cùng một lịch. \\
+\file{src/main.rs} & Alias solver và bốn tham số AGLR trên dòng lệnh. \\
+\file{run_aglr_experiments.sh} & Điều khiển bốn giai đoạn thực nghiệm và tiếp
+tục sau khi bị ngắt. \\
+\file{audit_aglr_campaign.py} & Kiểm tra độc lập lịch, chi phí, cận và điều kiện
+dùng kết quả cho submission. \\
+\bottomrule
+\end{tabularx}
+
+Tên cũ \file{maxsat_ddd_ladder_sc} vẫn là CSOnet \code{legacy}. Không đổi tên
+hoặc sửa cấu hình này vì nó là baseline dùng để biết AGLR có thực sự cải thiện
+kết quả hay không.
+
+\section{Việc cần làm trong toàn bộ chiến dịch}
 
 Công việc được chia thành bốn bước. Mỗi cấu hình chỉ chạy một lần ở vòng đầu.
 
@@ -308,6 +386,10 @@ Tập phát triển có A3, A6, A9, A12, B3, B6, B9, B12; mỗi base case gồm
 \code{orig}, \code{track} và \code{station}. Mỗi cấu hình chạy một lần với giới
 hạn 30 giây.
 
+Giai đoạn này có $18\times24\times3=1296$ lời gọi solver. Tổng timeout nội bộ
+tối đa là khoảng 10.8 giờ nếu chạy tuần tự và mọi lời gọi đều hết 30 giây; thời
+gian thực tế còn phụ thuộc thời gian khởi động và số instance kết thúc sớm.
+
 \subsection{Bước 2: nâng ba cấu hình tốt nhất}
 
 \begin{verbatim}
@@ -316,6 +398,9 @@ bash run_aglr_experiments.sh promote
 
 Auditor xếp hạng theo thứ tự: số optimum, PAR-2, rồi mức tăng mô hình. Ba cấu
 hình đầu chạy lại trên tập phát triển với giới hạn 120 giây.
+
+Giai đoạn này có $3\times24\times3=216$ lời gọi solver, tương ứng tối đa khoảng
+7.2 giờ timeout nội bộ nếu chạy tuần tự.
 
 \subsection{Bước 3: chạy toàn bộ dữ liệu}
 
@@ -331,6 +416,21 @@ Mỗi dòng CPLEX có \code{status=ok} còn phải có \code{valid=true}, nghĩa
 qua bộ kiểm tra nghiệm, và có cận dưới bằng cận trên. CSV cũ thiếu trường
 \code{valid} chỉ dùng để tham khảo.
 Nếu chưa có CPLEX, script vẫn chạy nhưng cổng submission sẽ báo thiếu baseline.
+
+CSV CPLEX tối thiểu có dạng:
+
+\begin{verbatim}
+name,status,lb,ub,total_time,valid
+originalA1,ok,11,11,0.446,true
+\end{verbatim}
+
+Mỗi objective cần một file riêng. Giá trị \code{valid=true} phải do chương
+trình kiểm tra lịch sinh ra, không được điền tay chỉ vì CPLEX báo tối ưu.
+
+Phần chạy tại repository gồm năm phương pháp, nên giai đoạn \code{full} có
+$5\times72\times3=1080$ lời gọi solver. Với timeout 120 giây, tổng timeout nội
+bộ tối đa là khoảng 36 giờ nếu chạy tuần tự. Dữ liệu CPLEX được nhập vào, không
+được tính trong 1080 lời gọi này.
 
 \subsection{Bước 4: xác nhận các instance quan trọng}
 
@@ -353,6 +453,8 @@ tạo ba file:
 \item \file{aglr_summary.csv}: coverage, median, PAR-2 và số đo tăng mô hình;
 \item \file{aglr_ranking.csv}: thứ tự các cấu hình AGLR;
 \item \file{aglr_audit.json}: lỗi và trạng thái cổng submission.
+\item \file{confirm_instances.txt}: danh sách instance cần chạy xác nhận nếu
+      lượt đầy đủ đã đạt ngưỡng.
 \end{itemize}
 
 Auditor dựng lại instance từ file văn bản và tự kiểm tra mọi lịch MaxSAT/Gurobi.
@@ -390,6 +492,11 @@ bảng chân trị và vét cạn trước khi bật giới hạn objective. \\
 Không bật \code{BinaryObjective} trong chiến dịch đầu. Đây là bước mở rộng dự
 phòng và chỉ được dùng sau khi có kiểm thử riêng. Khi thay đổi phương pháp, chạy
 lại \code{screen}; không dùng kết quả của hai phiên bản mã như cùng một cấu hình.
+Báo cáo mỗi vòng phải ghi commit, máy, phiên bản solver, giai đoạn, thư mục kết
+quả, cấu hình đứng đầu và mọi lỗi trong \file{aglr_audit.json}.
+Sinh viên điền trực tiếp mẫu
+\file{manuscript/journal/student_experiment_report_template_vi.md} để không bỏ
+sót thông tin.
 
 \section{Nội dung được phép đưa vào bài báo}
 

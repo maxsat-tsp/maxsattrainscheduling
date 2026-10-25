@@ -10,6 +10,30 @@ bảng chính.
 Chiến dịch đầu chỉ chạy mỗi cấu hình một lần. Các lượt lặp chỉ bắt đầu sau khi
 AGLR vượt ngưỡng coverage và PAR-2.
 
+## Việc sinh viên làm ngay
+
+Trước mắt chỉ chạy giai đoạn `screen`. Không sửa tham số, không sửa JSON/CSV và
+chưa chạy `full`. Chuẩn bị mã bằng các lệnh:
+
+```bash
+git fetch origin
+git checkout journal-aglr
+git pull --ff-only
+git rev-parse HEAD
+git status --short
+```
+
+`git status --short` phải không in gì. Sau khi test đạt, chạy:
+
+```bash
+bash run_aglr_experiments.sh screen
+```
+
+Khi hoàn tất, gửi lại đường dẫn thư mục chiến dịch cùng `campaign.txt`,
+`aglr_ranking.csv`, `aglr_summary.csv`, `aglr_audit.json` và
+`latest_screen.txt`. Nếu có lỗi, gửi thêm `*.stderr.log` của instance liên
+quan. Giữ và sao lưu toàn bộ `results/aglr/`; thư mục này không được commit.
+
 ## Chuẩn bị máy
 
 Máy cần Rust, Python 3, GNU `timeout`, Gurobi có license và hai repository
@@ -38,6 +62,11 @@ số là:
 - `K_min`: 16, 32, 64;
 - `rho`: 0.25, 0.5, 0.75;
 - `W`: 5, 10.
+
+Có 18 cấu hình, ba objective và 24 instance, tức 1296 lời gọi solver. Tổng
+timeout nội bộ tối đa khoảng 10.8 giờ nếu chạy tuần tự và mọi lời gọi đều hết
+30 giây. Thời gian thực tế có thể khác vì nhiều instance kết thúc sớm và mỗi
+lời gọi còn có chi phí khởi động.
 
 Kết quả gần nhất được ghi trong `results/aglr/latest_screen.txt`. Xem
 `aglr_ranking.csv` trong thư mục được chỉ ra bởi file này.
@@ -73,6 +102,16 @@ nhận mẫu `results_bigm_<objective>_120s.csv` hoặc
 `ub`, thời gian chạy và `valid`. Giá trị `valid=true` xác nhận lịch đã qua bộ
 kiểm tra nghiệm. `status=ok` chỉ được tính tối ưu khi `valid=true` và `lb`, `ub`
 khớp. CSV cũ thiếu `valid` chỉ dùng tham khảo, không dùng mở cổng submission.
+
+Ví dụ một CSV tối thiểu:
+
+```csv
+name,status,lb,ub,total_time,valid
+originalA1,ok,11,11,0.446,true
+```
+
+`valid=true` phải do chương trình kiểm tra lịch sinh ra, không được điền tay từ
+trạng thái tối ưu của CPLEX.
 
 ```bash
 CPLEX_RESULTS_DIR=/absolute/path/to/cplex_csv \
@@ -131,6 +170,10 @@ Các file cần giữ để viết bài:
 - `aglr_audit.json`;
 - `confirm_instances.txt`;
 - mọi JSON, manifest và log instance trong cùng thư mục chiến dịch.
+
+Báo cáo sau mỗi giai đoạn phải ghi commit, thông tin máy, phiên bản Gurobi/CPLEX,
+thư mục kết quả, cấu hình đứng đầu và mọi lỗi trong `aglr_audit.json`.
+Dùng mẫu `manuscript/journal/student_experiment_report_template_vi.md`.
 
 Nếu cổng chưa đạt, đọc telemetry rồi chỉ đổi một thành phần: giảm `W` hoặc tăng
 `rho` khi nhiều ứng viên chờ; giảm `rho` hoặc `K_min` khi mô hình tăng nhanh;

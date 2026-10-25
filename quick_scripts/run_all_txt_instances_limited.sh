@@ -16,6 +16,12 @@ MAXSAT_RC2_REFINEMENT_BUDGET="${MAXSAT_RC2_REFINEMENT_BUDGET:-}"
 MAXSAT_RC2_MAX_WAIT_ITERATIONS="${MAXSAT_RC2_MAX_WAIT_ITERATIONS:-}"
 MAXSAT_RC2_FULL_SCAN="${MAXSAT_RC2_FULL_SCAN:-}"
 MAXSAT_RC2_VALIDATE_BEFORE_RETURN="${MAXSAT_RC2_VALIDATE_BEFORE_RETURN:-}"
+AGLR_POLICY="${AGLR_POLICY:-}"
+AGLR_MIN_GROWTH="${AGLR_MIN_GROWTH:-}"
+AGLR_FRACTION="${AGLR_FRACTION:-}"
+AGLR_MAX_WAIT="${AGLR_MAX_WAIT:-}"
+INSTANCE_NAMES="${INSTANCE_NAMES:-}"
+INSTANCE_ORDER_SEED="${INSTANCE_ORDER_SEED:-0}"
 RERUN_NON_OK="${RERUN_NON_OK:-0}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 export RUST_BACKTRACE="${RUST_BACKTRACE:-1}"
@@ -26,6 +32,10 @@ if ! [[ "$INSTANCE_TIMEOUT_SECS" =~ ^[1-9][0-9]*$ ]]; then
 fi
 if ! [[ "$EXTERNAL_TIMEOUT_GRACE_SECS" =~ ^[0-9]+$ ]]; then
   echo "ERROR: EXTERNAL_TIMEOUT_GRACE_SECS phải là số nguyên không âm." >&2
+  exit 2
+fi
+if ! [[ "$INSTANCE_ORDER_SEED" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: INSTANCE_ORDER_SEED phải là số nguyên không âm." >&2
   exit 2
 fi
 EXTERNAL_TIMEOUT_SECS=$((INSTANCE_TIMEOUT_SECS + EXTERNAL_TIMEOUT_GRACE_SECS))
@@ -45,14 +55,16 @@ SATDDD_SEED_RESOURCE_CONFLICTS="${SATDDD_SEED_RESOURCE_CONFLICTS:-}"
 SATDDD_USE_SC_AMO="${SATDDD_USE_SC_AMO:-}"
 
 # `MaxSatDddLadderScSettings` knobs forwarded to `--maxsat-ladder-sc-*`
-# flags when set. Effective only when SOLVER=maxsat_ddd_ladder_sc. Empty
-# value means "leave the binary's default in place".
+# flags when set. Effective for maxsat_ddd_ladder_sc and its AGLR alias.
+# Empty value means "leave the binary's default in place".
 MAXSATDDD_USE_PRECEDENCE_GRAPH="${MAXSATDDD_USE_PRECEDENCE_GRAPH:-}"
 MAXSATDDD_USE_SC_AMO="${MAXSATDDD_USE_SC_AMO:-}"
 MAXSATDDD_USE_TOUCHED_CLIQUE_AMO="${MAXSATDDD_USE_TOUCHED_CLIQUE_AMO:-}"
 
 tmpdir="$(mktemp -d /tmp/ddd-run-all.XXXXXX)"
 order_file="$tmpdir/order.txt"
+selected_names_file="$tmpdir/selected_names.txt"
+planned_order_file="$tmpdir/planned_order.txt"
 touch "$order_file"
 mkdir -p "$RUN_LOG_DIR"
 instance_json_dir="$RUN_LOG_DIR/instances"
@@ -195,6 +207,38 @@ print(len(paths), digest.hexdigest())
 PY
 )
 
+python3 - "$INSTANCE_NAMES" "$INSTANCE_ORDER_SEED" "$selected_names_file" "$planned_order_file" <<'PY'
+import random
+import sys
+from pathlib import Path
+
+requested, seed, selected_path, order_path = sys.argv[1:]
+canonical = [
+    f"{prefix}{infra}{number}"
+    for prefix in ("orig", "track", "station")
+    for infra in ("A", "B")
+    for number in range(1, 13)
+]
+if requested.strip():
+    names = requested.split()
+    unknown = sorted(set(names) - set(canonical))
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if unknown or duplicates:
+        raise SystemExit(
+            f"ERROR: INSTANCE_NAMES không hợp lệ: unknown={unknown}, duplicates={duplicates}"
+        )
+    selected = [name for name in canonical if name in set(names)]
+else:
+    selected = canonical
+order = selected.copy()
+if int(seed) != 0:
+    random.Random(int(seed)).shuffle(order)
+Path(selected_path).write_text("\n".join(selected) + "\n")
+Path(order_path).write_text("\n".join(order) + "\n")
+PY
+selected_instance_count="$(wc -l < "$selected_names_file" | tr -d ' ')"
+selected_instances_csv="$(paste -sd, "$selected_names_file")"
+
 run_fingerprint="$(python3 - \
   "$binary_sha256" "$script_sha256" "$SOLVER" "$OBJECTIVE" \
   "$INSTANCE_TIMEOUT_SECS" "$EXTERNAL_TIMEOUT_GRACE_SECS" \
@@ -204,6 +248,11 @@ run_fingerprint="$(python3 - \
   "${MAXSAT_RC2_MAX_WAIT_ITERATIONS:-default}" \
   "${MAXSAT_RC2_FULL_SCAN:-default}" \
   "${MAXSAT_RC2_VALIDATE_BEFORE_RETURN:-default}" \
+  "${AGLR_POLICY:-default}" \
+  "${AGLR_MIN_GROWTH:-default}" \
+  "${AGLR_FRACTION:-default}" \
+  "${AGLR_MAX_WAIT:-default}" \
+  "$selected_instances_csv" "$INSTANCE_ORDER_SEED" \
   "${SATDDD_OBJECTIVE_ENCODING:-default}" \
   "${SATDDD_USE_PRECEDENCE_GRAPH:-default}" \
   "${SATDDD_PREALLOC_COST_THRESHOLDS:-default}" \
@@ -267,6 +316,13 @@ else
     printf 'maxsat_rc2_max_wait_iterations=%s\n' "${MAXSAT_RC2_MAX_WAIT_ITERATIONS:-default}"
     printf 'maxsat_rc2_full_scan=%s\n' "${MAXSAT_RC2_FULL_SCAN:-default}"
     printf 'maxsat_rc2_validate_before_return=%s\n' "${MAXSAT_RC2_VALIDATE_BEFORE_RETURN:-default}"
+    printf 'aglr_policy=%s\n' "${AGLR_POLICY:-default}"
+    printf 'aglr_min_growth=%s\n' "${AGLR_MIN_GROWTH:-default}"
+    printf 'aglr_fraction=%s\n' "${AGLR_FRACTION:-default}"
+    printf 'aglr_max_wait=%s\n' "${AGLR_MAX_WAIT:-default}"
+    printf 'selected_instance_count=%s\n' "$selected_instance_count"
+    printf 'selected_instances=%s\n' "$selected_instances_csv"
+    printf 'instance_order_seed=%s\n' "$INSTANCE_ORDER_SEED"
     printf 'satddd_objective_encoding=%s\n' "${SATDDD_OBJECTIVE_ENCODING:-default}"
     printf 'satddd_use_precedence_graph=%s\n' "${SATDDD_USE_PRECEDENCE_GRAPH:-default}"
     printf 'satddd_prealloc_cost_thresholds=%s\n' "${SATDDD_PREALLOC_COST_THRESHOLDS:-default}"
@@ -353,6 +409,18 @@ run_one() {
   fi
   if [[ -n "$MAXSAT_RC2_VALIDATE_BEFORE_RETURN" ]]; then
     extra_args+=(--maxsat-rc2-validate-before-return "$MAXSAT_RC2_VALIDATE_BEFORE_RETURN")
+  fi
+  if [[ -n "$AGLR_POLICY" ]]; then
+    extra_args+=(--aglr-policy "$AGLR_POLICY")
+  fi
+  if [[ -n "$AGLR_MIN_GROWTH" ]]; then
+    extra_args+=(--aglr-min-growth "$AGLR_MIN_GROWTH")
+  fi
+  if [[ -n "$AGLR_FRACTION" ]]; then
+    extra_args+=(--aglr-fraction "$AGLR_FRACTION")
+  fi
+  if [[ -n "$AGLR_MAX_WAIT" ]]; then
+    extra_args+=(--aglr-max-wait "$AGLR_MAX_WAIT")
   fi
 
   printf '%s\n' "$instance_name" >> "$order_file"
@@ -450,46 +518,38 @@ PY
 EOF
 }
 
-for prefix in orig track station; do
-  for infra in A B; do
-    for number in $(seq 1 12); do
-      run_one "${prefix}${infra}${number}"
-    done
-  done
-done
+while IFS= read -r instance_name; do
+  [[ -n "$instance_name" ]] && run_one "$instance_name"
+done < "$planned_order_file"
 
-python3 - "$instance_json_dir" "$order_file" "$JSON_OUT" <<'PY'
+python3 - "$instance_json_dir" "$selected_names_file" "$order_file" "$JSON_OUT" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 tmpdir = Path(sys.argv[1])
-order_file = Path(sys.argv[2])
-json_out = Path(sys.argv[3])
+selected_names_file = Path(sys.argv[2])
+order_file = Path(sys.argv[3])
+json_out = Path(sys.argv[4])
 
-items = []
+items_by_name = {}
 for line in order_file.read_text().splitlines():
     if not line:
         continue
     data = json.loads((tmpdir / f"{line}.json").read_text())
-    if isinstance(data, list):
-        items.extend(data)
-    else:
-        items.append(data)
+    rows = data if isinstance(data, list) else [data]
+    for item in rows:
+        items_by_name[item.get("name")] = item
 
-expected = [
-    f"{prefix}{infra}{number}"
-    for prefix in ("orig", "track", "station")
-    for infra in ("A", "B")
-    for number in range(1, 13)
-]
+expected = [line for line in selected_names_file.read_text().splitlines() if line]
+items = [items_by_name[name] for name in expected if name in items_by_name]
 names = [item.get("name") for item in items]
 if names != expected:
     missing = sorted(set(expected) - set(names))
     unexpected = sorted(set(names) - set(expected), key=str)
     duplicates = sorted({name for name in names if names.count(name) > 1}, key=str)
     raise SystemExit(
-        "ERROR: Kết quả không có đúng 72 instance theo thứ tự chuẩn. "
+        "ERROR: Kết quả không có đúng tập instance theo thứ tự chuẩn. "
         f"missing={missing}, unexpected={unexpected}, duplicates={duplicates}"
     )
 

@@ -1,9 +1,9 @@
 %% Internal brainstorming manuscript for a possible COR submission.
 %% Status of statements:
 %%   (i) Croella et al. and the accepted conference paper are prior work;
-%%  (ii) components B and R describe the current implementation;
-%% (iii) the utility-aware selection model and the main experiments are planned;
-%%  (iv) the week-5 table is diagnostic evidence and must not be used as a
+%%  (ii) AGLR describes the current implementation;
+%% (iii) the main experiments are planned;
+%%  (iv) the earlier RC2+B+R table is diagnostic evidence and must not be used as a
 %%       submission result.
 \documentclass[preprint,12pt,authoryear]{elsarticle}
 
@@ -20,7 +20,7 @@
 \emergencystretch=1em
 
 \newtheorem{proposition}{Proposition}
-\newcommand{\method}{MaxSAT-DDD-BR}
+\newcommand{\method}{AGLR}
 
 \journal{Computers \& Operations Research}
 \biboptions{authoryear,round}
@@ -30,7 +30,7 @@
 \begin{frontmatter}
 
 %% Working title. Revise after the selection model and main experiments are fixed.
-\title{Budgeted Conflict Selection in MaxSAT-DDD for Exact Train Rescheduling}
+\title{Adaptive Growth-Limited Refinement in MaxSAT-DDD for Exact Train Rescheduling}
 
 \author[vnu]{Tuyen Van Kieu}
 \ead{tuyenkv@vnu.edu.vn}
@@ -106,28 +106,24 @@ postponed?
 This working manuscript investigates the following questions.
 
 \begin{description}
-\item[RQ1.] Can temporal bounds and selective refinement be integrated without
-changing the feasible schedules or the optimality certificate of MaxSAT-DDD?
-\item[RQ2.] Does a refinement budget improve the number of instances proved
-optimal and the end-to-end runtime relative to the accepted conference
-baseline?
-\item[RQ3.] Is any improvement explained by fewer time points and clauses,
-fewer DDD iterations, faster bound progress, or a combination of these effects?
-\item[RQ4.] How sensitive is the method to the delay objective, the refinement
-budget, and the structure of the benchmark instance?
+\item[RQ1.] Does limiting model growth during refinement preserve the optimum
+returned by the published CSOnet solver?
+\item[RQ2.] Does adaptive selection improve the number of instances proved
+optimal and PAR-2 relative to CSOnet and the required MaxSAT and MILP baselines?
+\item[RQ3.] Is any difference explained by fewer time points and clauses,
+fewer DDD iterations, or lower time in conflict handling and MaxSAT?
+\item[RQ4.] How sensitive is the method to the delay objective and its three
+parameters?
 \end{description}
 
-The current implementation provides two components for studying these
-questions. Component B propagates lower and upper temporal bounds, uses a
-verified incumbent to derive objective-dependent upper bounds, and detects
-resource orders that have become mandatory. Component R groups detected
-violations into refinement packages and selects packages under a budget on
-distinct new time points. An age rule and a fallback prevent a violation from
-being postponed indefinitely. The present selector is deliberately simple: it
-prefers the package with the smallest marginal number of new points. A
-utility-aware selection model is formulated in Section~\ref{sec:selection-model}
-as the candidate journal extension. Its implementation and evaluation remain
-open work.
+The current implementation provides Adaptive Growth-Limited Refinement (AGLR).
+It scans the complete decoded schedule, assigns each conflict a benefit based
+on waiting time, recurrence, and shared time points, and selects conflicts by
+benefit per unit of immediate model growth. A waiting rule prevents indefinite
+postponement, while a rescue step adds all pending conflicts when neither bound
+has improved for several iterations. The implementation keeps the published
+CSOnet path unchanged and exposes an all-conflicts control through the same new
+scan. Section~\ref{sec:method} gives the complete rule used by the code.
 
 \section{Related Work and Positioning}
 \label{sec:related}
@@ -186,10 +182,9 @@ time points, variables, and clauses remain in subsequent MaxSAT instances.
 
 \subsection{Positioning}
 
-Table~\ref{tab:positioning} distinguishes the accepted work, the current
-implementation, and the planned journal contribution. The final row is a
-research target and must not be presented as a completed method until the
-selection model has been implemented and evaluated.
+Table~\ref{tab:positioning} distinguishes the accepted work from the journal
+method. AGLR is implemented; its performance remains an empirical question
+until the staged campaign has been completed.
 
 \begin{table}[htbp]
 \centering
@@ -210,10 +205,10 @@ Shu et al. & Service network design & Jointly minimize points for collected
 patterns & Closest joint-refinement work \\
 Helber et al. & Service network design & Minimize fixes for all observed
 conflicts & Closest optimal-refinement work \\
-Current B+R implementation & Train rescheduling & Select packages under a
-point budget with a greedy rule & Implemented experimental baseline \\
-Utility-aware selection & Train rescheduling & Select conflicts and shared
-repair points by value and cost & Planned journal method \\
+CSOnet implementation & Train rescheduling & Add conflicts found by its
+published local scan & Reproducible internal baseline \\
+AGLR & Train rescheduling & Select recurring and shared conflict repairs under
+an adaptive growth budget & Implemented journal method under evaluation \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -311,236 +306,165 @@ number of DDD iterations, detected and selected packages, new time points,
 forced orders, variables, clauses, and time spent in encoding, MaxSAT,
 validation, and selection.
 
-\section{Budgeted Bound-Guided Refinement}
+\section{Adaptive Growth-Limited Refinement}
 \label{sec:method}
 
-\subsection{Temporal bound propagation}
+AGLR changes only the refinement stage of the accepted CSOnet solver. The
+restricted MaxSAT model, its objective encoding, and the conditions for an
+optimal solution remain unchanged. After each MaxSAT call, AGLR scans every
+route arc and every potentially conflicting pair of resource visits. It does
+not generate the large collection of bound-implied resource orders used in the
+earlier RC2+B prototype.
 
-Component B maintains a window $[L_v,U_v]$ for every visit. For a route
-precedence $t_b\ge t_a+h$, the safe updates are
-\begin{align}
-L_b &\leftarrow \max\{L_b,L_a+h\}, \label{eq:lb-prop}\\
-U_a &\leftarrow \min\{U_a,U_b-h\}. \label{eq:ub-prop}
-\end{align}
-Forward and backward passes are repeated until no bound changes. The initial
-$L_v$ values are also used as the first elements of $\Lambda_v$; otherwise the
-propagation would not reduce the initial temporal domain seen by MaxSAT.
+\subsection{Stable conflict candidates}
 
-The implementation can tighten upper bounds after a feasible incumbent with
-cost $B$ has been independently verified. Let
-\[
-m_u=c_u\bigl(\max\{0,L_u-a_u\}\bigr)
-\]
-be the minimum currently implied cost for a visit with a target time, and let
+A detected candidate $b$ contains a stable conflict key, a type (travel or
+resource), and the set $P_b$ of time points required by its refinement clause.
+A travel key identifies its two consecutive visits. A resource key stores its
+two visits in a fixed order. Current event times are deliberately excluded from
+the key, allowing the algorithm to recognize a conflict that reappears at a
+later iteration.
+
+For every key, AGLR maintains its number of observations $r_b$ and waiting age
+$a_b$. The observation count increases whenever the key is detected. The age
+increases when the same key remains pending for another iteration and is reset
+when the candidate is selected or disappears. Duplicate time points are
+removed before costs are evaluated.
+
+\subsection{Immediate growth and adaptive budget}
+
+Let $D_k$ be the time points present before refinement iteration $k$, and let
+$S$ be the candidates already selected in that iteration. The marginal growth
+estimate is
 \begin{equation}
-R_v=B-\sum_{u\in\mathcal A\setminus\{v\}}m_u
-\label{eq:remaining-budget}
+g(b\mid S)=1+\left|P_b\setminus
+\left(D_k\cup\bigcup_{q\in S}P_q\right)\right|.
+\label{eq:aglr-growth}
 \end{equation}
-be the cost left for visit $v$. For continuous cost and an infinite staircase
-of width $\Delta$, respectively, the implementation uses
-\begin{align}
-U_v &\leftarrow \min\{U_v,a_v+R_v\}, \label{eq:continuous-ub}\\
-U_v &\leftarrow \min\{U_v,a_v+\Delta R_v\}.
-\label{eq:staircase-ub}
-\end{align}
-No such update is made for a finite-step objective because its bounded penalty
-does not imply a finite upper bound on time. A visit without $a_v$ is also
-skipped.
+The unit term represents the primary refinement clause. The set term counts
+distinct new time points, including a shared point only once. This inexpensive
+quantity guides selection; it is not claimed to equal the final CNF increase,
+because ladder and at-most-one encodings may add auxiliary variables and
+clauses. The experiments record the actual totals separately.
 
-\subsection{Forced resource orders}
-
-Consider conflicting visits $v$ and $w$. The ordering $v$ before $w$ is
-impossible if even the earliest exit of $v$ is later than the latest entry of
-$w$:
+The estimated growth of applying every candidate is
 \begin{equation}
-L_{e_v}>U_w.
-\label{eq:reject-vw}
+C_{\mathrm{all}}=|\mathcal B_k|+
+\left|\bigcup_{b\in\mathcal B_k}P_b\setminus D_k\right|,
+\label{eq:aglr-all-growth}
 \end{equation}
-Similarly, $L_{e_w}>U_v$ rejects the reverse ordering. If exactly one ordering
-is rejected, the other becomes mandatory and is propagated with the route
-constraints. If both are rejected, the current bounds are inconsistent. The
-strict inequality in Equation~\eqref{eq:reject-vw} follows from the half-open
-occupation convention: equality is feasible.
-
-A forced order is encoded as a precedence implication of the form
-\eqref{eq:refinement-implication}. It is not encoded as a unit decision at one
-absolute time, because the exit time of the first visit may move in later DDD
-iterations.
-
-\subsection{Violation packages}
-
-After each restricted solution, a full scan checks route precedences and all
-inter-train resource conflicts independently. Each concrete violation produces
-a package $b$ containing:
-\begin{enumerate}
-\item a stable identifier that includes the visits and their current times;
-\item a set $P_b$ of time points absent from the current discretization; and
-\item a hard-clause action for a travel-time violation, a resource conflict, or
-a forced precedence.
-\end{enumerate}
-Including the current times in the identifier distinguishes a repeated pair of
-visits at a new incumbent from the same concrete violation at the same times.
-
-\subsection{Implemented budget rule}
-
-Let $P_{\mathrm{sel}}$ be the set of distinct points already selected in the
-current iteration. The marginal point cost of package $b$ is
+and the iteration budget is
 \begin{equation}
-q(b)=|P_b\setminus P_{\mathrm{sel}}|.
-\label{eq:marginal-point-cost}
+K_k=\max\left\{K_{\min},\left\lceil\rho C_{\mathrm{all}}\right\rceil\right\}.
+\label{eq:aglr-budget}
 \end{equation}
-The implemented selector first inserts packages that have waited at least $W$
-iterations. These mandatory packages may exceed the nominal budget $K$. It then
-repeatedly chooses the remaining package with the smallest $q(b)$ that fits,
-using its input position as a deterministic tie breaker. If no package has
-been selected, the oldest package is chosen even when $K=0$. Setting
-$K=\texttt{all}$ applies every package and supplies the unrestricted refinement
-baseline.
+Thus $K_{\min}$ prevents a very small absolute budget, whereas $\rho$ scales the
+budget with the conflicts actually observed in that iteration.
 
-This rule is appropriate as a transparent baseline, but it values all
-violations equally and uses the number of new points as only a proxy for the
-increase in MaxSAT difficulty. In particular, it does not distinguish a point
-that covers several recurring conflicts from one that resolves a single
-low-impact violation.
-
-\subsection{Utility-aware conflict selection}
+\subsection{Benefit and deterministic selection}
 \label{sec:selection-model}
 
-The candidate journal extension separates the choice of conflicts from the
-choice of their repair points. For each detected conflict $b\in\mathcal B_k$,
-let $R_b$ be a set of valid repair plans. Plan $r\in R_b$ requires the new-point
-set $A_{br}\setminus D_k$, where $D_k$ is the current discretization. Binary
-variables $y_b$, $z_{br}$, and $x_p$ indicate whether conflict $b$, repair plan
-$r$, and time point $p$ are selected. A preliminary model is
-\begin{align}
-\max\quad
-&\sum_{b\in\mathcal B_k} w_b y_b
--\lambda\sum_{p}c_p x_p, \label{eq:selection-objective}\\
-\text{s.t.}\quad
-&\sum_{r\in R_b}z_{br}=y_b,
-&&b\in\mathcal B_k, \label{eq:one-plan}\\
-&x_p\ge z_{br},
-&&b\in\mathcal B_k,\ r\in R_b,\ p\in A_{br}\setminus D_k,
-\label{eq:point-link}\\
-&\sum_p c_p x_p\le K, \label{eq:selection-budget}\\
-&\sum_{b\in\mathcal B_k}y_b\ge1, \label{eq:selection-progress}\\
-&x_p,y_b,z_{br}\in\{0,1\}. \notag
-\end{align}
-Here, $c_p$ estimates the increase in variables and clauses caused by point
-$p$. The weight $w_b$ may combine violation age, recurrence, objective-level
-relevance, and the number of other violations covered by the same points.
-Every term must be computable before the test outcome is observed. If no repair
-plan fits $K$, the fallback relaxes the budget and applies at least one valid
-plan.
+Let $h_b$ be the number of distinct points in $P_b$ that also occur in at least
+one other current candidate. AGLR assigns benefit
+\begin{equation}
+u_b=1+\frac{\min\{a_b,W\}}{W}
++\log_2(1+r_b)+\log_2(1+h_b).
+\label{eq:aglr-utility}
+\end{equation}
+The four terms give every candidate positive value, increase the value of an
+older or recurring conflict, and reward points shared by several repairs.
+Logarithms limit the influence of a large recurrence or sharing count.
 
-Equations~\eqref{eq:selection-objective}--\eqref{eq:selection-progress} are a
-research specification, not a description of the current Rust selector. The
-main experiments must compare this model or a clearly derived approximation
-against the implemented smallest-marginal-cost rule.
+Candidates with $a_b\ge W$ are mandatory and may exceed $K_k$. The remaining
+candidates are added one at a time by decreasing
+$u_b/g(b\mid S)$, provided that their marginal growth fits the remaining
+budget. A fixed ordering of conflict keys resolves ties. If the budget admits
+no candidate, the highest-ranked candidate is still selected. If neither the
+lower bound nor the best verified feasible value improves for $2W$ iterations,
+AGLR selects every pending candidate in a rescue iteration.
 
-\subsection{Complete DDD loop}
+\subsection{Complete algorithm and controls}
 
-Algorithm~\ref{alg:ddd-br} shows how the implemented B and R components fit
-around the MaxSAT oracle. The utility-aware selector can replace
-\textsc{SelectPackages} without changing the other stages, provided that it
-obeys the progress and fallback requirements.
+Algorithm~\ref{alg:aglr} states the implemented loop. The \texttt{legacy}
+control retains the original CSOnet conflict handling. The
+\texttt{all-scanned} control uses the new complete scan but applies all detected
+candidates. The \texttt{adaptive} mode uses Equations
+\eqref{eq:aglr-growth}--\eqref{eq:aglr-utility}.
 
 \begin{algorithm}[htbp]
-\caption{Bound-guided MaxSAT-DDD with budgeted refinement}
-\label{alg:ddd-br}
+\caption{MaxSAT-DDD with adaptive growth-limited refinement}
+\label{alg:aglr}
 \footnotesize
-\KwIn{Train-rescheduling instance, point budget $K$, maximum wait $W$}
-\KwOut{Verified optimum, or valid incumbent and bounds at timeout}
-Initialize route-consistent lower bounds $L$, upper bounds $U$, and
-discretization $D$\;
-Initialize the MaxSAT model and an empty age table\;
+\KwIn{Instance, $K_{\min}$, fraction $\rho$, maximum wait $W$}
+\KwOut{Verified optimum, or timeout with a verified incumbent and bounds}
+Initialize the published CSOnet model and an empty conflict-history table\;
 \While{time remains}{
-  Solve the current weighted partial MaxSAT model and obtain lower bound
-  $\mathrm{LB}$\;
-  Decode its event times and perform a full feasibility scan\;
-  \If{a new feasible incumbent is found}{
-    Verify it in the original model and recompute its cost $\mathrm{UB}$\;
-    Tighten objective-dependent upper bounds and propagate forced orders\;
+  Solve the current restricted MaxSAT model and update its lower bound\;
+  Decode the schedule and receive any feasible heuristic candidate\;
+  Discard a heuristic candidate if its objective cannot improve the incumbent
+  or if the same schedule has already been checked\;
+  Fully verify every remaining heuristic candidate before updating the upper
+  bound\;
+  Scan all route arcs and resource pairs to create $\mathcal B_k$\;
+  \If{$\mathcal B_k$ is empty and the decoded cost equals the lower bound}{
+    \Return the decoded schedule as optimal\;
   }
-  Register missing objective levels required by the decoded schedule\;
-  \If{the schedule is feasible and its verified cost equals $\mathrm{LB}$}{
-    \Return the schedule as optimal\;
-  }
-  Create packages for every detected route, resource, and forced-order
-  violation\;
-  Update package ages and select packages under $(K,W)$\;
-  Apply their points and hard clauses; update the MaxSAT objective encoding\;
+  Update $a_b$, $r_b$, $h_b$, $C_{\mathrm{all}}$, and $K_k$\;
+  Select mandatory candidates, then candidates by $u_b/g(b\mid S)$\;
+  \If{neither bound improved for $2W$ iterations}{select every pending candidate\;}
+  Add the selected time points and refinement clauses, suppressing duplicates\;
 }
-\Return the best verified incumbent and final $(\mathrm{LB},\mathrm{UB})$\;
+\Return timeout with the best verified incumbent and final bounds\;
 \end{algorithm}
 
-\section{Correctness and Complexity}
+The implementation reports time spent in detection, selection, model
+application, MaxSAT, and heuristic validation. It also reports the numbers of
+detected, selected, mandatory, and rescued candidates; estimated all-candidate
+and selected growth; the maximum waiting age; and the final variable and clause
+counts.
+
+\section{Correctness and Progress}
 \label{sec:correctness}
 
-The statements in this section concern the mathematical rules above. Their
-connection to the experimental binary is accepted only after the validation
-rule and unit tests in Section~\ref{sec:correctness-gate} have been fixed.
+AGLR changes when a valid refinement is added, not the meaning of that
+refinement. A selected travel candidate adds an implication excluding the
+current route-time violation. A selected resource candidate adds the standard
+disjunctive refinement excluding the current overlap. Therefore, every added
+clause is valid for the original train-rescheduling model.
 
-\begin{proposition}[Route-bound safety]
-Updates~\eqref{eq:lb-prop}--\eqref{eq:ub-prop} preserve every schedule that
-satisfies the corresponding route precedence.
+\begin{proposition}[Per-iteration progress]
+If the complete scan detects at least one violation, AGLR selects at least one
+candidate and adds its valid refinement.
 \end{proposition}
 \begin{proof}
-For any feasible schedule, $t_b\ge t_a+h\ge L_a+h$, so raising $L_b$ to
-$L_a+h$ cannot remove it. The same constraint gives $t_a\le t_b-h\le U_b-h$,
-so lowering $U_a$ to $U_b-h$ is also safe. Repeated application preserves the
-intersection of these valid bounds.
+Mandatory candidates are selected first. If none is mandatory, the ratio rule
+selects every fitting candidate. If none fits, the explicit fallback selects
+the highest-ranked candidate even when this exceeds the budget. Its refinement
+excludes the detected violating assignment.
 \end{proof}
 
-\begin{proposition}[Incumbent-based upper-bound safety]
-Assume the incumbent is feasible and has recomputed cost $B$. For the
-continuous and infinite-staircase objectives, every schedule with cost at most
-$B$ satisfies Equations~\eqref{eq:continuous-ub} and
-\eqref{eq:staircase-ub}, respectively.
+\begin{proposition}[No indefinite postponement]
+A conflict key that remains detected in consecutive iterations is selected no
+later than the iteration at which its waiting age reaches $W$.
 \end{proposition}
 \begin{proof}
-Every other cost term is at least its value at the propagated lower bound.
-Consequently, visit $v$ can contribute at most $R_v$ in
-Equation~\eqref{eq:remaining-budget}. Continuous unit cost permits at most
-$R_v$ seconds of delay. An infinite staircase of width $\Delta$ permits at most
-$\Delta R_v$ seconds at cost at most $R_v$. The argument does not apply to a
-bounded finite-step cost, which is why that case is excluded.
+The history update increases the pending age once per consecutive observation.
+The mandatory phase selects every candidate with $a_b\ge W$ without applying
+the budget test and then resets its pending age.
 \end{proof}
 
-\begin{proposition}[Forced-order safety]
-If $L_{e_v}>U_w$, then no feasible schedule can place $v$ before $w$. If the
-reverse order remains feasible, $w$ before $v$ is mandatory.
-\end{proposition}
-\begin{proof}
-Placing $v$ before $w$ requires $e_v(t)\le t_w$. The bounds imply
-$e_v(t)\ge L_{e_v}>U_w\ge t_w$, a contradiction. The resource disjunction then
-leaves only the reverse ordering.
-\end{proof}
+The rescue rule is an additional practical safeguard: it applies every pending
+candidate after $2W$ iterations without bound progress. Exactness still follows
+from the published DDD termination condition: the solver returns optimal only
+when the decoded schedule passes the original feasibility check and its
+recomputed cost equals the MaxSAT lower bound. The independent result auditor
+rechecks this condition from the stored schedule.
 
-\begin{proposition}[Selector progress]
-If at least one violation package exists, the implemented selector returns at
-least one package.
-\end{proposition}
-\begin{proof}
-Packages older than $W$ are selected first. If none is mandatory, every package
-that fits is considered by the greedy phase. If no package fits, the fallback
-selects the oldest package, including when the nominal budget is zero.
-\end{proof}
-
-Finite termination additionally requires every applied package to add a new
-time point or a hard clause that excludes the current violating assignment, and
-the admissible integer-time domain to be finite. This proof obligation must be
-checked for all three package actions and for missing cost levels. The
-utility-aware model inherits progress only when
-Equation~\eqref{eq:selection-progress} and the over-budget fallback are enforced.
-
-For $n$ visits and $m$ conflicting visit pairs, one full scan costs
-$O(n+m)$ when the conflict relation and resource-to-visit lists are indexed.
-Route propagation is linear in the number of route arcs per forward/backward
-pass. The current package selector performs repeated scans of the package list;
-its worst-case cost is quadratic in the number of detected packages. The
-selection model~\eqref{eq:selection-objective} is a small 0--1 optimization
-problem whose practical overhead must be reported separately.
+With indexed route arcs and resource-to-visit lists, the complete conflict scan
+costs $O(n+m)$ for $n$ visits and $m$ candidate resource pairs. For $B$ detected
+candidates, the direct deterministic implementation of repeated ratio selection
+is $O(B^2)$ in the worst case. Selection time is recorded so this overhead is
+visible rather than absorbed into MaxSAT time.
 
 \section{Computational Study}
 \label{sec:experiments}
@@ -559,13 +483,14 @@ objective value without calling the Rust verifier.
 
 The campaign is accepted only when the following conditions hold:
 \begin{enumerate}
-\item tests cover infeasible order pairs, visits without target times, the
-180-second infinite-step objective, propagation through multiple forced orders,
-and the chosen feasibility boundaries;
-\item every \texttt{status=ok} schedule passes the corrected validator and its
-cost is recomputed;
-\item JSON metadata match the intended bound mode, budget, full-scan flag,
-validation flag, timeout, and binary;
+\item selector tests cover deterministic ties, shared points, the adaptive
+budget, mandatory overflow, and rescue selection;
+\item the legacy alias reproduces the objective and optimal status of CSOnet,
+and small AGLR instances agree with exhaustive enumeration;
+\item every \texttt{status=ok} schedule passes the independent validator, its
+cost is recomputed, and its lower and upper bounds agree;
+\item JSON metadata match the intended policy, $K_{\min}$, $\rho$, $W$,
+timeout, and binary;
 \item the commit, source diff, \texttt{Cargo.lock}, dependency patches, compiler,
 CPU, memory limits, seeds, data checksums, stdout, and stderr are retained; and
 \item tables and figures are generated from raw CSV files rather than copied
@@ -583,37 +508,38 @@ journal campaign uses the complete set for \texttt{finsteps123},
 
 The accepted conference results will be included as a prior-work baseline after
 their binary, commit, configuration, and CSV provenance have been recovered.
-They are not rerun merely to fill the journal tables. The Croella implementation
-and a strong continuous-time MILP baseline are included when their validation
-rules and resource limits can be made comparable.
+Runtime is reused only when the machine, solver version, limits, and optimality
+rule are comparable. The mandatory main-table baselines are the earlier journal
+MaxSAT-DDD, CSOnet, Big-M Gurobi, and Big-M CPLEX. A MILP run is counted as
+optimal only when it returns a valid schedule and matching lower and upper
+bounds within the stated tolerance.
 
 \subsection{Ablation configurations}
 
-Table~\ref{tab:ablation-configurations} defines the four implemented
-configurations. All main runs use a full violation scan and validation before
-return. The initial campaign uses $K=128$ and retains $K=32$ for sensitivity.
+Table~\ref{tab:ablation-configurations} defines the three controls implemented
+on the CSOnet code base. The original solver name invokes the legacy path. The
+AGLR alias invokes either the complete new scan or adaptive selection.
 
 \begin{table}[htbp]
 \centering
-\caption{Implemented ablation configurations.}
+\caption{Implemented controls for isolating the effect of adaptive selection.}
 \label{tab:ablation-configurations}
 \begin{tabular}{lll}
 \toprule
-Configuration & Bound mode & Refinement budget \\
+Configuration & Conflict scan & Selection \\
 \midrule
-RC2-Base & off & all packages \\
-RC2+B & chain-cost-forced & all packages \\
-RC2+R & off & $K$ distinct points \\
-RC2+B+R & chain-cost-forced & $K$ distinct points \\
+CSOnet legacy & published local scan & published rule \\
+AGLR-All & complete new scan & all detected candidates \\
+AGLR & complete new scan & Equations~\eqref{eq:aglr-budget}--\eqref{eq:aglr-utility} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-With 72 instances, three objectives, and four configurations, the one-run
-campaign contains $72\times3\times4=864$ solver calls. A single run is useful
-for checking coverage and large performance differences. Since many completed
-runs take only tens of milliseconds, repeated measurements will be required
-for stable runtime claims in the final submission.
+Parameter selection is separated from final evaluation. The 18 combinations
+$K_{\min}\in\{16,32,64\}$, $\rho\in\{0.25,0.5,0.75\}$, and
+$W\in\{5,10\}$ first receive one 30-second run on 24 development instances.
+The three best configurations receive one 120-second run on the same set. One
+configuration is then locked before the complete 72-instance evaluation.
 
 \subsection{Evaluation measures}
 
@@ -632,65 +558,56 @@ t_i,&\text{if instance }i\text{ is completed within }T,\\
 Runtime medians and speedups are computed on paired instances. A median over a
 different solved set is not used to establish that one method is faster.
 
-Mechanism measures include the number of detected and selected packages,
-distinct new points, forced orders, DDD iterations, variables, clauses, cost
-levels, and time spent in selection, encoding, MaxSAT, and validation. LB and UB
-traces are retained for timeout cases.
+Mechanism measures include detected and selected candidates, estimated primary
+growth, mandatory and rescue selections, maximum age, DDD iterations, variables,
+clauses, and time spent in detection, selection, application, MaxSAT, and
+heuristic validation. LB and UB traces are retained for timeout cases.
 
 \subsection{Diagnostic pilot}
 \label{sec:pilot}
 
-Table~\ref{tab:week5-pilot} records the existing week-5 run of RC2+B+R. It is
-included here to preserve the decision trail and to motivate the next
-experiment. These data were produced before the full-scan repair and final
-validation gate were added. They therefore cannot support a submission claim
-or a speedup comparison with the conference baseline.
+Table~\ref{tab:pilot-comparison} summarizes the already audited comparison that
+motivated AGLR. RC2+B+R selected almost every detected constraint when its point
+budget was 128. It gave a small gain for \texttt{finsteps123} and regressions for
+the other objectives. The results are retained as diagnostic evidence and are
+excluded from the main journal comparison.
 
 \begin{table}[htbp]
 \centering
-\caption{Diagnostic one-run results for RC2+B+R at three point budgets.
-Completed is the number of runs recorded as successful by the then-current
-pipeline. These values are excluded from the final journal analysis.}
-\label{tab:week5-pilot}
-\footnotesize
-\begin{tabular}{llrrl}
+\caption{Diagnostic one-run comparison at a 120-second cutoff. PAR-2 includes a
+two-cutoff penalty for runs not proved optimal.}
+\label{tab:pilot-comparison}
+\begin{tabular}{lrrrr}
 \toprule
-Objective & $K$ & Completed & Median time (ms) & Non-completed status \\
+& \multicolumn{2}{c}{RC2-Base} & \multicolumn{2}{c}{RC2+B+R, $K=128$} \\
+Objective & Proved & PAR-2 (s) & Proved & PAR-2 (s) \\
 \midrule
-\multirow{3}{*}{\texttt{finsteps123}}
- & 8   & 37/72 & 41.57 & 35 panic \\
- & 32  & 61/72 & 43.89 & 11 panic \\
- & 128 & 72/72 & 17.48 & none recorded \\
-\midrule
-\multirow{3}{*}{\texttt{infsteps180}}
- & 8   & 36/72 & 35.31 & 35 panic, 1 timeout \\
- & 32  & 61/72 & 50.05 & 7 panic, 4 timeout \\
- & 128 & 67/72 & 16.79 & 5 timeout \\
-\midrule
-\multirow{3}{*}{\texttt{cont}}
- & 8   & 35/72 & 37.70 & 24 panic, 13 timeout \\
- & 32  & 50/72 & 56.57 & 6 panic, 16 timeout \\
- & 128 & 56/72 & 16.72 & 16 timeout \\
+\texttt{finsteps123} & 72/72 & 1.538 & 72/72 & 1.451 \\
+\texttt{infsteps180} & 68/72 & 16.667 & 67/72 & 18.092 \\
+\texttt{cont}        & 57/72 & 54.878 & 56/72 & 56.694 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The only justified reading of this pilot is that very small budgets were
-associated with many failures in that implementation and that $K=128$ is the
-safer value for the next correctness-controlled run. The table does not show
-that budgeted refinement is faster than RC2-Base, and the low medians exclude
-failed cases.
+At $K=128$, 66 of 72 instances selected all detected constraints, so this run
+did not establish a useful selection effect. The bound component also generated
+many precedence relations, and heuristic verification dominated some easy
+instances. These observations motivated moving the selector directly into
+CSOnet, measuring actual model growth, and filtering heuristic candidates before
+full validation.
 
 \subsection{Planned result structure}
 
 The final analysis will answer the research questions in the following order:
 \begin{enumerate}
 \item establish objective equality and schedule validity across configurations;
-\item compare total coverage, PAR-2, and solved-over-time against the accepted
-conference baseline;
-\item use the B/R ablation to isolate each component;
-\item explain performance through point, clause, iteration, and bound traces;
-\item study $K\in\{32,128,\texttt{all}\}$ and at least one adaptive policy; and
+\item select parameters by proved optima, PAR-2, and estimated selected growth;
+\item compare AGLR coverage, PAR-2, and paired runtimes with all mandatory
+baselines;
+\item use the legacy/all-scanned/adaptive controls to isolate complete scanning
+from adaptive selection;
+\item explain differences through candidate, clause, iteration, phase-time, and
+bound traces; and
 \item report objective-specific regressions and failure cases.
 \end{enumerate}
 No numerical statement will be moved to the abstract or conclusion until the
@@ -699,26 +616,23 @@ corresponding raw results and generation script are archived.
 \section{Discussion}
 \label{sec:discussion}
 
-The current design separates three questions that can otherwise be conflated.
-Bound propagation asks what temporal information is already implied by the
-model and a verified incumbent. Package construction asks which additions
-validly remove a concrete violation. Package selection asks which valid
-additions should be paid for in the current iteration. Only the third question
-is controlled by the budget.
+The current design separates detection from selection. Detection decides which
+travel or resource conditions the decoded schedule violates. Selection decides
+which valid repairs are added now. The growth budget affects only the latter;
+it does not weaken the independent feasibility check or the condition used to
+declare an optimum.
 
-The likely benefit of selective refinement is also its main risk. A small
-selection keeps the MaxSAT instance compact, but repeated postponement can
-increase the number of solver calls. The age rule prevents indefinite
-postponement; it does not guarantee that the chosen package is computationally
-valuable. The proposed utility model must therefore be assessed through
-mechanism measures rather than runtime alone.
+Selective refinement can keep the MaxSAT instance compact, while postponement
+can add solver iterations. Age and rescue rules control postponement, but the
+benefit formula remains a heuristic for computational value. The
+all-scanned control and phase telemetry are therefore needed to distinguish a
+useful selection effect from overhead introduced by the new scan.
 
-The three objectives may react differently. Finite-step costs do not provide
-finite time upper bounds, so Component B has less information for
-\texttt{finsteps123}. Continuous costs provide the strongest direct link
-between cost and time, but their many objective levels can enlarge the Boolean
-model. Infinite-step costs lie between these cases. This distinction supplies a
-testable explanation for objective-dependent performance.
+The three objectives may react differently because they create different
+numbers and distributions of objective levels. Continuous delay can enlarge the
+Boolean objective encoding, whereas the finite-step objective has few levels.
+The same refinement policy may therefore move work between conflict handling
+and objective optimization in different ways.
 
 External validity remains limited by the fixed-route model and by 72 variants
 derived from 24 base cases in two networks. The model does not currently cover
@@ -730,24 +644,18 @@ budgeted refinement.
 \section{Conclusions and Next Steps}
 \label{sec:conclusion}
 
-This working manuscript reframes the journal extension around conflict
-selection during DDD refinement. The accepted conference contributions are
-retained as a cited baseline. The current code implements the route-bound rules
-analysed above, incumbent-based bounds for unbounded delay objectives, forced
-resource orders, full violation packages, a distinct-point budget, and an
-anti-starvation fallback. The temporal-boundary discrepancy has been removed,
-the missing unit tests pass, and an independent result audit now checks the
-stored schedules. The code also supplies the instrumentation required for an
-initial B/R ablation.
+This working manuscript defines AGLR as an implemented extension of the CSOnet
+refinement loop. The method combines a complete conflict scan, a deterministic
+benefit-to-growth selector, an age rule, and a rescue rule. The code also
+filters repeated or non-improving heuristic candidates and records the measures
+needed to explain its behavior. The accepted conference contributions remain
+prior work and a baseline.
 
-Three steps remain before this section can become a submission conclusion.
-First, the utility-aware selection rule must be
-implemented or the paper must explicitly limit its contribution to the
-implemented greedy policy. Second, the 864-run campaign and the conference
-baseline audit must be completed, followed by repeated timing where millisecond
-runs make a single measurement unreliable. Third, the abstract, highlights, final
-contribution list, and performance conclusions will be written from those
-results.
+This section is intentionally provisional. The staged parameter search, full
+72-instance campaign, mandatory MaxSAT and MILP comparisons, and confirmation
+runs must still be completed on the experiment machine. Abstract, numerical
+Results, and performance conclusions will be written only from independently
+audited outputs that meet the preregistered coverage and PAR-2 thresholds.
 
 \section*{Data and Code Availability}
 

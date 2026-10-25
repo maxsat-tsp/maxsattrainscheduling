@@ -7,41 +7,27 @@
  BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
 \setmonofont{lmmono10-regular.otf}[Scale=0.86]
 \usepackage{amsmath,amssymb}
-\usepackage{booktabs,tabularx,longtable,array}
+\usepackage{booktabs,tabularx,array}
 \usepackage{enumitem,fancyhdr,titlesec}
-\usepackage[unicode,colorlinks=true,linkcolor=black,
- urlcolor=black,citecolor=black]{hyperref}
+\usepackage[unicode,colorlinks=true,linkcolor=black,urlcolor=black]{hyperref}
 \usepackage{xurl}
 
 \titleformat{\section}{\large\bfseries}{\thesection}{0.7em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.7em}{}
-\titlespacing*{\section}{0pt}{14pt}{6pt}
-\titlespacing*{\subsection}{0pt}{10pt}{4pt}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{5pt}
 \setlength{\emergencystretch}{2em}
-\linespread{1.05}
 \setlist{leftmargin=1.6em,itemsep=2pt,topsep=3pt}
-\renewcommand{\arraystretch}{1.16}
+\renewcommand{\arraystretch}{1.15}
 \renewcommand{\contentsname}{Mục lục}
-\setcounter{tocdepth}{1}
-\renewcommand{\refname}{Tài liệu tham khảo}
-
-\newcommand{\file}[1]{\texttt{#1}}
 \newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\pathref}[1]{\nolinkurl{#1}}
-\newcommand{\LB}{\mathrm{LB}}
-\newcommand{\UB}{\mathrm{UB}}
+\newcommand{\file}[1]{\nolinkurl{#1}}
 
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small Hướng dẫn triển khai bản tạp chí}
-\fancyhead[R]{\small Phiên bản 4.3}
+\fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
+\fancyhead[R]{\small Phiên bản 5.0}
 \fancyfoot[C]{\thepage}
-\hypersetup{
-  pdftitle={Hướng dẫn triển khai và kiểm tra MaxSAT-DDD cho bản tạp chí},
-  pdfauthor={Nhóm nghiên cứu MaxSAT train scheduling}
-}
 
 \begin{document}
 \hypersetup{pageanchor=false}
@@ -49,767 +35,380 @@
 \vspace*{20mm}
 {\large TÀI LIỆU GIAO VIỆC CHO SINH VIÊN\par}
 \vspace{12mm}
-{\LARGE\bfseries Nâng cấp MaxSAT-DDD\par}
+{\LARGE\bfseries AGLR cho MaxSAT-DDD\par}
 \vspace{4mm}
-{\Large từ bài hội nghị lên bài tạp chí\par}
-\vspace{10mm}
-{\large Cài đặt, kiểm tra và chạy thực nghiệm\par}
-\vspace{10mm}
+{\Large Cài đặt, kiểm tra và chạy thực nghiệm tạp chí\par}
+\vspace{12mm}
 \rule{\textwidth}{0.4pt}
-\vspace{5mm}
+\vspace{6mm}
 
-Tài liệu này mô tả đúng phiên bản mã hiện tại. Hai phần đã có trong solver
-\code{maxsat\_rc2}: suy luận cận thời gian và refinement greedy có giới hạn.
-Bộ kiểm tra nghiệm đã được sửa để dùng đúng điều kiện thời gian của mô hình;
-các kiểm thử biên, số đo cơ chế và script kiểm toán kết quả cũng đã được bổ
-sung. Bốn cấu hình hiện tại vì vậy đã sẵn sàng cho một lượt chạy kiểm tra trên
-toàn bộ dữ liệu.
+Tài liệu này mô tả phiên bản đã được cài trong solver CSOnet. Phương pháp mới
+có tên \emph{Adaptive Growth-Limited Refinement} (AGLR), nghĩa là tinh chỉnh
+thích nghi nhưng kiểm soát mức tăng của mô hình. Mục tiêu của AGLR rất đơn giản:
+trong mỗi vòng DDD, xử lý trước những xung đột có ích và chưa làm mô hình tăng
+quá nhanh.
 
-Lượt chạy này đánh giá B và chính sách R greedy hiện có. Mô hình chọn theo
-utility trong bản thảo COR vẫn chưa được cài đặt. Vì vậy, kết quả mới có thể
-dùng ngay cho kiểm tra tính đúng, ablation B/R và phân tích cơ chế; chưa được
-gọi là kết quả của phương pháp utility-aware. Trước khi chốt đóng góp cuối,
-đọc Mục~\ref{sec:submission-use} và dàn ý tại
-\file{manuscript/journal/cor/outline\_brainstorm\_vi.md}.
+Kết quả RC2+B+R trước đây chỉ còn vai trò chẩn đoán. Cấu hình đó tốt hơn
+RC2-Base một ít với \code{finsteps123}, nhưng kém hơn ở hai objective còn lại.
+Không dùng các số đó làm kết quả chính của bài tạp chí.
 
-Các công thức được giữ lại để sinh viên hiểu mình đang kiểm tra điều gì. Mỗi
-công thức đều có giải thích bằng lời và chỉ ra vị trí tương ứng trong mã.
+Mã, kiểm thử và script cho AGLR đã được chuẩn bị. Sinh viên chạy thí nghiệm trên
+máy có Gurobi và CPLEX. Không sửa Abstract, Results hoặc Conclusion của bài báo
+cho đến khi bộ kiểm toán báo rằng kết quả đã qua cổng chất lượng.
 
 \vfill
-{\normalsize Phiên bản 4.3, tháng 10 năm 2026\par}
-\vspace{3mm}
-Mã nguồn: \file{maxsattrainscheduling/}.\par
-Bản thảo hội nghị: \file{manuscript/submission/main.tex}.
+{\normalsize Phiên bản 5.0, tháng 10 năm 2026\par}
 \end{titlepage}
+
 \hypersetup{pageanchor=true}
-\begingroup
-\small
-\setlength{\parskip}{0pt}
 \tableofcontents
-\endgroup
 \newpage
 
-\section{Mục tiêu và thứ tự làm việc}
-\label{sec:goal}
+\section{Việc cần làm}
 
-Mục tiêu trước mắt là trả lời hai câu hỏi:
-
-\begin{enumerate}
-\item Các cải tiến có luôn trả lịch hợp lệ và đúng chi phí tối ưu không?
-\item Sau khi tính đúng được xác nhận, cấu hình nào giải được nhiều bài hơn
-      trong cùng giới hạn thời gian và bộ nhớ?
-\end{enumerate}
-
-Trước mắt chỉ chạy một lần, nhưng phải chạy toàn bộ tập dữ liệu. Các sửa đổi về
-tính đúng và đo lường đã hoàn thành trong mã hiện tại. Trên máy thực nghiệm,
-làm theo thứ tự sau:
+Công việc được chia thành bốn bước. Mỗi cấu hình chỉ chạy một lần ở vòng đầu.
 
 \begin{enumerate}
-\item Chạy toàn bộ unit test và build đúng một binary \code{ddd}.
-\item Chạy script smoke test cho một instance ở cả bốn cấu hình.
-\item Chạy đủ 72 instance cho cả bốn cấu hình, với ba hàm mục tiêu.
-\item Mỗi cặp cấu hình--hàm mục tiêu--instance chỉ chạy một lần.
-\item Dùng script kiểm toán để tạo bảng số bài thành công, chi phí, thời gian
-      và loại lỗi.
+\item Chạy 18 cấu hình AGLR trong 30 giây trên tập phát triển gồm 24 instance.
+\item Đưa ba cấu hình tốt nhất sang vòng 120 giây, vẫn trên tập phát triển.
+\item Khóa một cấu hình rồi chạy đủ 72 instance, ba objective và các baseline.
+\item Chạy lại ba lần các instance khó, được thêm hoặc bị mất. Bước này chỉ làm
+      sau khi lượt chạy đầy đủ đã đạt ngưỡng.
 \end{enumerate}
 
-Trên môi trường mới, phải checkout \code{salvers} đúng commit và áp dụng bản
-vá đi kèm repository theo README. Nếu bỏ bước này, bản clone sạch của
-\code{salvers} không có lớp tương thích mà mã hiện tại cần để build.
+Ba chế độ của cùng solver giúp biết lợi ích đến từ đâu:
 
-Tập dữ liệu có 24 bài \code{original}, 24 bài \code{addtracktime} và 24 bài
-\code{addstationtime}. Do đó, lượt chạy mới có
-$72\times3\times4=864$ lần gọi solver. Baseline hội nghị đã có kết quả nên
-không chạy lại trong chiến dịch này; nhóm sẽ kiểm tra file baseline khi nhận
-được.
-
-Không triển khai chia sẻ AMO ở giai đoạn này. Phần đó làm thay đổi thêm một
-thành phần lớn của mô hình và sẽ làm khó việc xác định nguyên nhân nếu kết quả
-sai.
-
-\section{Kết quả tuần 5 và quyết định tiếp theo}
-\label{sec:week5}
-
-Sinh viên đã chạy \code{RC2+B+R} với ba ngân sách: 8, 32 và 128 mốc. Các file
-JSON và CSV đã được kiểm tra lại bằng script, thay vì chỉ chép số từ báo cáo.
-
-\begin{tabularx}{\textwidth}{@{}p{31mm}p{19mm}p{31mm}p{27mm}X@{}}
+\begin{tabularx}{\textwidth}{@{}p{29mm}X@{}}
 \toprule
-Hàm mục tiêu & Ngân sách & Bài thành công & Trung vị thời gian & Bài chưa xong \\\midrule
-\code{finsteps123} & 8   & 37/72 & 41,57 ms & 35 panic \\
-                    & 32  & 61/72 & 43,89 ms & 11 panic \\
-                    & 128 & 72/72 & 17,48 ms & không có \\\midrule
-\code{infsteps180} & 8   & 36/72 & 35,31 ms & 35 panic, 1 timeout \\
-                    & 32  & 61/72 & 50,05 ms & 7 panic, 4 timeout \\
-                    & 128 & 67/72 & 16,79 ms & 5 timeout \\\midrule
-\code{cont}        & 8   & 35/72 & 37,70 ms & 24 panic, 13 timeout \\
-                    & 32  & 50/72 & 56,57 ms & 6 panic, 16 timeout \\
-                    & 128 & 56/72 & 16,72 ms & 16 timeout \\
+Chế độ & Ý nghĩa \\
+\midrule
+\code{legacy} & Giữ nguyên cách refinement của CSOnet. Đây là baseline nội bộ. \\
+\code{all-scanned} & Dùng cách quét mới nhưng thêm mọi xung đột tìm thấy. Chế độ
+này đo chi phí do tái cấu trúc mã. \\
+\code{adaptive} & Dùng AGLR để chỉ chọn một phần xung đột trong mỗi vòng. \\
 \bottomrule
 \end{tabularx}
 
-Kiểm toán đã đọc 18 file, tương ứng 1.296 lượt chạy. Không có sai khác giữa
-JSON và CSV, giữa dữ liệu và bảng tổng hợp, hoặc giữa \code{cost}, \code{lb}
-và \code{ub} của các dòng \code{ok}. Bằng chứng nằm trong thư mục đánh giá
-tuần 5 được liệt kê ở Mục~\ref{sec:files}.
+Tên cũ \file{maxsat_ddd_ladder_sc} luôn dùng \code{legacy} nếu không có thay
+đổi khác. Tên mới \file{maxsat_ddd_ladder_aglr} mặc định dùng
+\code{adaptive}. Nhờ vậy, lệnh baseline cũ vẫn tái tạo đúng cấu hình CSOnet.
 
-Kết quả này cho thấy ngân sách 128 ổn định hơn 8 và 32 trong lần chạy đó. Vì
-vậy, 128 là giá trị chính cho vòng thực nghiệm tiếp theo. Giá trị 32 chỉ được
-giữ cho ablation. Không chạy lại ngân sách 8.
+\section{Ý tưởng AGLR qua một ví dụ nhỏ}
 
-Các số trên được tạo ra trước khi sửa lỗi quét vi phạm và trước khi thêm bước
-kiểm tra nghiệm cuối. Vì vậy chưa dùng chúng làm kết quả của bài tạp chí. Chúng
-cũng chưa chứng minh \code{RC2+B+R} nhanh hơn \code{RC2-Base}; cần chạy hai cấu
-hình trong cùng điều kiện mới được kết luận.
+Giả sử lịch tạm thời có ba xung đột. Nếu sửa cả ba, solver phải thêm ba mệnh đề
+và năm mốc thời gian mới. Mức tăng chính là $3+5=8$. Nếu ngân sách hiện tại là
+4, AGLR không thêm cả ba ngay. Nó ưu tiên xung đột xuất hiện nhiều lần, đã chờ
+lâu hoặc dùng chung mốc với xung đột khác.
 
-\subsection{Dùng lại kết quả cũ đúng cách}
+Một xung đột đã chọn được thêm vào mô hình theo đúng quy tắc DDD. Xung đột chưa
+chọn không bị quên: tuổi chờ của nó tăng. Khi tuổi đạt giới hạn $W$, xung đột đó
+phải được chọn dù làm vượt ngân sách. Nếu cận dưới và nghiệm tốt nhất đều không
+đổi trong $2W$ vòng, solver thêm toàn bộ xung đột đang chờ để thoát khỏi trạng
+thái lặp.
 
-Các kết quả tuần 5 được dùng lại cho ba việc:
+AGLR không sinh hàng loạt thứ tự bắt buộc như RC2+B. Đây là quyết định có chủ
+ý vì thí nghiệm cũ cho thấy phần đó có thể tạo hàng trăm hoặc hàng nghìn quan hệ
+và làm mô hình lớn nhanh.
+
+\section{Dữ liệu mà một ứng viên phải lưu}
+
+Sau mỗi lần giải MaxSAT, solver quét toàn bộ lịch. Mỗi vi phạm trở thành một ứng
+viên $b$ với bốn thông tin:
+
+\begin{enumerate}
+\item \textbf{Khóa xung đột}: cặp visit và loại xung đột. Khóa không chứa thời
+      gian hiện tại, nên cùng một xung đột được nhận ra ở vòng sau.
+\item \textbf{Tập mốc $P_b$}: các mốc cần để thêm mệnh đề sửa xung đột.
+\item \textbf{Số lần xuất hiện $r_b$}: tăng mỗi lần khóa này được phát hiện.
+\item \textbf{Tuổi chờ $a_b$}: số vòng liên tiếp ứng viên xuất hiện nhưng chưa
+      được chọn.
+\end{enumerate}
+
+Khóa travel có dạng \code{Travel\{from,to\}}. Khóa resource lưu hai visit theo
+thứ tự tăng dần, vì xung đột giữa $v$ và $w$ giống xung đột giữa $w$ và $v$.
+
+Các cấu trúc thuần cho bước chọn nằm trong:
+
+\begin{center}
+\file{src/solvers/ddd/maxsat_ladder_sc/aglr.rs}
+\end{center}
+
+Phần quét lịch và thêm ràng buộc nằm trong:
+
+\begin{center}
+\file{src/solvers/ddd/maxsat_ladder_sc/solve.rs}
+\end{center}
+
+\section{Công thức chọn ứng viên}
+
+\subsection{Chi phí tăng mô hình}
+
+Gọi $D_k$ là các mốc đã có trước vòng $k$, còn $S$ là các ứng viên đã chọn trong
+vòng hiện tại. Chi phí biên của ứng viên $b$ là
+
+\begin{equation}
+g(b\mid S)=1+\left|P_b\setminus
+\left(D_k\cup\bigcup_{q\in S}P_q\right)\right|.
+\end{equation}
+
+Số 1 là mệnh đề refinement chính. Phần sau đếm các mốc thực sự mới. Nếu hai ứng
+viên cần cùng một mốc, mốc đó chỉ được tính một lần.
+
+Đây là thước đo nhẹ dùng để chọn nhanh. Nó không phải tổng số mệnh đề CNF cuối
+cùng, vì ladder và at-most-one có thể sinh thêm mệnh đề phụ. Script vẫn ghi tổng
+số biến và mệnh đề thực tế để kiểm tra sau thí nghiệm.
+
+Nếu thêm tất cả ứng viên, mức tăng chính là
+
+\begin{equation}
+C_{\mathrm{all}}=|\mathcal B_k|+
+\left|\bigcup_{b\in\mathcal B_k}P_b\setminus D_k\right|.
+\end{equation}
+
+Ngân sách của vòng là
+
+\begin{equation}
+K_k=\max\!\left(K_{\min},\left\lceil\rho C_{\mathrm{all}}\right\rceil\right).
+\end{equation}
+
+$K_{\min}$ tránh ngân sách quá nhỏ khi chỉ có vài ứng viên. $\rho$ điều chỉnh tỷ
+lệ mức tăng được chấp nhận trong vòng đó.
+
+\subsection{Mức ưu tiên}
+
+Gọi $h_b$ là số mốc của $b$ cũng xuất hiện trong ít nhất một ứng viên khác. Mức
+ưu tiên là
+
+\begin{equation}
+u_b=1+\frac{\min(a_b,W)}{W}
+       +\log_2(1+r_b)+\log_2(1+h_b).
+\end{equation}
+
+Ý nghĩa từng phần:
 
 \begin{itemize}
-\item chọn 128 làm ngân sách chính và 32 làm ablation;
-\item dùng chi phí đã ghi làm mốc hồi quy khi kiểm tra mã mới;
-\item dùng danh sách panic và timeout để chẩn đoán nếu mã mới còn lỗi.
+\item $a_b$ lớn: ứng viên đã chờ lâu;
+\item $r_b$ lớn: xung đột quay lại nhiều lần;
+\item $h_b$ lớn: các mốc của ứng viên có thể giúp nhiều xung đột;
+\item logarit làm cho một giá trị rất lớn không lấn át hoàn toàn các phần khác.
 \end{itemize}
 
-Không cần chạy lại các baseline của bài hội nghị nếu chỉ cần trích số đã công
-bố. Không ghép thời gian chạy tuần 5 vào bảng hiệu năng của mã mới, vì mã đã
-được sửa sau lần chạy đó. Các cấu hình mới vẫn phải chạy lại để đo thời gian,
-nhưng một chiến dịch bị ngắt có thể tiếp tục từ các instance đã hoàn tất như
-hướng dẫn ở Mục~\ref{sec:logging}.
+AGLR chọn ứng viên có tỷ số $u_b/g(b\mid S)$ lớn nhất mà vẫn vừa ngân sách. Khi
+hai tỷ số bằng nhau, khóa xung đột quyết định thứ tự. Vì vậy cùng đầu vào luôn
+cho cùng kết quả.
 
-Khi nhận kết quả baseline, cần kiểm tra đủ 72 tên bài, ba hàm mục tiêu, timeout,
-commit, cấu hình máy và số luồng. Chỉ so sánh trực tiếp thời gian nếu điều kiện
-chạy đủ tương đương; các chi phí tối ưu vẫn có thể dùng làm mốc kiểm tra.
+\subsection{Giả mã}
 
-\section{Bài toán và ký hiệu tối thiểu}
-\label{sec:model}
+\begin{enumerate}
+\item Quét toàn bộ lịch và tạo danh sách $\mathcal B_k$.
+\item Cập nhật $a_b$ và $r_b$ cho từng khóa.
+\item Tính $C_{\mathrm{all}}$ và $K_k$.
+\item Chọn trước mọi ứng viên có $a_b\ge W$. Các ứng viên này được phép làm
+      vượt $K_k$.
+\item Trong số còn lại, chọn lặp ứng viên có $u_b/g(b\mid S)$ lớn nhất và vừa
+      phần ngân sách còn lại.
+\item Nếu chưa chọn được gì, chọn ứng viên tốt nhất để vòng DDD vẫn tiến lên.
+\item Nếu không có tiến bộ về cận hoặc nghiệm trong $2W$ vòng, chọn tất cả.
+\item Thêm mốc và mệnh đề của các ứng viên đã chọn, loại mốc hoặc mệnh đề trùng.
+\end{enumerate}
 
-Một tàu đi qua nhiều hoạt động theo thứ tự cố định. Mỗi hoạt động dùng một tài
-nguyên, chẳng hạn một đoạn đường hoặc một ga. Hai hoạt động xung đột không được
-chiếm tài nguyên cùng lúc.
+\section{Giảm thời gian kiểm tra nghiệm heuristic}
 
-\begin{tabularx}{\textwidth}{@{}p{26mm}X@{}}
+Solver heuristic có thể gửi cùng một lịch nhiều lần. Kiểm tra đầy đủ từng lịch
+làm mất thời gian, nhất là ở instance dễ. Đường chạy AGLR xử lý theo thứ tự sau:
+
+\begin{enumerate}
+\item Tính riêng giá trị objective; bước này rẻ.
+\item Nếu giá trị không tốt hơn nghiệm tốt nhất, bỏ qua.
+\item Nếu lịch đã được kiểm tra trước đó, bỏ qua.
+\item Chỉ khi còn khả năng cải thiện mới kiểm tra đầy đủ travel time, tài nguyên
+      và tính lại chi phí.
+\end{enumerate}
+
+Đường \code{legacy} vẫn dùng worker cũ. Như vậy, phép so sánh với CSOnet không
+bị thay đổi âm thầm. JSON ghi số lịch nhận được, số lịch bị bỏ qua, số lịch được
+kiểm tra và tổng thời gian kiểm tra.
+
+\section{Tham số dòng lệnh}
+
+\begin{tabularx}{\textwidth}{@{}p{47mm}p{28mm}X@{}}
 \toprule
-Ký hiệu & Ý nghĩa \\\midrule
-$t_v$ & Thời điểm bắt đầu hoạt động $v$. \\
-$s(v)$ & Hoạt động ngay sau $v$ trên cùng hành trình. \\
-$p_v$ & Thời gian tối thiểu từ $v$ đến $s(v)$. \\
-$L_v$ & Cận dưới: $v$ không thể bắt đầu trước thời điểm này. \\
-$U_v$ & Cận trên: $v$ không được bắt đầu sau thời điểm này. \\
-$a_v$ & Thời điểm dự kiến trong lịch gốc. \\
-$d_v(\tau)$ & Biến Boolean, đúng khi $t_v \geq \tau$. \\
-$\Lambda_v$ & Tập các mốc thời gian đang có của hoạt động $v$. \\
+Tham số & Giá trị mặc định & Ý nghĩa \\
+\midrule
+\code{--aglr-policy} & \code{adaptive} với alias AGLR &
+Chọn \code{legacy}, \code{all-scanned} hoặc \code{adaptive}. \\
+\code{--aglr-min-growth} & 32 & Giá trị $K_{\min}$. \\
+\code{--aglr-fraction} & 0.5 & Giá trị $\rho$, nằm trong $[0,1]$. \\
+\code{--aglr-max-wait} & 5 & Giá trị $W$, phải lớn hơn 0. \\
 \bottomrule
 \end{tabularx}
 
-Ba điều kiện cơ bản là:
-
-\begin{align}
-t_{s(v)} &\geq t_v+p_v,
-  &&\text{tàu phải có đủ thời gian di chuyển,} \label{eq:travel}\\
-t_w \geq e_v \quad &\text{hoặc}\quad t_v \geq e_w,
-  &&\text{hai khoảng chiếm tài nguyên không chồng nhau,} \label{eq:resource}\\
-F(t) &= \sum_v c_v\!\left(\max(0,t_v-a_v)\right),
-  &&\text{tổng chi phí trễ cần nhỏ nhất.} \label{eq:objective}
-\end{align}
-
-Ở đây $e_v$ là thời điểm tàu rời tài nguyên của hoạt động $v$. Nếu $v$ chưa
-phải hoạt động cuối thì $e_v=t_{s(v)}$. Nếu $v$ là hoạt động cuối thì
-$e_v=t_v+p_v$.
-
-Theo các ràng buộc đang dùng trong DDD và MILP, thời gian là số nguyên và hai
-khoảng chiếm dụng không chồng nhau khi $e_v\leq t_w$ hoặc $e_w\leq t_v$. Tài
-liệu này gọi đó là \emph{quy tắc chính xác}. Nếu nhóm muốn cho phép một dung sai,
-dung sai đó phải xuất hiện giống nhau trong mô hình toán, solver và bộ kiểm tra
-nghiệm.
-
-\section{DDD và cách biểu diễn một mốc}
-\label{sec:ddd}
-
-DDD không đưa mọi giây vào mô hình ngay từ đầu. Nó bắt đầu với ít mốc rồi lặp:
-
-\begin{enumerate}
-\item Giải mô hình MaxSAT hiện tại.
-\item Lấy lịch ứng viên từ mô hình.
-\item Quét toàn bộ lịch để tìm vi phạm.
-\item Tạo các gói refinement cho những vi phạm vừa tìm thấy.
-\item Chọn một số gói, thêm mốc và mệnh đề, rồi giải lại.
-\end{enumerate}
-
-Với hai mốc $\tau_1<\tau_2$, cấu trúc ladder phải có:
-
-\begin{equation}
-d_v(\tau_2) \Rightarrow d_v(\tau_1),
-\qquad
-\neg d_v(\tau_2)\lor d_v(\tau_1).
-\label{eq:ladder}
-\end{equation}
-
-Nếu lịch hiện tại có $t_a=\alpha$ nhưng vi phạm
-$t_b\geq t_a+h$, solver thêm mốc $\alpha+h$ cho $b$ và thêm:
-
-\begin{equation}
-\neg d_a(\alpha)\lor d_b(\alpha+h).
-\label{eq:precedence-clause}
-\end{equation}
-
-Ví dụ: $t_a=10$ và $h=5$. Solver thêm mốc 15 cho $b$. Mệnh đề mới buộc lịch
-lần sau phải đổi nếu $a$ vẫn bắt đầu từ giây 10 trở đi.
-
-\section{Cải tiến B: suy luận cận thời gian}
-\label{sec:bounds}
-
-Mã chính nằm trong
-\pathref{src/solvers/ddd/shared/precedence.rs}. Solver gọi các hàm này tại
-\pathref{src/solvers/ddd/maxsat_rc2.rs}.
-
-\subsection{Lan truyền trong cùng một tàu}
-
-Với ràng buộc $t_b\geq t_a+h$, cận được cập nhật theo hai chiều:
-
-\begin{align}
-L_b &\leftarrow \max(L_b,L_a+h), \label{eq:lb-prop}\\
-U_a &\leftarrow \min(U_a,U_b-h). \label{eq:ub-prop}
-\end{align}
-
-Ví dụ: $L_a=10$, $L_b=8$, $U_a=30$, $U_b=20$, $h=5$. Sau cập nhật:
-
-\[
-L_b=15,\qquad U_a=15.
-\]
-
-Giá trị $L_v$ sau lan truyền được dùng ngay khi tạo mốc đầu tiên của
-\code{Occ}. Đây là điểm cần kiểm tra kỹ: nếu vẫn khởi tạo bằng
-\code{visit.earliest} cũ thì phép suy luận không làm nhỏ mô hình ban đầu.
-
-\subsection{Siết cận trên từ một lịch hợp lệ}
-
-Giả sử heuristic tìm được lịch hợp lệ có chi phí $B$. Với mỗi hoạt động $v$,
-gọi $m_u=c_u(L_u)$ là chi phí nhỏ nhất đã biết của hoạt động $u$. Phần ngân
-sách còn lại cho $v$ là:
-
-\begin{equation}
-R_v=B-\sum_{u\neq v}m_u.
-\label{eq:remaining-budget}
-\end{equation}
-
-Từ $R_v$ suy ra cận trên:
-
-\begin{align}
-U_v &\leq a_v+R_v,
- &&\text{với chi phí liên tục,} \label{eq:continuous-ub}\\
-U_v &\leq a_v+R_v\Delta,
- &&\text{với chi phí bậc thang vô hạn có bước }\Delta. \label{eq:step-ub}
-\end{align}
-
-Không dùng công thức này cho \code{FiniteSteps*}. Loại chi phí đó có mức phạt
-tối đa hữu hạn nên một ngân sách chi phí không tạo ra cận thời gian hữu hạn.
-
-Để áp dụng $U_v$, solver tạo mốc $U_v+1$ và buộc
-$d_v(U_v+1)=\mathrm{false}$. Nói đơn giản: $t_v$ không thể vượt quá $U_v$.
-
-\subsection{Thứ tự bắt buộc trên tài nguyên}
-
-Với hai hoạt động xung đột $v$ và $w$:
-
-\begin{align}
-L_{e_v}>U_w
-&\Longrightarrow \text{$v$ không thể đi trước $w$,} \label{eq:reject-vw}\\
-L_{e_w}>U_v
-&\Longrightarrow \text{$w$ không thể đi trước $v$.} \label{eq:reject-wv}
-\end{align}
-
-Nếu chỉ một thứ tự bị loại, thứ tự còn lại là bắt buộc. Nếu cả hai bị loại,
-các cận hiện tại mâu thuẫn. Chương trình phải trả lỗi rõ ràng, không được tiếp
-tục và cũng không được báo tối ưu.
-
-Dấu trong hai công thức là $>$, không phải $\geq$. Hai tàu vừa chạm nhau tại
-một thời điểm vẫn hợp lệ vì khoảng chiếm dụng được hiểu là nửa kín
-$[t_{\mathrm{in}},t_{\mathrm{out}})$.
-
-Thứ tự bắt buộc được đưa vào solver bằng mệnh đề dạng
-\eqref{eq:precedence-clause}. Không dùng một unit clause cố định tại thời điểm
-phát hiện, vì thời điểm rời tài nguyên có thể đổi ở vòng sau.
-
-\section{Cải tiến R: refinement có giới hạn}
-\label{sec:refinement}
-
-Mã chính nằm trong \file{src/solvers/ddd/shared/refinement.rs}.
-
-\subsection{Một gói refinement gồm những gì?}
-
-Mỗi vi phạm tạo ra một \code{RefinementPackage}. Gói có ba phần:
-
-\begin{enumerate}
-\item Mã nhận dạng vi phạm, gồm cả hoạt động và thời điểm hiện tại.
-\item Danh sách mốc mới thực sự chưa có trong mô hình.
-\item Hành động cần áp dụng: mệnh đề hành trình, thứ tự bắt buộc hoặc xung đột
-      tài nguyên.
-\end{enumerate}
-
-Việc đưa thời điểm vào mã vi phạm rất quan trọng. Cùng hai hoạt động nhưng xung
-đột ở thời điểm khác là một vi phạm mới.
-
-\subsection{Ngân sách được tính như thế nào?}
-
-Gọi $P_b$ là tập mốc mới thực sự của gói $b$, và $P_{\mathrm{sel}}$ là các mốc
-đã chọn trong vòng hiện tại. Chi phí biên của gói là:
-
-\begin{equation}
-q(b)=\left|P_b\setminus P_{\mathrm{sel}}\right|.
-\label{eq:new-points}
-\end{equation}
-
-Gói cần ít mốc hơn được ưu tiên. Tổng số mốc phân biệt không được vượt ngân
-sách $K$. Một mốc đã tồn tại trong \code{Occ.delays} có chi phí bằng 0 và không
-được tính lại.
-
-Khi $K=\texttt{all}$, mọi gói đều được áp dụng. Đây là cấu hình cần dùng để
-kiểm tra sự tương đương với baseline trước khi giới hạn ngân sách.
-
-\subsection{Không để một vi phạm chờ mãi}
-
-Mỗi vi phạm lưu vòng đầu tiên mà nó xuất hiện, gọi là
-\code{first\_seen}. Nếu vi phạm đã chờ ít nhất $W$ vòng, gói đó được chọn bắt
-buộc, kể cả khi vượt ngân sách. Mặc định $W=5$.
-
-Quy tắc này có hai mục đích:
-
-\begin{itemize}
-\item Ngăn một gói lớn liên tục bị các gói nhỏ hơn vượt qua.
-\item Bảo đảm vòng DDD vẫn tiến triển khi $K$ rất nhỏ.
-\end{itemize}
-
-Nếu chưa có gói nào được chọn, solver chọn gói cũ nhất. Đây là bước dự phòng
-cho trường hợp $K=0$ hoặc mọi gói đều lớn hơn phần ngân sách còn lại.
-
-\subsection{Quét toàn bộ sau mỗi nghiệm SAT}
-
-Sau mỗi nghiệm SAT, cấu hình dùng cho bài tạp chí phải quét mọi hoạt động. Hai
-loại kiểm tra được làm độc lập:
-
-\begin{enumerate}
-\item Kiểm tra thời gian di chuyển của từng cặp hoạt động liên tiếp.
-\item Kiểm tra mọi cặp hoạt động dùng tài nguyên xung đột.
-\end{enumerate}
-
-Không được xóa một hoạt động khỏi danh sách kiểm tra chỉ vì hoạt động đó không
-có xung đột tài nguyên ở vòng hiện tại. Lỗi này có thể làm solver bỏ sót vi
-phạm hành trình và trả một lịch không hợp lệ.
-
-\section{Kiểm tra nghiệm trước khi trả kết quả}
-\label{sec:validation}
-
-Mọi lịch từ heuristic phải được kiểm tra bằng
-\code{Problem::verify\_solution()} trước khi dùng làm cận trên. Chi phí do
-heuristic báo phải bằng chi phí được tính lại.
-
-Quy tắc đã được chốt theo mô hình DDD và MILP: hoạt động không được bắt đầu sớm
-hơn \code{earliest}; hai khoảng nửa kín chỉ hợp lệ khi chúng không chồng nhau.
-Do đó, \code{verify\_solution()} hiện yêu cầu
-
-\begin{equation}
-t_v\geq \code{earliest}_v,
-\qquad e_v\leq t_w\ \text{hoặc}\ e_w\leq t_v.
-\end{equation}
-
-Không còn dung sai 10 giây cho thời điểm sớm nhất hoặc dung sai 1 giây cho xung
-đột tài nguyên. Bốn kiểm thử mới xác nhận: vào sớm một giây bị từ chối; vào đúng
-\code{earliest} được chấp nhận; hai khoảng vừa chạm nhau được chấp nhận; chồng
-nhau một giây bị từ chối.
-
-Sau khi quy tắc trên đã được thống nhất, trước khi solver trả một lịch cuối, nó
-phải kiểm tra lại:
-
-\begin{enumerate}
-\item Đủ số tàu và đủ số thời điểm cho từng tàu.
-\item Không vi phạm thời gian di chuyển.
-\item Không chồng lấn tài nguyên.
-\item Chi phí tính lại bằng cận dưới MaxSAT hiện tại.
-\end{enumerate}
-
-Nếu lịch hợp lệ nhưng chi phí chưa khớp và vẫn còn mốc chưa đăng ký vào mã hóa
-chi phí, solver đăng ký các mốc rồi giải lại. Nếu không còn thông tin nào để
-thêm mà chi phí vẫn sai, trạng thái trả về là \code{invalid\_solution} kèm
-\code{validation\_error}. Không được đổi trạng thái này thành \code{ok}.
-
-\section{Tùy chọn dòng lệnh}
-\label{sec:cli}
-
-Không sửa hằng số trong mã nguồn giữa các lần chạy. Dùng các tùy chọn sau:
-
-\begin{tabularx}{\textwidth}{@{}p{61mm}X@{}}
-\toprule
-Tùy chọn & Ý nghĩa \\\midrule
-\code{--timeout-seconds} &
-  Giới hạn thời gian bên trong solver; dùng 120 trong chiến dịch chính. \\
-\code{--maxsat-rc2-bound-mode} &
-  \code{off}, \code{chain}, \code{chain-cost}, hoặc
-  \code{chain-cost-forced}. \\
-\code{--maxsat-rc2-refinement-budget} &
-  \code{all} hoặc một số nguyên không âm, ví dụ 128. \\
-\code{--maxsat-rc2-max-wait-iterations} &
-  Số vòng tối đa một vi phạm được phép chờ; mặc định là 5. \\
-\code{--maxsat-rc2-full-scan} &
-  Dùng \code{true} cho mọi thí nghiệm chính. \\
-\code{--maxsat-rc2-validate-before-return} &
-  Dùng \code{true} cho mọi thí nghiệm chính. \\
-\bottomrule
-\end{tabularx}
-
-Bốn cấu hình ablation được định nghĩa như sau:
-
-\begin{tabularx}{\textwidth}{@{}p{27mm}p{48mm}X@{}}
-\toprule
-Tên & Bound mode & Refinement budget \\\midrule
-\code{RC2-Base} & \code{off} & \code{all} \\
-\code{RC2+B} & \code{chain-cost-forced} & \code{all} \\
-\code{RC2+R} & \code{off} & 128, sau đó thử thêm 32 \\
-\code{RC2+B+R} & \code{chain-cost-forced} & 128, sau đó thử thêm 32 \\
-\bottomrule
-\end{tabularx}
-
-Trước tiên chạy smoke test tự động:
+Ví dụ chạy một instance:
 
 \begin{verbatim}
-cd maxsattrainscheduling
-bash run_journal_smoke.sh 120 128 origA1 finsteps123
+./target/release/ddd \
+  -s maxsat_ddd_ladder_aglr \
+  --txt-instances \
+  --instance-name-filter origA1 \
+  --instance-name-exact \
+  --objective finsteps123 \
+  --timeout-seconds 120 \
+  --aglr-policy adaptive \
+  --aglr-min-growth 32 \
+  --aglr-fraction 0.5 \
+  --aglr-max-wait 5 \
+  --json-output /tmp/aglr-origA1.json
 \end{verbatim}
-
-Nếu smoke test đạt, chạy một lượt đầy đủ cho cả bốn cấu hình:
-
-\begin{verbatim}
-cd maxsattrainscheduling
-bash run_journal_once.sh 120 128
-\end{verbatim}
-
-Hai đối số lần lượt là timeout nội bộ cho mỗi instance và ngân sách mốc.
-Script build đúng binary \code{ddd}, rồi chạy 72 instance, ba hàm mục tiêu và
-bốn cấu hình. Sau mỗi objective, script kiểm tra tên bài, cấu hình, telemetry,
-\code{cost=lb=ub} cho các dòng \code{ok} và diễn biến cận trong
-\code{value\_trace}. Sau đủ 12 file, script tạo
-\code{journal\_summary.csv}, \code{journal\_paired\_comparisons.csv} và
-\code{journal\_audit.json}.
-
-Điều kiện đúng 72 bài là hàng rào bảo vệ của chiến dịch submission. Không đổi
-nó thành một biến tùy ý để chạy subset. Khi cần gỡ lỗi nhanh, gọi binary trực
-tiếp với \code{--instance-name-exact} như hướng dẫn ở
-Mục~\ref{sec:smoke-test}.
-
-Nếu chiến dịch bị dừng, lấy lại \code{RUN\_ID} đã lưu rồi chạy tiếp:
-
-\begin{verbatim}
-RUN_ID=$(cat results/improvements/journal_once_run_id.txt)
-RUN_ID="$RUN_ID" bash run_journal_once.sh 120 128
-\end{verbatim}
-
-Script sẽ dùng lại mọi JSON đã hoàn tất, kể cả timeout và lỗi. Vì vậy việc tiếp
-tục không tạo lần lặp thứ hai. Không đặt \code{RERUN\_NON\_OK=1} trong chiến
-dịch một lượt này và không sao chép JSON từ chiến dịch khác vào thư mục kết quả.
-
-Timeout nội bộ là 120 giây. Lệnh giới hạn bên ngoài chờ thêm 20 giây để solver
-kịp ghi JSON hoặc bị dừng nếu thư viện con không trả quyền điều khiển. Khoảng
-20 giây này chỉ là thời gian bảo vệ, không được tính thành timeout 140 giây khi
-phân tích kết quả.
-
-\section{Log và khả năng chạy lại}
-\label{sec:logging}
-
-Mỗi chiến dịch phải giữ các file sau:
-
-\begin{itemize}
-\item File JSON và CSV tổng hợp.
-\item \file{config.txt}: cấu hình ablation đã chọn.
-\item \file{manifest.txt}: commit, trạng thái mã nguồn, hash của binary,
-      phiên bản Rust, Gurobi, CPU, RAM, timeout và giới hạn RAM của tiến trình.
-\item Commit và hash phần thay đổi của hai thư viện ngoài \code{salvers} và
-      \code{ipamir-rs}, cùng hash của \file{Cargo.lock}.
-\item Số lượng và hash nội dung của đúng 72 file dữ liệu.
-\item \file{source.diff}: phần mã chưa commit tại thời điểm chạy.
-\item Một file stdout và một file stderr cho từng instance.
-\end{itemize}
-
-Script đặt \code{RUST\_BACKTRACE=1}. Vì vậy, nếu có panic, stderr phải có vị
-trí lỗi. Không xóa log sau khi JSON đã được tạo.
-
-Mỗi instance có một JSON riêng trong thư mục \pathref{<objective>.logs/instances/}.
-Trước khi dùng lại, script so sánh dấu vân tay của lần chạy. Dấu vân tay gồm
-hash của binary, script, dataset, dependency, solver, hàm mục tiêu, timeout, RAM
-và toàn bộ tùy chọn liên quan. Cả file chưa được Git theo dõi trong dependency
-cũng được đưa vào hash. Nếu một giá trị khác, script dừng và yêu cầu dùng thư
-mục mới. Cách này cho phép tiếp tục một lần chạy dở mà không trộn kết quả từ hai
-phiên bản mã.
-
-Các trường thống kê mới trong JSON gồm:
-
-\begin{itemize}
-\item \code{refinement\_detected\_total};
-\item \code{refinement\_selected\_total};
-\item \code{refinement\_new\_points\_total};
-\item \code{forced\_orders\_total};
-\item \code{num\_vars\_total} và \code{num\_clauses\_total};
-\item thời gian quét, chọn, áp dụng refinement, mã hóa chi phí và kiểm tra nghiệm;
-\item \code{value\_trace}, thời gian tìm nghiệm đầu, đạt giá trị tốt nhất và
-      chứng minh tối ưu;
-\item \code{solution}: toàn bộ lịch để checker Python đọc lại độc lập;
-\item các giá trị cấu hình \code{maxsat\_rc2\_*}.
-\end{itemize}
-
-Có trường trong JSON chưa đủ; trước khi phân tích, script phải đối chiếu giá trị
-thực tế với cấu hình đang chạy. Với kết quả do solver ghi, cần kiểm tra
-\code{maxsat\_rc2\_bound\_mode}, \code{maxsat\_rc2\_refinement\_budget},
-\code{maxsat\_rc2\_full\_scan},
-\code{maxsat\_rc2\_validate\_before\_return} và \code{timeout\_seconds}. Bản
-ghi do timeout ngoài tạo ra được nhận biết bằng \code{external\_status} và không
-có đủ các trường nội bộ này.
-
-Với mọi dòng \code{ok}, checker Python đọc lại file TXT, dựng lại hành trình và
-tài nguyên, rồi kiểm tra lịch trong \code{solution}. Checker này không gọi
-\code{Problem::verify\_solution()}, nên có thể phát hiện sai khác giữa dữ liệu,
-parser, validator Rust và chi phí đã ghi.
 
 \section{Kiểm thử bắt buộc}
-\label{sec:tests}
 
-\subsection{Kiểm thử đơn vị}
+Trước khi chạy dài, thực hiện:
 
-Các kiểm thử hiện có đã kiểm tra:
+\begin{verbatim}
+cargo check -p ddd --all-targets
+cargo test -p ddd aglr --lib
+\end{verbatim}
+
+Các kiểm thử của bộ chọn phải xác nhận:
 
 \begin{itemize}
-\item lan truyền cận dưới theo hành trình;
-\item phát hiện thứ tự bắt buộc, kể cả khi cặp tài nguyên được ghi theo chiều
-      ngược lại;
-\item lan truyền cận dưới và cận trên qua một thứ tự bắt buộc;
-\item siết cận trên cho chi phí liên tục;
-\item ngân sách đếm các mốc phân biệt;
-\item gói cũ không bị bỏ đói;
-\item vẫn chọn được một gói khi ngân sách bằng 0.
-\item cả hai thứ tự của một cặp xung đột đều bất khả thi;
-\item hoạt động có \code{aimed=None} không bị siết cận trên từ chi phí;
-\item siết cận cho \code{infsteps180};
-\item nhiều thứ tự bắt buộc được lan truyền qua nhiều tàu;
-\item đúng biên \code{earliest} và đúng biên tiếp xúc tài nguyên.
+\item mỗi mệnh đề và mỗi mốc mới chỉ được tính một lần;
+\item cùng đầu vào cho cùng thứ tự chọn;
+\item ứng viên đủ tuổi được chọn dù vượt ngân sách;
+\item chế độ cứu và \code{all-scanned} chọn toàn bộ ứng viên;
+\item \code{legacy} và AGLR cho cùng optimum trên các bài rất nhỏ;
+\item nghiệm AGLR trên bài nhỏ khớp optimum tìm bằng vét cạn.
 \end{itemize}
 
-Trên máy đã cài Gurobi và các thư viện ngoài, chạy:
+Nếu máy macOS báo thiếu \code{libstdc++} khi link test, đây là vấn đề của
+dependency \code{ipamir-rs}, không phải lỗi biên dịch AGLR. Phải chạy lại test
+trên máy Linux dùng cho thực nghiệm. Không được bỏ bước này trong manifest cuối.
+
+\section{Quy trình thực nghiệm}
+
+Script chính là \file{run_aglr_experiments.sh}. Kết quả nằm dưới
+\file{results/aglr/}; script có thể tiếp tục từ các JSON instance đã hoàn tất.
+Cây Git phải sạch để commit và hash binary có ý nghĩa.
+
+\subsection{Bước 1: sàng lọc 18 cấu hình}
 
 \begin{verbatim}
-cargo test -p ddd --lib refinement::tests
-cargo test -p ddd --lib precedence::tests
-cargo test -p ddd --lib problem::tests
+bash run_aglr_experiments.sh screen
 \end{verbatim}
 
-\subsection{Chạy thử trước chiến dịch}
-\label{sec:smoke-test}
+Script dùng
 
-Sau khi các kiểm thử đơn vị đạt, chạy một instance ngắn cho cả bốn cấu hình:
+\[
+K_{\min}\in\{16,32,64\},\quad
+\rho\in\{0.25,0.5,0.75\},\quad
+W\in\{5,10\}.
+\]
+
+Tập phát triển có A3, A6, A9, A12, B3, B6, B9, B12; mỗi base case gồm
+\code{orig}, \code{track} và \code{station}. Mỗi cấu hình chạy một lần với giới
+hạn 30 giây.
+
+\subsection{Bước 2: nâng ba cấu hình tốt nhất}
 
 \begin{verbatim}
-bash run_journal_smoke.sh 120 128 origA1 finsteps123
+bash run_aglr_experiments.sh promote
 \end{verbatim}
 
-Script yêu cầu cả bốn lần đều có \code{status=ok}, cùng chi phí tối ưu, đúng cấu
-hình và đủ telemetry. Chỉ bắt đầu 864 lượt khi script kết thúc thành công.
+Auditor xếp hạng theo thứ tự: số optimum, PAR-2, rồi mức tăng mô hình. Ba cấu
+hình đầu chạy lại trên tập phát triển với giới hạn 120 giây.
 
-\subsection{Kiểm tra hồi quy trên 72 instance}
+\subsection{Bước 3: chạy toàn bộ dữ liệu}
 
-Một lần chạy chỉ được xem là đạt nếu thỏa tất cả điều kiện sau:
+\begin{verbatim}
+CPLEX_RESULTS_DIR=/duong/dan/den/cplex_csv \
+  bash run_aglr_experiments.sh full
+\end{verbatim}
 
-\begin{enumerate}
-\item Mọi kết quả có trạng thái \code{ok} đều qua
-      \code{verify\_solution()}.
-\item Với một instance mà cả hai cấu hình đều hoàn thành, chi phí tối ưu phải
-      bằng nhau.
-\item Không có \code{panic}, \code{aborted}, \code{segfault} hoặc
-      \code{invalid\_solution}.
-\item Nếu timeout, giữ lại stdout, stderr, cận dưới và cận trên nếu có.
-\end{enumerate}
+Lượt này gồm MaxSAT-DDD của bài tạp chí trước, CSOnet, \code{all-scanned}, AGLR
+và Big-M Gurobi. Ba file CPLEX được nhập từ thư mục chỉ định. Chỉ dùng file CPLEX
+khi timeout, số luồng, máy, cách xác nhận tối ưu và phiên bản mô hình phù hợp.
+Mỗi dòng CPLEX có \code{status=ok} còn phải có \code{valid=true}, nghĩa là lịch đã
+qua bộ kiểm tra nghiệm, và có cận dưới bằng cận trên. CSV cũ thiếu trường
+\code{valid} chỉ dùng để tham khảo.
+Nếu chưa có CPLEX, script vẫn chạy nhưng cổng submission sẽ báo thiếu baseline.
 
-Hai lịch có thể khác nhau nhưng vẫn cùng tối ưu. Vì vậy chỉ so sánh tính hợp lệ
-và chi phí, không yêu cầu toàn bộ thời điểm giống nhau. Số vòng refinement cũng
-có thể tăng hoặc giảm. Một phương pháp thêm ít mốc mỗi vòng thường cần nhiều
-vòng hơn; đây không phải lỗi nếu tổng thời gian tốt hơn và kết quả vẫn đúng.
+\subsection{Bước 4: xác nhận các instance quan trọng}
 
-\subsection{Thứ tự chạy chiến dịch một lượt}
+Chỉ chạy khi lượt đầy đủ vượt ngưỡng:
 
-\begin{enumerate}
-\item Xác nhận quy tắc kiểm tra nghiệm đã được thống nhất và có kiểm thử biên.
-\item Kiểm tra cây Git sạch và đúng commit đã chọn.
-\item Build bằng \code{Cargo.lock} với tùy chọn \code{--locked}.
-\item Chạy smoke test lần lượt cho \code{RC2-Base}, \code{RC2+B}, \code{RC2+R}
-      và \code{RC2+B+R}; kiểm tra cả trạng thái và trường cấu hình trong JSON.
-\item Chạy lần lượt \code{RC2-Base}, \code{RC2+B}, \code{RC2+R} và
-      \code{RC2+B+R}.
-\item Với mỗi cấu hình, chạy đủ 72 bài cho \code{finsteps123},
-      \code{infsteps180} và \code{cont}.
-\item Sau khi xong, kiểm tra trạng thái và chi phí giữa các cấu hình.
-\end{enumerate}
+\begin{verbatim}
+bash run_aglr_experiments.sh confirm
+\end{verbatim}
 
-Nếu kết nối bị ngắt, chạy lại với cùng \code{RUN\_ID}. Không đổi binary, timeout
-hoặc cấu hình trong cùng một thư mục kết quả.
+Script chạy ba lần các instance mất hơn 30 giây hoặc có trạng thái được/mất khác
+baseline. Hai mươi bốn base case là đơn vị độc lập trong phân tích; ba biến thể
+không được xem là 72 mẫu độc lập hoàn toàn.
 
-\section{Cách đánh giá kết quả}
-\label{sec:evaluation}
+\section{Cách đọc kết quả}
 
-Mỗi cấu hình cần báo cáo ít nhất:
+\file{quick_scripts/analyze/audit_aglr_campaign.py} tự đọc toàn bộ JSON/CSV và
+tạo ba file:
 
 \begin{itemize}
-\item số bài chứng minh tối ưu;
-\item số bài có lịch hợp lệ;
-\item số timeout và số lỗi theo từng loại;
-\item trung vị thời gian trên tập bài chung mà hai cấu hình đều giải được;
-\item PAR-2 trên toàn bộ 72 instance;
-\item tổng số gói phát hiện, gói được chọn và mốc mới thực sự;
-\item số thứ tự bắt buộc đã tìm thấy;
-\item số biến, số mệnh đề và thời gian của từng pha;
-\item thời gian tìm nghiệm đầu, đạt giá trị tốt nhất và chứng minh tối ưu.
+\item \file{aglr_summary.csv}: coverage, median, PAR-2 và số đo tăng mô hình;
+\item \file{aglr_ranking.csv}: thứ tự các cấu hình AGLR;
+\item \file{aglr_audit.json}: lỗi và trạng thái cổng submission.
 \end{itemize}
 
-Với timeout $T$ và $N$ instance:
+Auditor dựng lại instance từ file văn bản và tự kiểm tra mọi lịch MaxSAT/Gurobi.
+Với MILP, \code{status=ok} chưa đủ. Chỉ tính optimum khi cận dưới và cận trên
+bằng nhau trong sai số đã công bố. Auditor cũng từ chối tên instance thiếu,
+thừa hoặc trùng.
 
-\begin{equation}
-\mathrm{PAR2}=\frac{1}{N}\sum_{i=1}^{N}p_i,
-\qquad
-p_i=
-\begin{cases}
-t_i, & \text{nếu hoàn thành trong }T,\\
-2T, & \text{nếu không hoàn thành.}
-\end{cases}
-\label{eq:par2}
-\end{equation}
+AGLR chỉ đạt yêu cầu khi đồng thời có:
 
-Không so sánh hai số trung vị nếu chúng được tính trên hai tập instance khác
-nhau. Hãy dùng giao của hai tập bài thành công, đồng thời báo cáo riêng tổng số
-bài thành công của mỗi cấu hình.
+\begin{itemize}
+\item không có lịch sai, sai chi phí, panic hoặc file thiếu;
+\item \code{finsteps123}: 72/72 và PAR-2 thấp hơn baseline đầy đủ tốt nhất;
+\item \code{infsteps180}: ít nhất 69/72;
+\item \code{cont}: ít nhất 68/72;
+\item đủ bốn baseline: MaxSAT-DDD tạp chí trước, CSOnet, Big-M Gurobi và
+      Big-M CPLEX.
+\end{itemize}
 
-\section{Kết quả nào dùng được cho submission?}
-\label{sec:submission-use}
+\section{Nếu kết quả chưa đạt}
 
-Lượt $K=128$ sắp chạy có thể dùng ngay cho bốn loại bằng chứng:
+Mỗi vòng chỉ thay đổi một thành phần. Đọc telemetry trước khi sửa:
 
-\begin{enumerate}
-\item tính đúng: nghiệm hợp lệ, \code{cost=lb=ub} và cùng optimum giữa các cấu
-      hình hoàn thành;
-\item độ bao phủ: số bài chứng minh tối ưu, timeout và lỗi;
-\item ablation B/R greedy: so sánh bốn cấu hình hiện tại;
-\item cơ chế: số mốc, biến, mệnh đề, thứ tự bắt buộc, diễn biến cận và thời gian
-      từng pha.
-\end{enumerate}
-
-Chưa dùng một lượt này để viết phát biểu mạnh về chênh lệch thời gian ở mức vài
-chục mili giây. Sau khi chốt phương pháp cuối, cần chạy lặp trong cùng môi
-trường và xem mỗi instance là một đơn vị so sánh ghép cặp. Các lần lặp trên
-cùng instance là phép đo kỹ thuật, không phải các mẫu độc lập mới.
-
-Chính sách R hiện tại chọn greedily gói cần ít mốc mới nhất và có chống bỏ đói.
-Nó chưa phải mô hình utility-aware ở bản thảo COR. Nhóm phải chọn một trong hai
-hướng trước chiến dịch cuối: cài đặt và đánh giá utility-aware; hoặc sửa phạm vi
-bài báo để đóng góp được phát biểu đúng là bound-guided DDD với budgeted greedy
-refinement. Không được dùng số của R greedy dưới tên utility-aware.
-
-Sau lượt chính $K=128$, nếu cần sensitivity $K=32$, chỉ chạy hai cấu hình có R;
-không chạy lại \code{RC2-Base} và \code{RC2+B} vì chúng dùng
-\code{budget=all}:
-
-\begin{verbatim}
-JOURNAL_CONFIGS="RC2+R RC2+B+R" \
-RUN_ID="journal-k32-$(date +%Y-%m-%d_%H-%M-%S)" \
-bash run_journal_once.sh 120 32
-\end{verbatim}
-
-Khi nhận baseline hội nghị, giữ nguyên file gốc và đối chiếu tên instance, hàm
-mục tiêu, timeout, commit, máy và số luồng. Có thể dùng chi phí tối ưu làm mốc
-tính đúng. Chỉ ghép thời gian vào cùng bảng nếu điều kiện đo đủ tương đương.
-
-\section{Kế hoạch triển khai tiếp theo}
-\label{sec:next}
-
-\begin{longtable}{@{}p{16mm}p{69mm}p{67mm}@{}}
+\begin{tabularx}{\textwidth}{@{}p{50mm}X@{}}
 \toprule
-Bước & Việc cần làm & Điều kiện hoàn thành \\\midrule\endhead
-1 & Tính đúng và đo lường (đã xong). & Validator, kiểm thử biên, telemetry và
-    bốn smoke test đạt. \\
-2 & Khóa commit và chạy đủ 72 instance cho bốn cấu
-    hình, đúng một lần. & Có JSON, CSV, manifest và log cho từng hàm mục tiêu. \\
-3 & Nhận và kiểm tra kết quả baseline hội nghị. & Xác định được phạm vi so sánh
-    thời gian và chi phí. \\
-4 & Phân tích kết quả. & Có bảng số bài thành công, trung vị trên tập chung,
-    PAR-2 và bảng lỗi. \\
-5 & Chốt utility-aware hoặc phạm vi greedy. & Tên phương pháp và thí nghiệm
-    khớp chính xác với mã đã chạy. \\
-6 & Chạy sensitivity và lặp thời gian cần thiết. & Không chạy lại cấu hình không
-    phụ thuộc $K$; mọi lần lặp dùng cùng môi trường. \\
-7 & Cập nhật bản thảo tạp chí. & Mọi phát biểu trong bài có file kết quả hỗ trợ. \\
-\bottomrule
-\end{longtable}
-
-Nếu $K=128$ vẫn có nhiều timeout nhưng không còn lỗi tính đúng, có thể thử
-$K=256$ hoặc \code{all}. Nếu $K=32$ kém rõ rệt như kết quả tuần 5, chỉ giữ nó
-trong bảng ablation; không dùng làm cấu hình đề xuất.
-
-\section{Danh sách file đã thay đổi}
-\label{sec:files}
-
-\begin{tabularx}{\textwidth}{@{}p{78mm}X@{}}
-\toprule
-File & Vai trò \\\midrule
-\pathref{src/solvers/ddd/maxsat_rc2.rs} &
-  Nối cấu hình, quét toàn bộ, tạo gói, áp dụng cận và kiểm tra nghiệm. \\
-\pathref{src/solvers/ddd/shared/precedence.rs} &
-  Lan truyền $L/U$, siết cận từ chi phí và tìm thứ tự bắt buộc. \\
-\pathref{src/solvers/ddd/shared/refinement.rs} &
-  Biểu diễn gói, chọn theo ngân sách và chống bỏ đói. \\
-\pathref{src/solvers/ddd/shared/common.rs} &
-  Kiểm tra một mốc đã có trong \code{Occ} hay chưa. \\
-\pathref{src/problem.rs} &
-  Kiểm tra nghiệm theo đúng biên thời gian và tài nguyên của mô hình. \\
-\pathref{src/main.rs} &
-  Tùy chọn dòng lệnh, timeout, trạng thái lỗi và số biến/mệnh đề. \\
-\pathref{quick_scripts/}\newline
-\pathref{run_all_txt_instances_limited.sh} &
-  Chuyển tùy chọn vào binary và giữ manifest, stdout, stderr. \\
-\pathref{test_improvements.sh} &
-  Chạy một cấu hình và tiếp tục an toàn từ các instance đã hoàn tất. \\
-\pathref{run_journal_smoke.sh} &
-  Kiểm tra nhanh bốn cấu hình, telemetry và chi phí trên một instance. \\
-\pathref{run_journal_once.sh} &
-  Chạy toàn bộ dataset đúng một lần; có thể chỉ chọn hai cấu hình R cho $K=32$. \\
-\pathref{quick_scripts/analyze/audit\_journal\_campaign.py} &
-  Kiểm tra dữ liệu, cấu hình, manifest, chi phí và tạo bảng tổng hợp. \\
-\pathref{external_patches/}\newline
-\pathref{salvers-rustsat-compat.patch} &
-  Làm cho dependency \code{salvers} có thể build lại đúng như môi trường phát triển. \\
-\pathref{manuscript/journal/reviews/}\newline
-\pathref{tuan5_doquangvinh_20261013/} &
-  Bảng kiểm toán và checksum của 1.296 lượt chạy tuần 5. \\
+Dấu hiệu & Việc thử tiếp theo \\
+\midrule
+Thời gian kiểm tra heuristic lớn & Kiểm tra cache và điều kiện bỏ lịch không cải thiện. \\
+Nhiều ứng viên phải chờ & Giảm $W$ hoặc tăng $\rho$. \\
+Mô hình tăng nhanh nhưng cận không tiến & Giảm $\rho$ hoặc $K_{\min}$. \\
+Phần objective chiếm phần lớn thời gian & Kiểm thử \code{BinaryObjective} bằng
+bảng chân trị và vét cạn trước khi bật giới hạn objective. \\
 \bottomrule
 \end{tabularx}
 
-\section{Biên dịch tài liệu}
+Không bật \code{BinaryObjective} trong chiến dịch đầu. Đây là bước mở rộng dự
+phòng và chỉ được dùng sau khi có kiểm thử riêng. Khi thay đổi phương pháp, chạy
+lại \code{screen}; không dùng kết quả của hai phiên bản mã như cùng một cấu hình.
 
-\begin{verbatim}
-cd manuscript/journal
-latexmk -xelatex -interaction=nonstopmode student_implementation_guide_vi.tex
-mkdir -p ../../output/pdf
-cp student_implementation_guide_vi.pdf ../../output/pdf/
-\end{verbatim}
+\section{Nội dung được phép đưa vào bài báo}
 
-Trên Overleaf, chọn XeLaTeX.
+Methods có thể mô tả AGLR ngay vì công thức đã khớp với mã. Các số RC2+B+R cũ
+chỉ xuất hiện trong bảng chẩn đoán và phải ghi rõ không dùng cho kết luận.
 
-\begin{thebibliography}{9}
-\bibitem{croella}
-A.~L. Croella, B.~Luteberget, C.~Mannino và P.~Ventura.
-\emph{A MaxSAT approach for solving a new Dynamic Discretization Discovery
-model for train rescheduling problems}.
-Computers \& Operations Research, 167, 106679, 2024.
-\url{https://doi.org/10.1016/j.cor.2024.106679}.
+Chỉ cập nhật Abstract, Results và Conclusion sau khi:
 
-\bibitem{conference}
-T.~V. Kieu, T.~H. Nguyen và K.~V. To.
-\emph{An Efficient MaxSAT-DDD Approach for Train Rescheduling via
-Precedence Propagation and Hybrid AMO Encodings}.
-Bản thảo tại \file{manuscript/submission/main.tex}.
-\end{thebibliography}
+\begin{enumerate}
+\item auditor không báo lỗi;
+\item cổng submission báo \code{PASS};
+\item các instance quan trọng đã được chạy xác nhận;
+\item baseline hội nghị có commit, cấu hình và môi trường đủ rõ;
+\item bảng và hình được sinh tự động từ dữ liệu đã lưu.
+\end{enumerate}
+
+Trong bài, giải thích thuật ngữ ở lần đầu xuất hiện. Dùng ``xung đột'', ``mốc
+thời gian'', ``mức tăng mô hình'', ``nghiệm tốt nhất'' và ``cận dưới'' thay cho
+tên biến nội bộ. Không viết rằng AGLR nhanh hơn hoặc mạnh hơn trước khi số liệu
+đã qua cổng trên.
 
 \end{document}

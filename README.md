@@ -100,26 +100,26 @@ cargo build --release --locked --bin ddd
 
 The compiled binary will be located at `target/release/ddd`.
 
-### Journal B/R campaign
+### Journal AGLR campaign
 
-The current journal campaign evaluates bound propagation (B) and the implemented
-budgeted greedy refinement rule (R) on all 72 instances and three objectives.
-Read `manuscript/journal/experiment_runbook_vi.md` before starting. Then run:
+The journal branch adds Adaptive Growth-Limited Refinement (AGLR) directly to
+the CSOnet solver. The published `maxsat_ddd_ladder_sc` command remains the
+legacy baseline; `maxsat_ddd_ladder_aglr` exposes the new complete scan and
+adaptive selector. Read `manuscript/journal/experiment_runbook_vi.md`, then run:
 
 ```bash
-bash run_journal_smoke.sh 120 128 origA1 finsteps123
-bash run_journal_once.sh 120 128
+bash run_aglr_experiments.sh screen
+bash run_aglr_experiments.sh promote
+CPLEX_RESULTS_DIR=/path/to/cplex_csv bash run_aglr_experiments.sh full
 ```
 
-The second command performs one run of four configurations, for 864 solver
-calls in total. It requires a clean main repository and writes raw results,
-per-instance logs, manifests, checksums, an audit report, and summary CSV files
-under `results/improvements/`.
-
-The R selector in this campaign is the implemented smallest-marginal-point
-greedy rule with an anti-starvation fallback. The utility-aware selector in the
-working COR manuscript is still a research specification and must not be used
-as the name of these results.
+The stages screen 18 parameter combinations, promote the best three, and lock
+one configuration before the 72-instance comparison. They require a clean
+repository and write resumable raw results, logs, manifests, checksums, and an
+independent audit under `results/aglr/`. Imported CPLEX rows need explicit
+`valid=true` evidence and matching bounds to count as optimal. Run the `confirm`
+stage only after the full audit reports that its preregistered submission gate
+has passed.
 
 ---
 

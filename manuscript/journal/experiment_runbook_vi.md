@@ -1,90 +1,138 @@
-# Runbook thực nghiệm cho bản tạp chí
+# Runbook thực nghiệm AGLR
 
-## Trạng thái hiện tại
+## Trạng thái
 
-Mã đã sẵn sàng cho **một lượt kiểm tra toàn bộ dataset với K=128**. Các điểm
-chặn về tính đúng và ghi số liệu đã được xử lý:
+AGLR đã được cài trực tiếp trên solver CSOnet. Tên solver mới là
+`maxsat_ddd_ladder_aglr`; tên cũ `maxsat_ddd_ladder_sc` vẫn chạy đúng đường
+`legacy`. Các kết quả RC2+B+R trước đây chỉ dùng để chẩn đoán và không đi vào
+bảng chính.
 
-- validator dùng đúng biên thời gian của DDD/MILP;
-- có test cho biên `earliest`, tiếp xúc tài nguyên, suy luận cận và forced order;
-- JSON ghi số biến, số mệnh đề, thời gian từng pha và diễn biến LB/UB;
-- script kiểm tra đúng 72 instance, cấu hình thực tế, chi phí, manifest và hash
-  dataset/dependency;
-- smoke test trên `origA1/finsteps123` đã hoàn thành tối ưu ở cả bốn cấu hình
-  với cùng chi phí.
+Chiến dịch đầu chỉ chạy mỗi cấu hình một lần. Các lượt lặp chỉ bắt đầu sau khi
+AGLR vượt ngưỡng coverage và PAR-2.
 
-Chính sách R đang chạy là greedy theo số mốc mới, kèm chống bỏ đói. Chính sách
-utility-aware mô tả trong bản thảo COR chưa được cài đặt. Vì vậy không gọi kết
-quả của chiến dịch này là kết quả utility-aware.
+## Chuẩn bị máy
 
-## Việc chạy ngay trên máy thực nghiệm
-
-Từ thư mục gốc repository:
+Máy cần Rust, Python 3, GNU `timeout`, Gurobi có license và hai repository
+`../salvers`, `../ipamir-rs`. Lượt so sánh đầy đủ cần thêm kết quả Big-M CPLEX
+từ cùng điều kiện chạy hoặc một môi trường đủ tương đương.
 
 ```bash
-# 1. Kiểm tra môi trường và bốn cấu hình trên một instance
-bash run_journal_smoke.sh 120 128 origA1 finsteps123
-
-# 2. Chạy đúng một lần: 72 instance × 3 objective × 4 cấu hình = 864 lượt
-bash run_journal_once.sh 120 128
+git checkout journal-aglr
+git pull --ff-only
+cargo check -p ddd --all-targets
+cargo test -p ddd aglr --lib
 ```
 
-Máy phải có Gurobi và license hợp lệ, `timeout` hoặc `gtimeout`, cùng hai
-repository `../salvers` và `../ipamir-rs`. `run_journal_once.sh` chỉ chạy khi
-cây Git chính sạch; hãy commit trước khi chạy.
+Cây Git phải sạch trước khi chạy. Script tự build một binary release, ghi commit,
+hash binary, hash dữ liệu, môi trường, tham số, thứ tự instance, stdout và stderr.
 
-Nếu chiến dịch bị ngắt, tiếp tục đúng thư mục cũ:
+## 1. Sàng lọc 18 cấu hình
 
 ```bash
-RUN_ID=$(cat results/improvements/journal_once_run_id.txt)
-RUN_ID="$RUN_ID" bash run_journal_once.sh 120 128
+bash run_aglr_experiments.sh screen
 ```
 
-Không đặt `RERUN_NON_OK=1` cho chiến dịch một lượt. Script sẽ giữ và dùng lại
-cả timeout để không vô tình tạo lần lặp thứ hai.
+Lệnh này chạy một lần trên 24 instance phát triển, giới hạn 30 giây. Lưới tham
+số là:
 
-## File cần lấy sau khi chạy
+- `K_min`: 16, 32, 64;
+- `rho`: 0.25, 0.5, 0.75;
+- `W`: 5, 10.
 
-Thư mục `results/improvements/<RUN_ID>/` phải có:
+Kết quả gần nhất được ghi trong `results/aglr/latest_screen.txt`. Xem
+`aglr_ranking.csv` trong thư mục được chỉ ra bởi file này.
 
-- 12 file JSON và 12 file CSV của 4 cấu hình × 3 objective;
-- `journal_summary.csv`;
-- `journal_paired_comparisons.csv`;
-- `journal_audit.json` với `errors` rỗng;
-- `campaign.txt`, `config.txt`, manifest, stdout và stderr từng instance.
+Nếu tiến trình bị ngắt, chạy lại với đúng `RUN_ID`:
 
-Không dùng chiến dịch nếu audit báo `panic`, `invalid_solution`, `segfault`,
-`aborted`, `gurobi_error`, thiếu telemetry, khác chi phí giữa hai cấu hình cùng
-hoàn thành, hoặc manifest không khớp.
+```bash
+RUN_ID=screen-YYYY-MM-DD_HH-MM-SS \
+  bash run_aglr_experiments.sh screen
+```
 
-## Kết quả nào dùng ngay trong bài
+Các instance đã có JSON hợp lệ sẽ được dùng lại.
 
-Lượt K=128 dùng được cho:
+## 2. Chạy ba cấu hình tốt nhất ở 120 giây
 
-1. tính đúng và tính tối ưu của nghiệm;
-2. số bài giải được, timeout và loại lỗi;
-3. ablation B và R greedy giữa bốn cấu hình;
-4. số mốc, biến, mệnh đề, forced order, LB/UB và thời gian từng pha.
+```bash
+bash run_aglr_experiments.sh promote
+```
 
-Chưa dùng một lượt để đưa ra phát biểu mạnh về chênh lệch runtime ở mức vài
-chục mili giây. Sau khi chốt thuật toán cuối, chạy lặp trên cùng máy và phân
-tích ghép cặp theo instance.
+Script tự đọc ba dòng đầu của ranking. Thứ tự xếp hạng là số optimum, PAR-2,
+rồi mức tăng mô hình. Có thể chỉ rõ kết quả sàng lọc:
 
-## Các bước sau lượt K=128
+```bash
+SCREEN_DIR=results/aglr/<screen-run> \
+  bash run_aglr_experiments.sh promote
+```
 
-1. Nhập baseline hội nghị khi được cung cấp. Giữ nguyên file gốc và kiểm tra đủ
-   72 tên, 3 objective, timeout, commit, máy và số luồng.
-2. Chốt phạm vi bài: cài utility-aware và so với greedy, hoặc mô tả đóng góp
-   đúng là bound-guided DDD với budgeted greedy refinement.
-3. Nếu cần sensitivity K=32, chỉ chạy hai cấu hình phụ thuộc K:
+## 3. Khóa cấu hình và chạy đủ 72 instance
 
-   ```bash
-   JOURNAL_CONFIGS="RC2+R RC2+B+R" \
-   RUN_ID="journal-k32-$(date +%Y-%m-%d_%H-%M-%S)" \
-   bash run_journal_once.sh 120 32
-   ```
+Chuẩn bị ba CSV Big-M CPLEX cho `finsteps123`, `infsteps180` và `cont`. Script
+nhận mẫu `results_bigm_<objective>_120s.csv` hoặc
+`MILP_BigM_CPLEX_<objective>_120s.csv`. File phải chứa `name`, `status`, `lb`,
+`ub`, thời gian chạy và `valid`. Giá trị `valid=true` xác nhận lịch đã qua bộ
+kiểm tra nghiệm. `status=ok` chỉ được tính tối ưu khi `valid=true` và `lb`, `ub`
+khớp. CSV cũ thiếu `valid` chỉ dùng tham khảo, không dùng mở cổng submission.
 
-4. Không chạy K=8. Chỉ thử K=256 hoặc `all` nếu K=128 còn nhiều timeout nhưng
-   không còn lỗi tính đúng.
-5. Khi phương pháp cuối đã ổn định, chạy lặp cho các kết luận runtime và cập
-   nhật bảng/hình trong bản thảo COR từ các file audit, không chép số thủ công.
+```bash
+CPLEX_RESULTS_DIR=/absolute/path/to/cplex_csv \
+  bash run_aglr_experiments.sh full
+```
+
+Lượt đầy đủ chạy và kiểm tra:
+
+- MaxSAT-DDD của bài tạp chí trước;
+- CSOnet `legacy`;
+- AGLR `all-scanned`;
+- AGLR `adaptive` với tham số đã khóa;
+- Big-M Gurobi;
+- Big-M CPLEX nhập từ thư mục trên.
+
+Có thể khóa tham số bằng tay nếu cần tái tạo một cấu hình đã chọn:
+
+```bash
+AGLR_MIN_GROWTH=32 \
+AGLR_FRACTION=0.5 \
+AGLR_MAX_WAIT=5 \
+CPLEX_RESULTS_DIR=/absolute/path/to/cplex_csv \
+  bash run_aglr_experiments.sh full
+```
+
+Không dùng thời gian CPLEX cũ nếu máy, phiên bản solver, timeout, số luồng hoặc
+cách xác nhận tối ưu khác với chiến dịch chính. Chi phí tối ưu cũ vẫn có thể
+dùng làm mốc kiểm tra.
+
+## 4. Xác nhận các instance quan trọng
+
+Chỉ làm bước này sau khi `aglr_audit.json` của lượt đầy đủ có `gate.passed=true`.
+
+```bash
+bash run_aglr_experiments.sh confirm
+```
+
+Script chạy ba lần các instance trên 30 giây và các instance AGLR được/mất so
+với baseline. Không chạy lặp toàn bộ 72 instance ở giai đoạn đầu.
+
+## Cổng sử dụng cho submission
+
+Auditor từ chối file thiếu, tên instance thừa/trùng, lịch sai, chi phí sai và
+kết quả MILP không có cận khớp. AGLR chỉ qua cổng khi:
+
+- `finsteps123`: 72/72 và PAR-2 thấp hơn baseline hoàn chỉnh tốt nhất;
+- `infsteps180`: ít nhất 69/72;
+- `cont`: ít nhất 68/72;
+- đủ MaxSAT-Journal, CSOnet, BigM-Gurobi và BigM-CPLEX;
+- không có `panic`, nghiệm sai hoặc lỗi dữ liệu.
+
+Các file cần giữ để viết bài:
+
+- `aglr_summary.csv`;
+- `aglr_ranking.csv`;
+- `aglr_audit.json`;
+- `confirm_instances.txt`;
+- mọi JSON, manifest và log instance trong cùng thư mục chiến dịch.
+
+Nếu cổng chưa đạt, đọc telemetry rồi chỉ đổi một thành phần: giảm `W` hoặc tăng
+`rho` khi nhiều ứng viên chờ; giảm `rho` hoặc `K_min` khi mô hình tăng nhanh;
+kiểm tra cache khi thời gian validation lớn. Chỉ thử `BinaryObjective` sau khi
+có kiểm thử bảng chân trị và bài nhỏ vét cạn.

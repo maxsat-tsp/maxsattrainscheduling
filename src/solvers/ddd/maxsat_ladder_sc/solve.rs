@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
-    time::Instant,
+    collections::{BTreeMap, HashMap, HashSet},
+    time::{Duration, Instant},
 };
 
 #[allow(unused)]
@@ -87,9 +87,13 @@ pub struct SolveStats {
 // Settings + tunable constants moved to `super::settings`.
 // SC AMO helpers moved to `super::sc_amo`.
 // Precedence helpers moved to `super::precedence`.
+use super::aglr::{
+    select as select_aglr_candidates, Candidate as AglrCandidate, CandidateHistory, ConflictKey,
+    Selection as AglrSelection, VisitTime,
+};
 use super::precedence::{add_fixed_precedence_row, propagate_precedence};
-use super::sc_amo::{add_hybrid_amo, build_active_lit, get_delay_lit_at};
-use super::settings::MaxSatDddLadderScSettings;
+use super::sc_amo::{add_hybrid_amo, build_active_lit};
+use super::settings::{MaxSatDddLadderScSettings, RefinementPolicy};
 
 enum Soft<L: satcoder::Lit> {
     Primary,
@@ -295,6 +299,425 @@ impl<L: satcoder::Lit + Copy + 'static> BinaryObjective<L> {
     }
 }
 
+#[derive(Default)]
+struct AglrTelemetry {
+    detection_time: Duration,
+    selection_time: Duration,
+    application_time: Duration,
+    candidates_detected: usize,
+    candidates_selected: usize,
+    all_growth: usize,
+    selected_growth: usize,
+    mandatory_selected: usize,
+    rescue_iterations: usize,
+    max_age: usize,
+    duplicate_clauses_skipped: usize,
+    final_validation_time: Duration,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum AglrClauseKey {
+    Travel {
+        from: VisitId,
+        from_time: i32,
+        to: VisitId,
+        required_time: i32,
+    },
+    Resource {
+        first: VisitId,
+        first_exit: i32,
+        second: VisitId,
+        second_exit: i32,
+    },
+}
+
+enum RefinementAction<L: satcoder::Lit> {
+    Travel {
+        visit_id: VisitId,
+        next_visit: VisitId,
+        in_var: Bool<L>,
+        in_t: i32,
+        required_t: i32,
+        interval: ResourceInterval,
+    },
+    Resource {
+        visit_id: VisitId,
+        other_visit: VisitId,
+        resource_id: usize,
+        other_resource_id: usize,
+        t1_out: i32,
+        t2_out: i32,
+        t1_out_lit: Bool<L>,
+        t2_out_lit: Bool<L>,
+    },
+}
+
+struct DetectedRefinement<L: satcoder::Lit> {
+    candidate: AglrCandidate,
+    action: RefinementAction<L>,
+}
+
+#[derive(Default)]
+struct RefinementOutcome {
+    found_travel: bool,
+    found_resource: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn detect_and_apply_aglr<L: satcoder::Lit + Copy + 'static>(
+    solver: &mut impl SatInstance<L>,
+    problem: &Problem,
+    visits: &TiVec<VisitId, (usize, usize)>,
+    resource_visits: &[Vec<VisitId>],
+    conflicts: &HashMap<usize, Vec<usize>>,
+    occupations: &mut TiVec<VisitId, Occ<L>>,
+    new_time_points: &mut Vec<(VisitId, Bool<L>, i32)>,
+    fixed_prec_rows: &mut HashSet<(VisitId, i32)>,
+    clique_amo_encoded: &mut HashSet<Vec<VisitId>>,
+    encoded_refinement_clauses: &mut HashSet<AglrClauseKey>,
+    settings: MaxSatDddLadderScSettings,
+    history: &mut CandidateHistory,
+    rescue: bool,
+    stats: &mut SolveStats,
+    debug_actions: &mut Vec<SolverAction>,
+    n_conflict_constraints: &mut usize,
+    telemetry: &mut AglrTelemetry,
+) -> RefinementOutcome {
+    let detect_start = Instant::now();
+    let mut detected = Vec::<DetectedRefinement<L>>::new();
+
+    for visit_id in visits.keys() {
+        let (train_idx, visit_idx) = visits[visit_id];
+        if visit_idx + 1 >= problem.trains[train_idx].visits.len() {
+            continue;
+        }
+        let next_visit: VisitId = (usize::from(visit_id) + 1).into();
+        let in_t = occupations[visit_id].incumbent_time();
+        let out_t = occupations[next_visit].incumbent_time();
+        let visit = problem.trains[train_idx].visits[visit_idx];
+        if in_t + visit.travel_time <= out_t {
+            continue;
+        }
+
+        let required_t = in_t + visit.travel_time;
+        detected.push(DetectedRefinement {
+            candidate: AglrCandidate {
+                key: ConflictKey::Travel {
+                    from: visit_id.0,
+                    to: next_visit.0,
+                },
+                points: vec![VisitTime {
+                    visit: next_visit.0,
+                    time: required_t,
+                }],
+            },
+            action: RefinementAction::Travel {
+                visit_id,
+                next_visit,
+                in_var: occupations[visit_id].delays[occupations[visit_id].incumbent_idx].0,
+                in_t,
+                required_t,
+                interval: ResourceInterval {
+                    train_idx,
+                    visit_idx,
+                    resource_idx: visit.resource_id,
+                    time_in: in_t,
+                    time_out: out_t,
+                },
+            },
+        });
+    }
+
+    let mut seen_pairs = HashSet::<(VisitId, VisitId)>::new();
+    for visit_id in visits.keys() {
+        let (train_idx, visit_idx) = visits[visit_id];
+        let visit = problem.trains[train_idx].visits[visit_idx];
+        let t1_in = occupations[visit_id].incumbent_time();
+        let next_visit = (visit_idx + 1 < problem.trains[train_idx].visits.len())
+            .then(|| VisitId(visit_id.0 + 1));
+        let t1_out = next_visit
+            .map(|next| occupations[next].incumbent_time())
+            .unwrap_or(t1_in + visit.travel_time);
+
+        let Some(conflicting_resources) = conflicts.get(&visit.resource_id) else {
+            continue;
+        };
+        for &other_resource in conflicting_resources {
+            for &other_visit in &resource_visits[other_resource] {
+                if other_visit == visit_id {
+                    continue;
+                }
+                let pair = if visit_id.0 < other_visit.0 {
+                    (visit_id, other_visit)
+                } else {
+                    (other_visit, visit_id)
+                };
+                if !seen_pairs.insert(pair) {
+                    continue;
+                }
+
+                let (other_train_idx, other_visit_idx) = visits[other_visit];
+                if train_idx == other_train_idx {
+                    continue;
+                }
+                let other = problem.trains[other_train_idx].visits[other_visit_idx];
+                let t2_in = occupations[other_visit].incumbent_time();
+                let other_next_visit = (other_visit_idx + 1
+                    < problem.trains[other_train_idx].visits.len())
+                .then(|| VisitId(other_visit.0 + 1));
+                let t2_out = other_next_visit
+                    .map(|next| occupations[next].incumbent_time())
+                    .unwrap_or(t2_in + other.travel_time);
+                if t1_out <= t2_in || t2_out <= t1_in {
+                    continue;
+                }
+
+                let t1_out_lit = next_visit
+                    .map(|next| occupations[next].delays[occupations[next].incumbent_idx].0)
+                    .unwrap_or_else(|| true.into());
+                let t2_out_lit = other_next_visit
+                    .map(|next| occupations[next].delays[occupations[next].incumbent_idx].0)
+                    .unwrap_or_else(|| true.into());
+                detected.push(DetectedRefinement {
+                    candidate: AglrCandidate {
+                        key: ConflictKey::resource(visit_id.0, other_visit.0),
+                        points: vec![
+                            VisitTime {
+                                visit: visit_id.0,
+                                time: t2_out,
+                            },
+                            VisitTime {
+                                visit: other_visit.0,
+                                time: t1_out,
+                            },
+                        ],
+                    },
+                    action: RefinementAction::Resource {
+                        visit_id,
+                        other_visit,
+                        resource_id: visit.resource_id,
+                        other_resource_id: other_resource,
+                        t1_out,
+                        t2_out,
+                        t1_out_lit,
+                        t2_out_lit,
+                    },
+                });
+            }
+        }
+    }
+    telemetry.detection_time += detect_start.elapsed();
+
+    let outcome = RefinementOutcome {
+        found_travel: detected
+            .iter()
+            .any(|item| matches!(&item.action, RefinementAction::Travel { .. })),
+        found_resource: detected
+            .iter()
+            .any(|item| matches!(&item.action, RefinementAction::Resource { .. })),
+    };
+    telemetry.candidates_detected += detected.len();
+
+    let existing = occupations
+        .iter_enumerated()
+        .flat_map(|(visit, occupation)| {
+            occupation.delays[..occupation.delays.len() - 1]
+                .iter()
+                .map(move |(_, time)| VisitTime {
+                    visit: visit.0,
+                    time: *time,
+                })
+        })
+        .collect::<HashSet<_>>();
+    let candidates = detected
+        .iter()
+        .map(|item| item.candidate.clone())
+        .collect::<Vec<_>>();
+    let selection_start = Instant::now();
+    let selection: AglrSelection = select_aglr_candidates(
+        &candidates,
+        &existing,
+        settings.aglr,
+        rescue && settings.aglr.policy == RefinementPolicy::Adaptive,
+        history,
+    );
+    telemetry.selection_time += selection_start.elapsed();
+    telemetry.candidates_selected += selection.indices.len();
+    telemetry.all_growth += selection.all_growth;
+    telemetry.selected_growth += selection.selected_growth;
+    telemetry.mandatory_selected += selection.mandatory;
+    telemetry.max_age = telemetry.max_age.max(selection.max_age);
+    if selection.rescued {
+        telemetry.rescue_iterations += 1;
+    }
+
+    let apply_start = Instant::now();
+    let mut touched_pair_cliques: HashMap<(usize, i32), HashSet<VisitId>> = HashMap::new();
+    let selected_indices = selection.indices.into_iter().collect::<HashSet<_>>();
+    for (idx, refinement) in detected.into_iter().enumerate() {
+        if !selected_indices.contains(&idx) {
+            continue;
+        }
+        match refinement.action {
+            RefinementAction::Travel {
+                visit_id,
+                next_visit,
+                in_var,
+                in_t,
+                required_t,
+                interval,
+            } => {
+                debug_actions.push(SolverAction::TravelTimeConflict(interval));
+                let clause_key = AglrClauseKey::Travel {
+                    from: visit_id,
+                    from_time: in_t,
+                    to: next_visit,
+                    required_time: required_t,
+                };
+                if !encoded_refinement_clauses.insert(clause_key) {
+                    telemetry.duplicate_clauses_skipped += 1;
+                    continue;
+                }
+                if settings.use_eager_chain_expansion {
+                    let _ = add_fixed_precedence_row(
+                        solver,
+                        problem,
+                        visits,
+                        occupations,
+                        new_time_points,
+                        fixed_prec_rows,
+                        visit_id,
+                        in_var,
+                        in_t,
+                        true,
+                    );
+                } else {
+                    let (required_var, is_new) =
+                        occupations[next_visit].time_point(solver, required_t);
+                    solver.add_clause(vec![!in_var, required_var]);
+                    if is_new {
+                        new_time_points.push((next_visit, required_var, required_t));
+                    }
+                }
+                stats.n_travel += 1;
+            }
+            RefinementAction::Resource {
+                visit_id,
+                other_visit,
+                resource_id,
+                other_resource_id,
+                t1_out,
+                t2_out,
+                t1_out_lit,
+                t2_out_lit,
+            } => {
+                let clause_key = if visit_id.0 <= other_visit.0 {
+                    AglrClauseKey::Resource {
+                        first: visit_id,
+                        first_exit: t1_out,
+                        second: other_visit,
+                        second_exit: t2_out,
+                    }
+                } else {
+                    AglrClauseKey::Resource {
+                        first: other_visit,
+                        first_exit: t2_out,
+                        second: visit_id,
+                        second_exit: t1_out,
+                    }
+                };
+                if !encoded_refinement_clauses.insert(clause_key) {
+                    telemetry.duplicate_clauses_skipped += 1;
+                    continue;
+                }
+                let (delay_t2, t2_is_new) = occupations[other_visit].time_point(solver, t1_out);
+                let (delay_t1, t1_is_new) = occupations[visit_id].time_point(solver, t2_out);
+                if t1_is_new {
+                    new_time_points.push((visit_id, delay_t1, t2_out));
+                }
+                if t2_is_new {
+                    new_time_points.push((other_visit, delay_t2, t1_out));
+                }
+
+                if settings.use_eager_chain_expansion {
+                    let _ = add_fixed_precedence_row(
+                        solver,
+                        problem,
+                        visits,
+                        occupations,
+                        new_time_points,
+                        fixed_prec_rows,
+                        visit_id,
+                        delay_t1,
+                        t2_out,
+                        true,
+                    );
+                    let _ = add_fixed_precedence_row(
+                        solver,
+                        problem,
+                        visits,
+                        occupations,
+                        new_time_points,
+                        fixed_prec_rows,
+                        other_visit,
+                        delay_t2,
+                        t1_out,
+                        true,
+                    );
+                }
+
+                solver.add_clause(vec![!t1_out_lit, !t2_out_lit, delay_t1, delay_t2]);
+                *n_conflict_constraints += 1;
+                stats.n_conflict += 1;
+
+                if settings.use_touched_clique_amo && resource_id == other_resource_id {
+                    let tau_plus_1 = t1_out.min(t2_out);
+                    let entry = touched_pair_cliques
+                        .entry((other_resource_id, tau_plus_1))
+                        .or_default();
+                    entry.insert(visit_id);
+                    entry.insert(other_visit);
+                }
+            }
+        }
+    }
+
+    if settings.use_touched_clique_amo {
+        let mut active_lit_cache = HashMap::<(VisitId, i32), Bool<L>>::new();
+        for ((_, tau_plus_1), visit_set) in touched_pair_cliques {
+            if visit_set.len() < 3 {
+                continue;
+            }
+            let mut visits_sorted = visit_set.into_iter().collect::<Vec<_>>();
+            visits_sorted.sort_by_key(|visit| visit.0);
+            if !clique_amo_encoded.insert(visits_sorted.clone()) {
+                continue;
+            }
+            let active_lits = visits_sorted
+                .iter()
+                .map(|&visit| {
+                    build_active_lit(
+                        solver,
+                        problem,
+                        visits,
+                        occupations,
+                        new_time_points,
+                        fixed_prec_rows,
+                        &mut active_lit_cache,
+                        settings.use_eager_chain_expansion,
+                        visit,
+                        tau_plus_1,
+                    )
+                })
+                .collect::<Vec<_>>();
+            add_hybrid_amo(solver, &active_lits, settings.use_sc_amo);
+            *n_conflict_constraints += 1;
+        }
+    }
+    telemetry.application_time += apply_start.elapsed();
+    outcome
+}
+
 #[allow(dead_code)]
 fn compute_initial_heuristic_upper_bound<L: satcoder::Lit>(
     mk_env: &impl Fn() -> grb::Env,
@@ -419,6 +842,32 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let mut solver_time = std::time::Duration::ZERO;
     let mut stats = SolveStats::default();
 
+    assert!(
+        settings.aglr.policy == RefinementPolicy::Legacy
+            || !settings.use_eager_chain_expansion,
+        "AGLR policies require eager chain expansion to be disabled so the growth budget matches the applied refinement"
+    );
+    assert!(
+        settings.aglr.min_growth > 0,
+        "AGLR min_growth must be positive"
+    );
+    assert!(
+        settings.aglr.fraction.is_finite() && (0.0..=1.0).contains(&settings.aglr.fraction),
+        "AGLR fraction must be finite and between zero and one"
+    );
+    assert!(settings.aglr.max_wait > 0, "AGLR max_wait must be positive");
+
+    output_stats(
+        "aglr_policy".to_string(),
+        settings.aglr.policy.as_str().into(),
+    );
+    output_stats(
+        "aglr_min_growth".to_string(),
+        settings.aglr.min_growth.into(),
+    );
+    output_stats("aglr_fraction".to_string(), settings.aglr.fraction.into());
+    output_stats("aglr_max_wait".to_string(), settings.aglr.max_wait.into());
+
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
     let mut occupations: TiVec<VisitId, Occ<_>> = TiVec::new();
@@ -438,7 +887,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let mut n_timepoints = 0;
     let mut n_conflict_constraints = 0;
 
-    //Build conflict adjacency 
+    //Build conflict adjacency
     for (a, b) in problem.conflicts.iter() {
         conflicts.entry(*a).or_default().push(*b);
         if *a != *b {
@@ -446,7 +895,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         }
     }
 
-    //Build Occ 
+    //Build Occ
     for (train_idx, train) in problem.trains.iter().enumerate() {
         for (visit_idx, visit) in train.visits.iter().enumerate() {
             let visit_id: VisitId = visits.push_and_get_key((train_idx, visit_idx));
@@ -470,16 +919,18 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             // (1.1)
             resource_visits[visit.resource_id].push(visit_id);
             //
-            
+
             touched_intervals.push(visit_id);
             new_time_points.push((visit_id, true.into(), earliest));
 
             // Pre-allocate SAT vars + monotonicity clauses for each cost-step
-            // threshold time. 
+            // threshold time.
             if settings.prealloc_cost_thresholds {
-                for t in problem.trains[train_idx]
-                    .visit_cost_threshold_times(delay_cost_type, visit_idx, earliest)
-                {
+                for t in problem.trains[train_idx].visit_cost_threshold_times(
+                    delay_cost_type,
+                    visit_idx,
+                    earliest,
+                ) {
                     let (var, is_new) = occupations[visit_id].time_point(&mut solver, t);
                     if is_new {
                         n_timepoints += 1;
@@ -505,6 +956,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let mut clique_amo_encoded: HashSet<Vec<VisitId>> = HashSet::new();
     // Rows already added for fixed-precedence encoding: (visit_id, time).
     let mut fixed_prec_rows: HashSet<(VisitId, i32)> = HashSet::new();
+    let mut encoded_refinement_clauses = HashSet::<AglrClauseKey>::new();
 
     // Optional: seed fixed-precedence (travel-time) constraints from the earliest
     // time points to reduce the number of "travel-time conflict" iterations.
@@ -565,16 +1017,44 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         }
     }
 
+    let heuristic_filter = std::sync::Arc::new(heuristic::HeuristicFilter::new(
+        best_heur
+            .as_ref()
+            .map(|(cost, _)| *cost)
+            .unwrap_or(i32::MAX),
+    ));
+
     //UB from Gurobi
     let heur_thread = USE_HEURISTIC.then(|| {
         let (sol_in_tx, sol_in_rx) = std::sync::mpsc::channel();
         let (sol_out_tx, sol_out_rx) = std::sync::mpsc::channel();
         let problem = problem.clone();
-        heuristic::spawn_heuristic_thread(mk_env, sol_in_rx, problem, delay_cost_type, sol_out_tx);
+        if settings.aglr.policy == RefinementPolicy::Legacy {
+            heuristic::spawn_heuristic_thread(
+                mk_env,
+                sol_in_rx,
+                problem,
+                delay_cost_type,
+                sol_out_tx,
+            );
+        } else {
+            heuristic::spawn_filtered_heuristic_thread(
+                mk_env,
+                sol_in_rx,
+                problem,
+                delay_cost_type,
+                sol_out_tx,
+                heuristic_filter.clone(),
+            );
+        }
         (sol_in_tx, sol_out_rx)
     });
 
-    /// Main DDD loop
+    let mut aglr_history = CandidateHistory::default();
+    let mut aglr_telemetry = AglrTelemetry::default();
+    let mut last_progress_iteration = 0usize;
+
+    // Main DDD loop.
     loop {
         // Check timeout at the start of each iteration.
         if start_time.elapsed().as_secs_f64() > timeout {
@@ -591,6 +1071,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 solver_time,
                 total_cost,
                 ub,
+                &aglr_telemetry,
+                &heuristic_filter,
             );
             return Err(SolverError::Timeout);
         }
@@ -598,7 +1080,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         // Check SAT/UNSAT of the current iteration's formula.
         let _p = hprof::enter("iteration");
         if is_sat {
-            
             // If SAT, extract the solution and check for optimality via the async.
             if let Some((sol_tx, sol_rx)) = heur_thread.as_ref() {
                 let sol = extract_solution(problem, &occupations);
@@ -606,12 +1087,20 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
                 while let Ok((ub_cost, ub_sol)) = sol_rx.try_recv() {
                     if ub_cost < total_cost as i32 {
+                        if settings.aglr.policy != RefinementPolicy::Legacy {
+                            return Err(SolverError::InvalidSolution(format!(
+                                "verified AGLR heuristic upper bound {} is below lower bound {}",
+                                ub_cost, total_cost
+                            )));
+                        }
                         println!(
                             "HEURISTIC UB={} is below current LB={}; keeping UB but skipping LB==UB termination this iteration",
                             ub_cost, total_cost
                         );
                         if ub_cost < best_heur.as_ref().map(|(c, _)| *c).unwrap_or(i32::MAX) {
                             best_heur = Some((ub_cost, ub_sol));
+                            heuristic_filter.update_best(ub_cost);
+                            last_progress_iteration = iteration;
                         }
                         continue;
                     }
@@ -632,6 +1121,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                             solver_time,
                             total_cost,
                             ub_cost,
+                            &aglr_telemetry,
+                            &heuristic_filter,
                         );
 
                         return Ok((ub_sol, stats));
@@ -639,196 +1130,61 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
                     if ub_cost < best_heur.as_ref().map(|(c, _)| *c).unwrap_or(i32::MAX) {
                         best_heur = Some((ub_cost, ub_sol));
+                        heuristic_filter.update_best(ub_cost);
+                        last_progress_iteration = iteration;
                     }
                 }
-
             }
 
             // Extract the current solution and check for travel-time and resource conflicts.
-               let mut found_travel_time_conflict = false;
+            let mut found_travel_time_conflict = false;
             let mut found_resource_conflict = false;
 
-            // travel time conflict check.
-            for visit_id in touched_intervals.iter().copied() {
-                let _p = hprof::enter("travel time check");
-                let (train_idx, visit_idx) = visits[visit_id];
-                let next_visit: Option<VisitId> =
-                    if visit_idx + 1 < problem.trains[train_idx].visits.len() {
-                        Some((usize::from(visit_id) + 1).into())
-                    } else {
-                        None
-                    };
-
-                // GATHER INFORMATION ABOUT TWO CONSECUTIVE TIME POINTS
-                let t1_in = occupations[visit_id].incumbent_time();
-                let visit = problem.trains[train_idx].visits[visit_idx];
-
-                if let Some(next_visit) = next_visit {
-                    let v1 = &occupations[visit_id];
-                    let v2 = &occupations[next_visit];
-                    let t1_out = v2.incumbent_time();
-
-                    // TRAVEL TIME CONFLICT
-                    if t1_in + visit.travel_time > t1_out {
-                        found_travel_time_conflict = true;
-
-                        debug_actions.push(SolverAction::TravelTimeConflict(ResourceInterval {
-                            train_idx,
-                            visit_idx,
-                            resource_idx: visit.resource_id,
-                            time_in: t1_in,
-                            time_out: t1_out,
-                        }));
-
-                        // When `use_eager_chain_expansion` is OFF, emit the
-                        // travel-time clause inline — matches ladder semantics
-                        // exactly (no dedup, no short-circuit). The dedup +
-                        // earliest-next short-circuit inside
-                        // `add_fixed_precedence_row` change the emitted CNF in
-                        // subtle ways that make `ScNothing != Ldr` even when
-                        // every other flag is off.
-                        if settings.use_eager_chain_expansion {
-                            let in_var = v1.delays[v1.incumbent_idx].0;
-                            let in_t = v1.incumbent_time();
-                            let _ = add_fixed_precedence_row(
-                                &mut solver,
-                                problem,
-                                &visits,
-                                &mut occupations,
-                                &mut new_time_points,
-                                &mut fixed_prec_rows,
-                                visit_id,
-                                in_var,
-                                in_t,
-                                settings.use_eager_chain_expansion,
-                            );
+            if settings.aglr.policy == RefinementPolicy::Legacy {
+                // travel time conflict check.
+                for visit_id in touched_intervals.iter().copied() {
+                    let _p = hprof::enter("travel time check");
+                    let (train_idx, visit_idx) = visits[visit_id];
+                    let next_visit: Option<VisitId> =
+                        if visit_idx + 1 < problem.trains[train_idx].visits.len() {
+                            Some((usize::from(visit_id) + 1).into())
                         } else {
-                            let t1_in_var = v1.delays[v1.incumbent_idx].0;
-                            let new_t = v1.incumbent_time() + visit.travel_time;
-                            let (t1_earliest_out_var, t1_is_new) =
-                                occupations[next_visit].time_point(&mut solver, new_t);
-                            SatInstance::add_clause(
-                                &mut solver,
-                                vec![!t1_in_var, t1_earliest_out_var],
-                            );
-                            if t1_is_new {
-                                new_time_points.push((next_visit, t1_earliest_out_var, new_t));
-                            }
-                        }
-                        stats.n_travel += 1;
-                    }
+                            None
+                        };
 
+                    // GATHER INFORMATION ABOUT TWO CONSECUTIVE TIME POINTS
+                    let t1_in = occupations[visit_id].incumbent_time();
+                    let visit = problem.trains[train_idx].visits[visit_idx];
 
+                    if let Some(next_visit) = next_visit {
+                        let v1 = &occupations[visit_id];
+                        let v2 = &occupations[next_visit];
+                        let t1_out = v2.incumbent_time();
 
+                        // TRAVEL TIME CONFLICT
+                        if t1_in + visit.travel_time > t1_out {
+                            found_travel_time_conflict = true;
 
-                }
-            }
+                            debug_actions.push(SolverAction::TravelTimeConflict(
+                                ResourceInterval {
+                                    train_idx,
+                                    visit_idx,
+                                    resource_idx: visit.resource_id,
+                                    time_in: t1_in,
+                                    time_out: t1_out,
+                                },
+                            ));
 
-
-            //Resource conflict check: find all pairs of overlapping visits on conflicting resources, 
-            //and add a clause to forbid the current overlap.
-            let _p = hprof::enter("conflict check");
-            let mut deconflicted_train_pairs: HashSet<(usize, usize)> = HashSet::new();
-
-            // Lite clique aggregation for the pair-based scan: each
-            // (resource, tau_plus_1) accumulates visits that ended up in a
-            // detected conflict. After the scan, cliques with ≥3 members
-            // are encoded as a single AMO over `active(v, tau_plus_1)`
-            // literals — opt-in via `use_touched_clique_amo`. This lets
-            // SC AMO encoding fire WITHOUT the heavier interval-
-            // graph clique-cover pass.
-            let mut touched_pair_cliques: HashMap<(usize, i32), HashSet<VisitId>> =
-                HashMap::new();
-
-            touched_intervals.retain(|visit_id| {
-                let visit_id = *visit_id;
-                let (train_idx, visit_idx) = visits[visit_id];
-                let next_visit: Option<VisitId> =
-                    if visit_idx + 1 < problem.trains[train_idx].visits.len() {
-                        Some((usize::from(visit_id) + 1).into())
-                    } else {
-                        None
-                    };
-
-                let t1_in = occupations[visit_id].incumbent_time();
-                let visit = problem.trains[train_idx].visits[visit_idx];
-                let mut retain = false;
-
-                if let Some(conflicting_resources) = conflicts.get(&visit.resource_id) {
-                    for other_resource in conflicting_resources.iter().copied() {
-                        let t1_out = next_visit
-                            .map(|nx| occupations[nx].incumbent_time())
-                            .unwrap_or(t1_in + visit.travel_time);
-
-                        for other_visit in resource_visits[other_resource].iter().copied() {
-                            if usize::from(visit_id) == usize::from(other_visit) {
-                                continue;
-                            }
-
-                            let v2 = &occupations[other_visit];
-                            let t2_in = v2.incumbent_time();
-                            let (other_train_idx, other_visit_idx) = visits[other_visit];
-
-                            if other_train_idx == train_idx {
-                                continue;
-                            }
-
-                            let other_next_visit: Option<VisitId> = if other_visit_idx + 1
-                                < problem.trains[other_train_idx].visits.len()
-                            {
-                                Some((usize::from(other_visit) + 1).into())
-                            } else {
-                                None
-                            };
-
-                            let t2_out = other_next_visit
-                                .map(|v| occupations[v].incumbent_time())
-                                .unwrap_or_else(|| {
-                                    let other_v =
-                                        problem.trains[other_train_idx].visits[other_visit_idx];
-                                    t2_in + other_v.travel_time
-                                });
-
-                            if t1_out <= t2_in || t2_out <= t1_in {
-                                continue;
-                            }
-
-                            if !deconflicted_train_pairs.insert((train_idx, other_train_idx))
-                                || !deconflicted_train_pairs
-                                    .insert((other_train_idx, train_idx))
-                            {
-                                retain = true;
-                                continue;
-                            }
-
-                            found_resource_conflict = true;
-                            stats.n_conflict += 1;
-
-                            let (delay_t2, t2_is_new) =
-                                occupations[other_visit].time_point(&mut solver, t1_out);
-                            let (delay_t1, t1_is_new) =
-                                occupations[visit_id].time_point(&mut solver, t2_out);
-
-                            if t1_is_new {
-                                new_time_points.push((visit_id, delay_t1, t2_out));
-                            }
-                            if t2_is_new {
-                                new_time_points.push((other_visit, delay_t2, t1_out));
-                            }
-
-                            // Eager SC-style precedence propagation: pre-emptively add a
-                            // fixed-precedence row at the new time point (delay_t1, delay_t2)
-                            // for the train's NEXT visit, propagating travel time forward.
-                            //
-                            // Gated on `use_eager_chain_expansion` so that this entire block
-                            // is a no-op when the flag is OFF — that yields semantics
-                            // equivalent to `maxsat_ladder.rs` (which only enforces travel
-                            // time lazily in the dedicated travel-time-conflict branch above).
-                            //
-                            // With the flag ON we keep the previous eager behaviour: better
-                            // unit propagation, but +50–70% more time points per benchmark
-                            // (see sc-vs-ladder analysis).
+                            // When `use_eager_chain_expansion` is OFF, emit the
+                            // travel-time clause inline — matches ladder semantics
+                            // exactly (no dedup, no short-circuit). The dedup +
+                            // earliest-next short-circuit inside
+                            // `add_fixed_precedence_row` change the emitted CNF in
+                            // subtle ways that make `ScNothing != Ldr` even when
+                            // every other flag is off.
                             if settings.use_eager_chain_expansion {
+                                let in_var = v1.delays[v1.incumbent_idx].0;
+                                let in_t = v1.incumbent_time();
                                 let _ = add_fixed_precedence_row(
                                     &mut solver,
                                     problem,
@@ -837,103 +1193,261 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                                     &mut new_time_points,
                                     &mut fixed_prec_rows,
                                     visit_id,
-                                    delay_t1,
-                                    t2_out,
+                                    in_var,
+                                    in_t,
                                     settings.use_eager_chain_expansion,
                                 );
-
-                                let _ = add_fixed_precedence_row(
+                            } else {
+                                let t1_in_var = v1.delays[v1.incumbent_idx].0;
+                                let new_t = v1.incumbent_time() + visit.travel_time;
+                                let (t1_earliest_out_var, t1_is_new) =
+                                    occupations[next_visit].time_point(&mut solver, new_t);
+                                SatInstance::add_clause(
                                     &mut solver,
-                                    problem,
-                                    &visits,
-                                    &mut occupations,
-                                    &mut new_time_points,
-                                    &mut fixed_prec_rows,
-                                    other_visit,
-                                    delay_t2,
-                                    t1_out,
-                                    settings.use_eager_chain_expansion,
+                                    vec![!t1_in_var, t1_earliest_out_var],
                                 );
+                                if t1_is_new {
+                                    new_time_points.push((next_visit, t1_earliest_out_var, new_t));
+                                }
                             }
-
-                            let t1_out_lit = next_visit
-                                .map(|v| occupations[v].delays[occupations[v].incumbent_idx].0)
-                                .unwrap_or_else(|| true.into());
-                            let t2_out_lit = other_next_visit
-                                .map(|v| occupations[v].delays[occupations[v].incumbent_idx].0)
-                                .unwrap_or_else(|| true.into());
-
-                            n_conflict_constraints += 1;
-                            SatInstance::add_clause(
-                                &mut solver,
-                                vec![!t1_out_lit, !t2_out_lit, delay_t1, delay_t2],
-                            );
-
-                            // Touched-clique-AMO aggregation: record
-                            // both visits at the (resource, tau_plus_1)
-                            // of their overlap. Only meaningful for
-                            // self-conflicts (both on same resource);
-                            // cross-resource conflicts skipped.
-                            if settings.use_touched_clique_amo
-                                && visit.resource_id == other_resource
-                            {
-                                let tau_plus_1 = t1_out.min(t2_out);
-                                let entry = touched_pair_cliques
-                                    .entry((other_resource, tau_plus_1))
-                                    .or_default();
-                                entry.insert(visit_id);
-                                entry.insert(other_visit);
-                            }
-
-                            retain = true;
+                            stats.n_travel += 1;
                         }
                     }
                 }
-                retain
-            });
 
-            // ───────── Touched-clique AMO (post-retain) ─────────
-            // For each (resource, tau_plus_1) that accumulated ≥ 3
-            // visits during the pair-based scan, emit a single AMO
-            // over their `active(v, tau_plus_1)` literals. Choice of
-            // pairwise vs SC encoding follows `use_sc_amo`.
-            if settings.use_touched_clique_amo {
-                let mut active_lit_cache_tcamo: HashMap<(VisitId, i32), Bool<L>> =
+                //Resource conflict check: find all pairs of overlapping visits on conflicting resources,
+                //and add a clause to forbid the current overlap.
+                let _p = hprof::enter("conflict check");
+                let mut deconflicted_train_pairs: HashSet<(usize, usize)> = HashSet::new();
+
+                // Lite clique aggregation for the pair-based scan: each
+                // (resource, tau_plus_1) accumulates visits that ended up in a
+                // detected conflict. After the scan, cliques with ≥3 members
+                // are encoded as a single AMO over `active(v, tau_plus_1)`
+                // literals — opt-in via `use_touched_clique_amo`. This lets
+                // SC AMO encoding fire WITHOUT the heavier interval-
+                // graph clique-cover pass.
+                let mut touched_pair_cliques: HashMap<(usize, i32), HashSet<VisitId>> =
                     HashMap::new();
-                let entries: Vec<((usize, i32), HashSet<VisitId>)> =
-                    touched_pair_cliques.into_iter().collect();
-                for ((_, tau_plus_1), visit_set) in entries {
-                    if visit_set.len() < 3 {
-                        continue;
-                    }
-                    let mut visits_sorted: Vec<VisitId> =
-                        visit_set.into_iter().collect();
-                    visits_sorted.sort_by_key(|v| v.0);
-                    if !clique_amo_encoded.insert(visits_sorted.clone()) {
-                        continue;
-                    }
-                    let mut active_lits: Vec<Bool<L>> =
-                        Vec::with_capacity(visits_sorted.len());
-                    for &v in &visits_sorted {
-                        let lit = build_active_lit(
-                            &mut solver,
-                            problem,
-                            &visits,
-                            &mut occupations,
-                            &mut new_time_points,
-                            &mut fixed_prec_rows,
-                            &mut active_lit_cache_tcamo,
-                            settings.use_eager_chain_expansion,
-                            v,
-                            tau_plus_1,
-                        );
-                        active_lits.push(lit);
-                    }
-                    add_hybrid_amo(&mut solver, &active_lits, settings.use_sc_amo);
-                    n_conflict_constraints += 1;
-                }
-            }
 
+                touched_intervals.retain(|visit_id| {
+                    let visit_id = *visit_id;
+                    let (train_idx, visit_idx) = visits[visit_id];
+                    let next_visit: Option<VisitId> =
+                        if visit_idx + 1 < problem.trains[train_idx].visits.len() {
+                            Some((usize::from(visit_id) + 1).into())
+                        } else {
+                            None
+                        };
+
+                    let t1_in = occupations[visit_id].incumbent_time();
+                    let visit = problem.trains[train_idx].visits[visit_idx];
+                    let mut retain = false;
+
+                    if let Some(conflicting_resources) = conflicts.get(&visit.resource_id) {
+                        for other_resource in conflicting_resources.iter().copied() {
+                            let t1_out = next_visit
+                                .map(|nx| occupations[nx].incumbent_time())
+                                .unwrap_or(t1_in + visit.travel_time);
+
+                            for other_visit in resource_visits[other_resource].iter().copied() {
+                                if usize::from(visit_id) == usize::from(other_visit) {
+                                    continue;
+                                }
+
+                                let v2 = &occupations[other_visit];
+                                let t2_in = v2.incumbent_time();
+                                let (other_train_idx, other_visit_idx) = visits[other_visit];
+
+                                if other_train_idx == train_idx {
+                                    continue;
+                                }
+
+                                let other_next_visit: Option<VisitId> = if other_visit_idx + 1
+                                    < problem.trains[other_train_idx].visits.len()
+                                {
+                                    Some((usize::from(other_visit) + 1).into())
+                                } else {
+                                    None
+                                };
+
+                                let t2_out = other_next_visit
+                                    .map(|v| occupations[v].incumbent_time())
+                                    .unwrap_or_else(|| {
+                                        let other_v =
+                                            problem.trains[other_train_idx].visits[other_visit_idx];
+                                        t2_in + other_v.travel_time
+                                    });
+
+                                if t1_out <= t2_in || t2_out <= t1_in {
+                                    continue;
+                                }
+
+                                if !deconflicted_train_pairs.insert((train_idx, other_train_idx))
+                                    || !deconflicted_train_pairs
+                                        .insert((other_train_idx, train_idx))
+                                {
+                                    retain = true;
+                                    continue;
+                                }
+
+                                found_resource_conflict = true;
+                                stats.n_conflict += 1;
+
+                                let (delay_t2, t2_is_new) =
+                                    occupations[other_visit].time_point(&mut solver, t1_out);
+                                let (delay_t1, t1_is_new) =
+                                    occupations[visit_id].time_point(&mut solver, t2_out);
+
+                                if t1_is_new {
+                                    new_time_points.push((visit_id, delay_t1, t2_out));
+                                }
+                                if t2_is_new {
+                                    new_time_points.push((other_visit, delay_t2, t1_out));
+                                }
+
+                                // Eager SC-style precedence propagation: pre-emptively add a
+                                // fixed-precedence row at the new time point (delay_t1, delay_t2)
+                                // for the train's NEXT visit, propagating travel time forward.
+                                //
+                                // Gated on `use_eager_chain_expansion` so that this entire block
+                                // is a no-op when the flag is OFF — that yields semantics
+                                // equivalent to `maxsat_ladder.rs` (which only enforces travel
+                                // time lazily in the dedicated travel-time-conflict branch above).
+                                //
+                                // With the flag ON we keep the previous eager behaviour: better
+                                // unit propagation, but +50–70% more time points per benchmark
+                                // (see sc-vs-ladder analysis).
+                                if settings.use_eager_chain_expansion {
+                                    let _ = add_fixed_precedence_row(
+                                        &mut solver,
+                                        problem,
+                                        &visits,
+                                        &mut occupations,
+                                        &mut new_time_points,
+                                        &mut fixed_prec_rows,
+                                        visit_id,
+                                        delay_t1,
+                                        t2_out,
+                                        settings.use_eager_chain_expansion,
+                                    );
+
+                                    let _ = add_fixed_precedence_row(
+                                        &mut solver,
+                                        problem,
+                                        &visits,
+                                        &mut occupations,
+                                        &mut new_time_points,
+                                        &mut fixed_prec_rows,
+                                        other_visit,
+                                        delay_t2,
+                                        t1_out,
+                                        settings.use_eager_chain_expansion,
+                                    );
+                                }
+
+                                let t1_out_lit = next_visit
+                                    .map(|v| occupations[v].delays[occupations[v].incumbent_idx].0)
+                                    .unwrap_or_else(|| true.into());
+                                let t2_out_lit = other_next_visit
+                                    .map(|v| occupations[v].delays[occupations[v].incumbent_idx].0)
+                                    .unwrap_or_else(|| true.into());
+
+                                n_conflict_constraints += 1;
+                                SatInstance::add_clause(
+                                    &mut solver,
+                                    vec![!t1_out_lit, !t2_out_lit, delay_t1, delay_t2],
+                                );
+
+                                // Touched-clique-AMO aggregation: record
+                                // both visits at the (resource, tau_plus_1)
+                                // of their overlap. Only meaningful for
+                                // self-conflicts (both on same resource);
+                                // cross-resource conflicts skipped.
+                                if settings.use_touched_clique_amo
+                                    && visit.resource_id == other_resource
+                                {
+                                    let tau_plus_1 = t1_out.min(t2_out);
+                                    let entry = touched_pair_cliques
+                                        .entry((other_resource, tau_plus_1))
+                                        .or_default();
+                                    entry.insert(visit_id);
+                                    entry.insert(other_visit);
+                                }
+
+                                retain = true;
+                            }
+                        }
+                    }
+                    retain
+                });
+
+                // ───────── Touched-clique AMO (post-retain) ─────────
+                // For each (resource, tau_plus_1) that accumulated ≥ 3
+                // visits during the pair-based scan, emit a single AMO
+                // over their `active(v, tau_plus_1)` literals. Choice of
+                // pairwise vs SC encoding follows `use_sc_amo`.
+                if settings.use_touched_clique_amo {
+                    let mut active_lit_cache_tcamo: HashMap<(VisitId, i32), Bool<L>> =
+                        HashMap::new();
+                    let entries: Vec<((usize, i32), HashSet<VisitId>)> =
+                        touched_pair_cliques.into_iter().collect();
+                    for ((_, tau_plus_1), visit_set) in entries {
+                        if visit_set.len() < 3 {
+                            continue;
+                        }
+                        let mut visits_sorted: Vec<VisitId> = visit_set.into_iter().collect();
+                        visits_sorted.sort_by_key(|v| v.0);
+                        if !clique_amo_encoded.insert(visits_sorted.clone()) {
+                            continue;
+                        }
+                        let mut active_lits: Vec<Bool<L>> = Vec::with_capacity(visits_sorted.len());
+                        for &v in &visits_sorted {
+                            let lit = build_active_lit(
+                                &mut solver,
+                                problem,
+                                &visits,
+                                &mut occupations,
+                                &mut new_time_points,
+                                &mut fixed_prec_rows,
+                                &mut active_lit_cache_tcamo,
+                                settings.use_eager_chain_expansion,
+                                v,
+                                tau_plus_1,
+                            );
+                            active_lits.push(lit);
+                        }
+                        add_hybrid_amo(&mut solver, &active_lits, settings.use_sc_amo);
+                        n_conflict_constraints += 1;
+                    }
+                }
+            } else {
+                let rescue_after = settings.aglr.max_wait.saturating_mul(2);
+                let rescue = rescue_after > 0
+                    && iteration.saturating_sub(last_progress_iteration) >= rescue_after;
+                let outcome = detect_and_apply_aglr(
+                    &mut solver,
+                    problem,
+                    &visits,
+                    &resource_visits,
+                    &conflicts,
+                    &mut occupations,
+                    &mut new_time_points,
+                    &mut fixed_prec_rows,
+                    &mut clique_amo_encoded,
+                    &mut encoded_refinement_clauses,
+                    settings,
+                    &mut aglr_history,
+                    rescue,
+                    &mut stats,
+                    &mut debug_actions,
+                    &mut n_conflict_constraints,
+                    &mut aglr_telemetry,
+                );
+                found_travel_time_conflict = outcome.found_travel;
+                found_resource_conflict = outcome.found_resource;
+                touched_intervals.clear();
+            }
 
             // If UNSAT, add conflict-graph-based constraints, optimal check
             let iterationtype = if found_travel_time_conflict && found_resource_conflict {
@@ -958,6 +1472,18 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 } else {
                     panic!()
                 };
+
+                if settings.aglr.policy != RefinementPolicy::Legacy {
+                    let validation_start = Instant::now();
+                    let verified_cost = problem.verify_solution(&trains, delay_cost_type);
+                    aglr_telemetry.final_validation_time += validation_start.elapsed();
+                    if verified_cost != Some(total_cost) {
+                        return Err(SolverError::InvalidSolution(format!(
+                            "AGLR final validation returned {:?}, expected {}",
+                            verified_cost, total_cost
+                        )));
+                    }
+                }
 
                 println!(
                     "Finished with cost {} iterations {} solver {:?}",
@@ -1006,6 +1532,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     solver_time,
                     total_cost,
                     total_cost,
+                    &aglr_telemetry,
+                    &heuristic_filter,
                 );
 
                 println!("VARSCLAUSES {:?}", solver);
@@ -1027,8 +1555,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 problem.trains[train_idx].visit_delay_cost(delay_cost_type, visit_idx, new_t);
 
             if new_timepoint_cost > 0 {
-
-
                 const USE_COST_TREE: bool = true;
                 if !USE_COST_TREE {
                     for cost in occupations[visit].cost.len()..=new_timepoint_cost {
@@ -1050,9 +1576,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                             occupations[visit].cost[new_timepoint_cost],
                         ],
                     );
-
                 } else {
-
                     // Direct insertion in callback — no Vec buffering overhead.
                     // Matches the ladder (non-SC) pattern for lower allocation cost.
                     occupations[visit].cost_tree.add_cost(
@@ -1060,15 +1584,13 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                         new_timepoint_var,
                         new_timepoint_cost,
                         &mut |weight, cost_var| {
-                            soft_constraints
-                                .insert(!cost_var, (Soft::Primary, weight, weight));
+                            soft_constraints.insert(!cost_var, (Soft::Primary, weight, weight));
                         },
                     );
                 }
             }
 
             // set the cost for this new time point.
-
         }
 
         //Solve
@@ -1122,10 +1644,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                         }
                         let (_train_idx, visit_idx) = visits[visit];
 
-
-
                         if touched {
-
                             // We are really interested not in the visits, but the resource occupation
                             // intervals. Therefore, also the previous visit has been touched by this visit.
                             if visit_idx > 0 {
@@ -1136,7 +1655,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                             }
                             touched_intervals.push(visit);
                         }
-
                     }
 
                     //Local Minimization: Optimize incumbent solution by trying to move each visit earlier as much as possible
@@ -1266,8 +1784,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                         }
                     }
 
-
-
                     debug_out(DebugInfo {
                         iteration,
                         actions: std::mem::take(&mut debug_actions),
@@ -1297,8 +1813,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 //
                 // Pure-ladder mode (all SC features off) skips this branch
                 // entirely so behaviour matches `maxsat_ladder.rs` exactly.
-                let any_other_sc_feature = settings.use_eager_chain_expansion
-                    || settings.use_touched_clique_amo;
+                let any_other_sc_feature =
+                    settings.use_eager_chain_expansion || settings.use_touched_clique_amo;
                 if !settings.use_precedence_graph && any_other_sc_feature {
                     if let Some((ub_cost, ub_sol)) = best_heur.as_ref() {
                         if injected_heuristic_cost != Some(*ub_cost) {
@@ -1323,18 +1839,14 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
             let core = core.iter().map(|c| Bool::Lit(*c)).collect::<Vec<_>>();
 
-
             *iteration_types.entry(IterationType::Objective).or_default() += 1;
             debug_actions.push(SolverAction::Core(core.len()));
 
             let min_weight = core.iter().map(|c| soft_constraints[c].1).min().unwrap();
             assert!(min_weight >= 1);
 
-
             for c in core.iter() {
                 let (soft, cost, original_cost) = soft_constraints.remove(c).unwrap();
-
-
 
                 assert!(cost >= min_weight);
                 let new_cost = cost - min_weight;
@@ -1348,15 +1860,12 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     }
                     Soft::Totalizer(mut tot, bound) => {
                         if new_cost > 0 {
-
                             soft_constraints
                                 .insert(*c, (Soft::Totalizer(tot, bound), new_cost, original_cost));
                         } else {
                             let new_bound = bound + 1;
                             tot.increase_bound(&mut solver, new_bound as u32);
                             if new_bound < tot.rhs().len() {
-
-
                                 soft_constraints.insert(
                                     !tot.rhs()[new_bound], // tot <= 2, 3, 4...
                                     (
@@ -1373,6 +1882,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             }
 
             total_cost += min_weight as i32;
+            last_progress_iteration = iteration;
             println!("    LB={}", total_cost);
 
             if total_cost as i32 == best_heur.as_ref().map(|(c, _)| *c).unwrap_or(i32::MAX) {
@@ -1391,6 +1901,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     solver_time,
                     total_cost,
                     total_cost,
+                    &aglr_telemetry,
+                    &heuristic_filter,
                 );
 
                 return Ok((best_heur.unwrap().1, stats));
@@ -1424,6 +1936,8 @@ fn do_output_stats<L: satcoder::Lit>(
     solver_time: std::time::Duration,
     lb: i32,
     ub: i32,
+    aglr: &AglrTelemetry,
+    heuristic_filter: &heuristic::HeuristicFilter,
 ) {
     output_stats("iterations".to_string(), iteration.into());
     output_stats(
@@ -1498,6 +2012,69 @@ fn do_output_stats<L: satcoder::Lit>(
     );
     output_stats("lb".to_string(), lb.into());
     output_stats("ub".to_string(), ub.into());
+    output_stats(
+        "aglr_detection_time".to_string(),
+        aglr.detection_time.as_secs_f64().into(),
+    );
+    output_stats(
+        "aglr_selection_time".to_string(),
+        aglr.selection_time.as_secs_f64().into(),
+    );
+    output_stats(
+        "aglr_application_time".to_string(),
+        aglr.application_time.as_secs_f64().into(),
+    );
+    output_stats(
+        "aglr_candidates_detected".to_string(),
+        aglr.candidates_detected.into(),
+    );
+    output_stats(
+        "aglr_candidates_selected".to_string(),
+        aglr.candidates_selected.into(),
+    );
+    output_stats("aglr_all_growth".to_string(), aglr.all_growth.into());
+    output_stats(
+        "aglr_selected_growth".to_string(),
+        aglr.selected_growth.into(),
+    );
+    output_stats(
+        "aglr_mandatory_selected".to_string(),
+        aglr.mandatory_selected.into(),
+    );
+    output_stats(
+        "aglr_rescue_iterations".to_string(),
+        aglr.rescue_iterations.into(),
+    );
+    output_stats("aglr_max_age".to_string(), aglr.max_age.into());
+    output_stats(
+        "aglr_duplicate_clauses_skipped".to_string(),
+        aglr.duplicate_clauses_skipped.into(),
+    );
+    let heuristic = heuristic_filter.snapshot();
+    output_stats(
+        "heuristic_candidates_received".to_string(),
+        heuristic.received.into(),
+    );
+    output_stats(
+        "heuristic_validation_skipped_non_improving".to_string(),
+        heuristic.skipped_non_improving.into(),
+    );
+    output_stats(
+        "heuristic_validation_skipped_duplicate".to_string(),
+        heuristic.skipped_duplicate.into(),
+    );
+    output_stats(
+        "heuristic_candidates_verified".to_string(),
+        heuristic.verified.into(),
+    );
+    output_stats(
+        "heuristic_verification_time".to_string(),
+        heuristic.verification_seconds.into(),
+    );
+    output_stats(
+        "validation_time_seconds".to_string(),
+        (aglr.final_validation_time.as_secs_f64() + heuristic.verification_seconds).into(),
+    );
 }
 
 fn extract_solution<L: satcoder::Lit>(
@@ -1561,6 +2138,84 @@ fn inject_solution_timepoints_maxsat<L: satcoder::Lit>(
     }
 }
 
+#[cfg(test)]
+mod aglr_end_to_end_tests {
+    use super::*;
+    use crate::problem::{Problem, Train, Visit};
+    use crate::solvers::ddd::maxsat_ladder_sc::AglrSettings;
+    use grb::parameter::IntParam::OutputFlag;
+
+    fn two_train_problem() -> Problem {
+        let visit = || Visit {
+            resource_id: 0,
+            earliest: 0,
+            aimed: Some(0),
+            travel_time: 2,
+        };
+        Problem {
+            name: "two-train-exhaustive".to_string(),
+            trains: vec![
+                Train {
+                    visits: vec![visit()],
+                },
+                Train {
+                    visits: vec![visit()],
+                },
+            ],
+            conflicts: vec![(0, 0)],
+        }
+    }
+
+    fn exhaustive_optimum(problem: &Problem) -> i32 {
+        (0..=4)
+            .flat_map(|first| (0..=4).map(move |second| (first, second)))
+            .filter_map(|(first, second)| {
+                let solution = vec![vec![first, first + 2], vec![second, second + 2]];
+                problem.verify_solution(&solution, DelayCostType::Continuous)
+            })
+            .min()
+            .unwrap()
+    }
+
+    fn quiet_env() -> grb::Env {
+        let mut env = grb::Env::new("").unwrap();
+        env.set(OutputFlag, 0).unwrap();
+        env
+    }
+
+    fn solve_cost(problem: &Problem, policy: RefinementPolicy) -> i32 {
+        let mut settings = MaxSatDddLadderScSettings::default();
+        settings.aglr = AglrSettings {
+            policy,
+            min_growth: 1,
+            fraction: 0.5,
+            max_wait: 2,
+        };
+        let solution = solve_with_settings(
+            &quiet_env,
+            satcoder::solvers::minisat::Solver::new(),
+            problem,
+            30.0,
+            DelayCostType::Continuous,
+            settings,
+            |_, _| {},
+        )
+        .unwrap()
+        .0;
+        problem
+            .verify_solution(&solution, DelayCostType::Continuous)
+            .unwrap()
+    }
+
+    #[test]
+    fn legacy_and_aglr_match_exhaustive_optimum_on_tiny_problem() {
+        let problem = two_train_problem();
+        let optimum = exhaustive_optimum(&problem);
+        assert_eq!(solve_cost(&problem, RefinementPolicy::Legacy), optimum);
+        assert_eq!(solve_cost(&problem, RefinementPolicy::Adaptive), optimum);
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct Occ<L: satcoder::Lit> {
     pub(super) cost: Vec<Bool<L>>,
@@ -1575,9 +2230,7 @@ impl<L: satcoder::Lit> Occ<L> {
     }
 
     pub fn time_point(&mut self, solver: &mut impl SatInstance<L>, t: i32) -> (Bool<L>, bool) {
-
         let idx = self.delays.partition_point(|(_, t0)| *t0 < t);
-
 
         assert!(idx > 0 || t == self.delays[0].1); // cannot insert before the earliest time.
         assert!(idx < self.delays.len()); // cannot insert after infinity.

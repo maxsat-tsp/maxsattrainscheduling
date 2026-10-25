@@ -110,6 +110,22 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_prealloc_cost_thresholds: Option<bool>,
 
+    /// AGLR refinement policy: legacy, all-scanned, or adaptive.
+    #[structopt(long)]
+    aglr_policy: Option<String>,
+
+    /// Minimum model-growth budget per AGLR iteration. Default: 32.
+    #[structopt(long)]
+    aglr_min_growth: Option<usize>,
+
+    /// Fraction of the detected growth admitted per AGLR iteration. Default: 0.5.
+    #[structopt(long)]
+    aglr_fraction: Option<f64>,
+
+    /// Select a repeatedly waiting AGLR conflict after this many iterations. Default: 5.
+    #[structopt(long)]
+    aglr_max_wait: Option<usize>,
+
     /// Objective encoding for `sat_ddd*` solvers: `scpb`, `totalizer`, or `bit_totalizer`.
     #[structopt(long)]
     satddd_objective_encoding: Option<String>,
@@ -170,6 +186,18 @@ fn parse_maxsat_rc2_bound_mode(value: &str) -> maxsat_rc2::BoundMode {
         "chain-cost-forced" => maxsat_rc2::BoundMode::ChainCostForced,
         _ => panic!(
             "Unknown maxsat_rc2 bound mode '{}'. Supported: off, chain, chain-cost, chain-cost-forced",
+            value
+        ),
+    }
+}
+
+fn parse_aglr_policy(value: &str) -> maxsat_ladder_sc::RefinementPolicy {
+    match value.to_ascii_lowercase().as_str() {
+        "legacy" => maxsat_ladder_sc::RefinementPolicy::Legacy,
+        "all-scanned" | "all_scanned" | "all" => maxsat_ladder_sc::RefinementPolicy::AllScanned,
+        "adaptive" | "aglr" => maxsat_ladder_sc::RefinementPolicy::Adaptive,
+        _ => panic!(
+            "Unknown AGLR policy '{}'. Supported: legacy, all-scanned, adaptive",
             value
         ),
     }
@@ -349,6 +377,7 @@ enum SolverType {
     BigMLazy,
     MaxSatDddLadderRC2,
     MaxSatDddLadderSc,
+    MaxSatDddLadderAglr,
     MaxSatDddLadderRC2Abstract,
     MaxSatDddLadderIpamir,
     MaxSatDddCadical,
@@ -417,6 +446,7 @@ fn main() {
             "maxsat_ddd_ladder" => SolverType::MaxSatDddLadderRC2,
             "maxsat_ddd_abstract" => SolverType::MaxSatDddLadderRC2Abstract,
             "maxsat_ddd_ladder_sc" => SolverType::MaxSatDddLadderSc,
+            "maxsat_ddd_ladder_aglr" => SolverType::MaxSatDddLadderAglr,
             "maxsat_ddd_ladder_ipamir" => SolverType::MaxSatDddLadderIpamir,
             "maxsat_ddd_cdc" => SolverType::MaxSatDddCadical,
             "maxsat_idl" => SolverType::MaxSatIdl,
@@ -497,8 +527,47 @@ fn main() {
         prealloc_cost_thresholds: opt
             .maxsat_ladder_sc_prealloc_cost_thresholds
             .unwrap_or(false),
+        aglr: maxsat_ladder_sc::AglrSettings::default(),
     };
     println!("MaxSatDddLadderSc settings {:?}", maxsat_ladder_sc_settings);
+
+    let aglr_fraction = opt.aglr_fraction.unwrap_or(0.5);
+    if !aglr_fraction.is_finite() || !(0.0..=1.0).contains(&aglr_fraction) {
+        panic!("--aglr-fraction must be a finite number between 0 and 1");
+    }
+    let aglr_max_wait = opt.aglr_max_wait.unwrap_or(5);
+    if aglr_max_wait == 0 {
+        panic!("--aglr-max-wait must be greater than zero");
+    }
+    let aglr_min_growth = opt.aglr_min_growth.unwrap_or(32);
+    if aglr_min_growth == 0 {
+        panic!("--aglr-min-growth must be greater than zero");
+    }
+    let mut maxsat_ladder_aglr_settings = maxsat_ladder_sc_settings;
+    maxsat_ladder_aglr_settings.aglr = maxsat_ladder_sc::AglrSettings {
+        policy: opt
+            .aglr_policy
+            .as_deref()
+            .map(parse_aglr_policy)
+            .unwrap_or(maxsat_ladder_sc::RefinementPolicy::Adaptive),
+        min_growth: aglr_min_growth,
+        fraction: aglr_fraction,
+        max_wait: aglr_max_wait,
+    };
+    if solvers
+        .iter()
+        .any(|solver| matches!(solver, SolverType::MaxSatDddLadderAglr))
+        && maxsat_ladder_aglr_settings.aglr.policy != maxsat_ladder_sc::RefinementPolicy::Legacy
+        && maxsat_ladder_aglr_settings.use_eager_chain_expansion
+    {
+        panic!(
+            "--maxsat-ladder-sc-use-eager-chain-expansion=true is incompatible with AGLR growth accounting"
+        );
+    }
+    println!(
+        "MaxSatDddLadderAglr settings {:?}",
+        maxsat_ladder_aglr_settings
+    );
 
     let satddd_objective_encoding = opt
         .satddd_objective_encoding
@@ -781,6 +850,23 @@ fn main() {
                             timeout,
                             delay_cost_type,
                             maxsat_ladder_sc_settings,
+                            |k, v| {
+                                solve_data.insert(k, v);
+                            },
+                        )
+                        .map(|(v, _)| v)
+                    }
+                    SolverType::MaxSatDddLadderAglr => {
+                        counting_solver::reset_counts();
+                        maxsat_ladder_sc::solve_with_settings(
+                            &mk_env,
+                            counting_solver::CountingSolver::new(
+                                satcoder::solvers::minisat::Solver::new(),
+                            ),
+                            &p.problem,
+                            timeout,
+                            delay_cost_type,
+                            maxsat_ladder_aglr_settings,
                             |k, v| {
                                 solve_data.insert(k, v);
                             },

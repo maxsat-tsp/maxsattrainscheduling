@@ -14,10 +14,13 @@
 //! `MaxSatDddLadderScSettings`, both re-exported here for compatibility
 //! with the old flat-file layout.
 
+mod aglr;
 mod precedence;
 mod sc_amo;
 mod settings;
 mod solve;
 
-pub use settings::MaxSatDddLadderScSettings;
-pub use solve::{solve, solve_debug, solve_debug_with_settings, solve_with_settings, IterationType, SolveStats};
+pub use settings::{AglrSettings, MaxSatDddLadderScSettings, RefinementPolicy};
+pub use solve::{
+    solve, solve_debug, solve_debug_with_settings, solve_with_settings, IterationType, SolveStats,
+};

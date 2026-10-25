@@ -1,8 +1,186 @@
-use grb::parameter::IntParam::NetworkCuts;
-
-use crate::solvers::SolverError;
 use crate::problem::{DelayCostType, Problem};
-use std::collections::VecDeque;
+use crate::solvers::SolverError;
+use std::{
+    collections::{HashSet, VecDeque},
+    sync::{
+        atomic::{AtomicI32, AtomicU64, AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Instant,
+};
+
+/// Shared counters for the filtered heuristic used by AGLR.
+///
+/// The accepted CSOnet baseline keeps using `spawn_heuristic_thread`; these
+/// counters and the filtered path are enabled only by the new AGLR alias.
+#[derive(Debug)]
+pub struct HeuristicFilter {
+    best_cost: AtomicI32,
+    received: AtomicUsize,
+    skipped_non_improving: AtomicUsize,
+    skipped_duplicate: AtomicUsize,
+    verified: AtomicUsize,
+    verification_nanos: AtomicU64,
+}
+
+impl HeuristicFilter {
+    pub fn new(best_cost: i32) -> Self {
+        Self {
+            best_cost: AtomicI32::new(best_cost),
+            received: AtomicUsize::new(0),
+            skipped_non_improving: AtomicUsize::new(0),
+            skipped_duplicate: AtomicUsize::new(0),
+            verified: AtomicUsize::new(0),
+            verification_nanos: AtomicU64::new(0),
+        }
+    }
+
+    pub fn update_best(&self, cost: i32) {
+        self.best_cost.fetch_min(cost, Ordering::Relaxed);
+    }
+
+    pub fn snapshot(&self) -> HeuristicFilterSnapshot {
+        HeuristicFilterSnapshot {
+            received: self.received.load(Ordering::Relaxed),
+            skipped_non_improving: self.skipped_non_improving.load(Ordering::Relaxed),
+            skipped_duplicate: self.skipped_duplicate.load(Ordering::Relaxed),
+            verified: self.verified.load(Ordering::Relaxed),
+            verification_seconds: self.verification_nanos.load(Ordering::Relaxed) as f64 / 1e9,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct HeuristicFilterSnapshot {
+    pub received: usize,
+    pub skipped_non_improving: usize,
+    pub skipped_duplicate: usize,
+    pub verified: usize,
+    pub verification_seconds: f64,
+}
+
+fn objective_cost_without_feasibility_check(
+    problem: &Problem,
+    delay_cost_type: DelayCostType,
+    solution: &[Vec<i32>],
+) -> Option<i32> {
+    if solution.len() != problem.trains.len() {
+        return None;
+    }
+    let mut cost = 0i32;
+    for (train_idx, train) in problem.trains.iter().enumerate() {
+        if solution[train_idx].len() != train.visits.len() + 1 {
+            return None;
+        }
+        for visit_idx in 0..train.visits.len() {
+            cost = cost.checked_add(train.visit_delay_cost(
+                delay_cost_type,
+                visit_idx,
+                solution[train_idx][visit_idx],
+            ) as i32)?;
+        }
+    }
+    Some(cost)
+}
+
+fn send_if_improving_and_valid(
+    problem: &Problem,
+    delay_cost_type: DelayCostType,
+    solution: Vec<Vec<i32>>,
+    output: &std::sync::mpsc::Sender<(i32, Vec<Vec<i32>>)>,
+    filter: &HeuristicFilter,
+    seen: &mut HashSet<Vec<Vec<i32>>>,
+) {
+    filter.received.fetch_add(1, Ordering::Relaxed);
+    let Some(claimed_cost) =
+        objective_cost_without_feasibility_check(problem, delay_cost_type, &solution)
+    else {
+        return;
+    };
+    if claimed_cost >= filter.best_cost.load(Ordering::Relaxed) {
+        filter.skipped_non_improving.fetch_add(1, Ordering::Relaxed);
+        return;
+    }
+    if seen.contains(&solution) {
+        filter.skipped_duplicate.fetch_add(1, Ordering::Relaxed);
+        return;
+    }
+
+    let verify_start = Instant::now();
+    let verified_cost = problem.verify_solution(&solution, delay_cost_type);
+    filter.verified.fetch_add(1, Ordering::Relaxed);
+    filter.verification_nanos.fetch_add(
+        verify_start.elapsed().as_nanos().min(u64::MAX as u128) as u64,
+        Ordering::Relaxed,
+    );
+    seen.insert(solution.clone());
+    if verified_cost == Some(claimed_cost) {
+        filter.update_best(claimed_cost);
+        if output.send((claimed_cost, solution)).is_ok() {
+            println!("HEUR.FEAS. {}", claimed_cost);
+        }
+    }
+}
+
+/// AGLR-only heuristic worker that avoids validating candidates which cannot
+/// improve the current incumbent and does not validate the same schedule twice.
+pub fn spawn_filtered_heuristic_thread(
+    mk_env: impl Fn() -> grb::prelude::Env + Send + 'static,
+    sol_in_rx: std::sync::mpsc::Receiver<Vec<Vec<i32>>>,
+    problem: Problem,
+    delay_cost_type: DelayCostType,
+    sol_out_tx: std::sync::mpsc::Sender<(i32, Vec<Vec<i32>>)>,
+    filter: Arc<HeuristicFilter>,
+) {
+    std::thread::spawn(move || {
+        let env = mk_env();
+        let mut seen = HashSet::<Vec<Vec<i32>>>::new();
+        while let Ok(mut sol) = sol_in_rx.recv() {
+            loop {
+                while let Ok(more_recent_sol) = sol_in_rx.try_recv() {
+                    sol = more_recent_sol;
+                }
+                let candidate =
+                    solve_heuristic_better(&env, &problem, delay_cost_type, false, Some(&sol))
+                        .unwrap();
+                if let Some(candidate) = candidate {
+                    send_if_improving_and_valid(
+                        &problem,
+                        delay_cost_type,
+                        candidate,
+                        &sol_out_tx,
+                        &filter,
+                        &mut seen,
+                    );
+                }
+
+                match sol_in_rx.try_recv() {
+                    Ok(more_recent_sol) => {
+                        sol = more_recent_sol;
+                        continue;
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
+                    _ => {}
+                }
+
+                let candidate =
+                    solve_heuristic_better(&env, &problem, delay_cost_type, true, Some(&sol))
+                        .unwrap();
+                if let Some(candidate) = candidate {
+                    send_if_improving_and_valid(
+                        &problem,
+                        delay_cost_type,
+                        candidate,
+                        &sol_out_tx,
+                        &filter,
+                        &mut seen,
+                    );
+                }
+                break;
+            }
+        }
+    });
+}
 
 pub fn spawn_heuristic_thread(
     mk_env: impl Fn() -> grb::prelude::Env + Send + 'static,

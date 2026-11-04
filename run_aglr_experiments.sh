@@ -34,6 +34,14 @@ case "$MODE" in
   screen|promote|full|confirm) ;;
   *) echo "ERROR: mode phải là screen, promote, full hoặc confirm." >&2; exit 2 ;;
 esac
+[[ "$SCREEN_PARALLELISM" =~ ^[1-9][0-9]*$ ]] || {
+  echo "ERROR: SCREEN_PARALLELISM phải là số nguyên dương." >&2
+  exit 2
+}
+[[ "$FULL_TIMEOUT_SECS" =~ ^[1-9][0-9]*$ ]] || {
+  echo "ERROR: FULL_TIMEOUT_SECS phải là số nguyên dương." >&2
+  exit 2
+}
 [[ -f Cargo.toml && -f "$RUNNER" && -f "$AUDITOR" ]] || {
   echo "ERROR: Hãy chạy script từ thư mục gốc repository." >&2
   exit 2
@@ -244,7 +252,7 @@ PY
     ((++running))
     if (( running >= SCREEN_PARALLELISM )); then
       wait -n
-      ((--running))
+      running=$((running - 1))
     fi
   done
   wait

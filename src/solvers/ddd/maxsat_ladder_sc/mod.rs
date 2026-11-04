@@ -20,7 +20,9 @@ mod sc_amo;
 mod settings;
 mod solve;
 
-pub use settings::{AglrSettings, MaxSatDddLadderScSettings, RefinementPolicy};
+pub use settings::{
+    AglrSettings, MaxSatDddLadderScSettings, RefinementPolicy, RescueProgressPolicy,
+};
 pub use solve::{
     solve, solve_debug, solve_debug_with_settings, solve_with_settings, IterationType, SolveStats,
 };

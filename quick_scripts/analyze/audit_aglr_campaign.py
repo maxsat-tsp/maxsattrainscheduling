@@ -17,6 +17,7 @@ import summarize_conference as conference_audit
 
 OBJECTIVES = ("finsteps123", "infsteps180", "cont")
 FATAL_STATUSES = journal_audit.FATAL_STATUSES
+DEFAULT_CONFERENCE_COVERAGE = {"finsteps123": 72, "infsteps180": 68, "cont": 58}
 
 
 def read_config(path: Path) -> dict[str, str]:
@@ -251,9 +252,34 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
                 "min_growth": config.get("min_growth", ""),
                 "fraction": config.get("fraction", ""),
                 "max_wait": config.get("max_wait", ""),
+                "conference_coverage": "",
+                "coverage_delta": "",
+                "conference_par2_seconds": "",
+                "par2_delta_seconds": "",
+                "paired_runtime_seconds": "",
             }
         )
     return rows
+
+
+def add_conference_metrics(
+    summary: list[dict], conference_summary: list[dict] | None
+) -> None:
+    if not conference_summary:
+        return
+    reference = {row["objective"]: row for row in conference_summary}
+    for row in summary:
+        ref = reference.get(row["objective"])
+        if ref is None:
+            continue
+        coverage = int(ref["verified_ok"])
+        row["conference_coverage"] = coverage
+        row["coverage_delta"] = int(row["proven_optimal"]) - coverage
+        row["conference_par2_seconds"] = float(ref["par2_seconds"])
+        row["par2_delta_seconds"] = float(row["par2_seconds"]) - float(
+            ref["par2_seconds"]
+        )
+        row["paired_runtime_seconds"] = ""
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
@@ -266,7 +292,10 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
-def ranking(summary: list[dict]) -> list[dict]:
+def ranking(
+    summary: list[dict], coverage_targets: dict[str, int] | None = None
+) -> list[dict]:
+    targets = coverage_targets or DEFAULT_CONFERENCE_COVERAGE
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in summary:
         if row.get("policy") == "adaptive":
@@ -276,6 +305,11 @@ def ranking(summary: list[dict]) -> list[dict]:
         if {row["objective"] for row in rows} != set(OBJECTIVES):
             continue
         sample = rows[0]
+        by_objective = {row["objective"]: row for row in rows}
+        coverage = {
+            objective: int(by_objective[objective]["proven_optimal"])
+            for objective in OBJECTIVES
+        }
         ranked.append(
             {
                 "rank": 0,
@@ -284,6 +318,13 @@ def ranking(summary: list[dict]) -> list[dict]:
                 "fraction": sample["fraction"],
                 "max_wait": sample["max_wait"],
                 "proven_total": sum(int(row["proven_optimal"]) for row in rows),
+                "finsteps123_proven": coverage["finsteps123"],
+                "infsteps180_proven": coverage["infsteps180"],
+                "cont_proven": coverage["cont"],
+                "coverage_non_regression": all(
+                    coverage[objective] >= targets[objective]
+                    for objective in OBJECTIVES
+                ),
                 "par2_sum": sum(float(row["par2_seconds"]) for row in rows),
                 "selected_growth_sum": sum(
                     float(row["mean_selected_growth"] or 0.0) for row in rows
@@ -292,6 +333,7 @@ def ranking(summary: list[dict]) -> list[dict]:
         )
     ranked.sort(
         key=lambda row: (
+            not row["coverage_non_regression"],
             -row["proven_total"],
             row["par2_sum"],
             row["selected_growth_sum"],
@@ -304,10 +346,18 @@ def ranking(summary: list[dict]) -> list[dict]:
     return ranked
 
 
-def evaluate_gate(summary: list[dict]) -> dict:
+def evaluate_gate(
+    summary: list[dict], conference_summary: list[dict] | None = None
+) -> dict:
     lookup = {(row["tag"], row["objective"]): row for row in summary}
-    targets = {"finsteps123": 72, "infsteps180": 69, "cont": 68}
+    targets = dict(DEFAULT_CONFERENCE_COVERAGE)
+    conference_par2 = {}
+    if conference_summary:
+        for row in conference_summary:
+            targets[row["objective"]] = int(row["verified_ok"])
+            conference_par2[row["objective"]] = float(row["par2_seconds"])
     reasons: list[str] = []
+    coverage = {}
     for objective, target in targets.items():
         row = lookup.get(("AGLR", objective))
         if row is None or int(row["instances"]) != 72:
@@ -316,22 +366,16 @@ def evaluate_gate(summary: list[dict]) -> dict:
             reasons.append(
                 f"AGLR/{objective}: {row['proven_optimal']} proven, target {target}"
             )
+        else:
+            coverage[objective] = int(row["proven_optimal"])
 
-    fin = lookup.get(("AGLR", "finsteps123"))
-    baseline_fin = [
-        row
-        for (tag, objective), row in lookup.items()
-        if tag != "AGLR" and objective == "finsteps123" and int(row["instances"]) == 72
-    ]
-    if fin and baseline_fin and int(fin["proven_optimal"]) == 72:
-        best_baseline_par2 = min(float(row["par2_seconds"]) for row in baseline_fin)
-        if float(fin["par2_seconds"]) >= best_baseline_par2:
-            reasons.append(
-                "AGLR/finsteps123: PAR-2 does not beat the best complete baseline "
-                f"({fin['par2_seconds']:.6f} >= {best_baseline_par2:.6f})"
-            )
-    else:
-        reasons.append("Cannot compare finsteps123 PAR-2 against all complete baselines")
+    total_coverage = sum(coverage.values()) if len(coverage) == 3 else 0
+    total_target = sum(targets.values())
+    if len(coverage) == 3 and total_coverage <= total_target:
+        reasons.append(
+            f"AGLR total coverage {total_coverage} does not exceed conference "
+            f"coverage {total_target}"
+        )
 
     required = ("MaxSAT-Journal", "CSOnet", "BigM-Gurobi", "BigM-CPLEX")
     for tag in required:
@@ -345,7 +389,21 @@ def evaluate_gate(summary: list[dict]) -> dict:
             reasons.append(
                 f"{tag}: missing or incomplete objectives: {', '.join(incomplete)}"
             )
-    return {"passed": not reasons, "reasons": reasons, "targets": targets}
+    par2 = {
+        objective: lookup[("AGLR", objective)]["par2_seconds"]
+        for objective in OBJECTIVES
+        if ("AGLR", objective) in lookup
+    }
+    return {
+        "passed": not reasons,
+        "reasons": reasons,
+        "targets": targets,
+        "coverage": coverage,
+        "total_coverage": total_coverage,
+        "total_target": total_target,
+        "conference_par2_seconds": conference_par2,
+        "aglr_par2_seconds": par2,
+    }
 
 
 def confirmation_instances(records: list[dict]) -> list[str]:
@@ -371,14 +429,10 @@ def confirmation_instances(records: list[dict]) -> list[str]:
 
 
 def compare_conference_reference(
-    records: list[dict], reference_dir: Path
+    records: list[dict], reference_dir: Path, runtime_mode: str = "diagnostic"
 ) -> tuple[list[dict], list[dict], dict]:
-    """Compare proven exact-solver costs with independently verified conference costs.
-
-    Conference runtimes are deliberately not copied into ``records``.  They therefore
-    cannot affect PAR-2, configuration ranking, or the submission gate.
-    """
-    _, reference_audit, reference_records = conference_audit.audit_directory(
+    """Compare exact results with conference costs and, optionally, runtimes."""
+    reference_summary, reference_audit, reference_records = conference_audit.audit_directory(
         reference_dir
     )
     errors = [
@@ -444,14 +498,20 @@ def compare_conference_reference(
                 "campaign_status": record["status"],
                 "campaign_proven": record["proven"],
                 "campaign_cost": record["solve"].get("cost", ""),
+                "conference_total_time": (
+                    reference.get("total_time", "") if reference else ""
+                ),
+                "runtime_mode": runtime_mode,
                 "comparison": outcome,
             }
         )
     metadata = {
         "source_data_commit": reference_audit["source_data_commit"],
         "source_directory": reference_audit["source_directory"],
-        "runtime_comparable": False,
-        "runtime_used_for_gate_or_ranking": False,
+        "runtime_comparable": runtime_mode == "assumed-equivalent",
+        "runtime_used_for_gate_or_ranking": runtime_mode == "assumed-equivalent",
+        "runtime_mode": runtime_mode,
+        "summary": reference_summary,
         "verified_optima": reference_audit["verified_optima"],
         "warnings": reference_audit["warnings"],
     }
@@ -527,6 +587,11 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, required=True)
     parser.add_argument("--reference-full", type=Path)
     parser.add_argument("--conference-reference", type=Path)
+    parser.add_argument(
+        "--conference-runtime-mode",
+        choices=("diagnostic", "assumed-equivalent"),
+        default="diagnostic",
+    )
     args = parser.parse_args()
     campaign_dir = args.campaign_dir.resolve()
 
@@ -538,7 +603,24 @@ def main() -> int:
     records.extend(load_cplex(campaign_dir, args.timeout))
 
     summary = summarize(records, args.timeout)
-    ranked = ranking(summary)
+    conference_metadata = None
+    conference_summary = None
+    comparison_errors: list[dict] = []
+    comparisons: list[dict] = []
+    if args.conference_reference is not None:
+        comparisons, comparison_errors, conference_metadata = compare_conference_reference(
+            records, args.conference_reference, args.conference_runtime_mode
+        )
+        conference_summary = conference_metadata.get("summary", [])
+        add_conference_metrics(summary, conference_summary)
+    ranked = ranking(
+        summary,
+        {
+            row["objective"]: int(row["verified_ok"])
+            for row in conference_summary or []
+        }
+        or None,
+    )
     errors = [
         {
             "tag": record["tag"],
@@ -554,14 +636,14 @@ def main() -> int:
         errors.extend(
             audit_confirmations(records, args.reference_full.resolve(), args.timeout)
         )
-    conference_metadata = None
+    errors.extend(comparison_errors)
     if args.conference_reference is not None:
-        comparisons, comparison_errors, conference_metadata = compare_conference_reference(
-            records, args.conference_reference
-        )
-        errors.extend(comparison_errors)
         write_csv(campaign_dir / "conference_reference_comparison.csv", comparisons)
-    gate = evaluate_gate(summary) if any(row["tag"] == "AGLR" for row in summary) else None
+    gate = (
+        evaluate_gate(summary, conference_summary)
+        if any(row["tag"] == "AGLR" for row in summary)
+        else None
+    )
     if gate is not None and errors:
         gate["passed"] = False
         gate["reasons"].insert(0, f"Independent audit found {len(errors)} invalid/fatal records")

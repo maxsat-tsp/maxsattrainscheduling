@@ -20,6 +20,10 @@ AGLR_POLICY="${AGLR_POLICY:-}"
 AGLR_MIN_GROWTH="${AGLR_MIN_GROWTH:-}"
 AGLR_FRACTION="${AGLR_FRACTION:-}"
 AGLR_MAX_WAIT="${AGLR_MAX_WAIT:-}"
+AGLR_RESCUE_PROGRESS="${AGLR_RESCUE_PROGRESS:-}"
+AGLR_HEURISTIC_PERIOD="${AGLR_HEURISTIC_PERIOD:-}"
+AGLR_HEURISTIC_MIN_GAP="${AGLR_HEURISTIC_MIN_GAP:-}"
+AGLR_USE_OBJECTIVE_BOUND="${AGLR_USE_OBJECTIVE_BOUND:-}"
 INSTANCE_NAMES="${INSTANCE_NAMES:-}"
 INSTANCE_ORDER_SEED="${INSTANCE_ORDER_SEED:-0}"
 RERUN_NON_OK="${RERUN_NON_OK:-0}"
@@ -252,6 +256,10 @@ run_fingerprint="$(python3 - \
   "${AGLR_MIN_GROWTH:-default}" \
   "${AGLR_FRACTION:-default}" \
   "${AGLR_MAX_WAIT:-default}" \
+  "${AGLR_RESCUE_PROGRESS:-default}" \
+  "${AGLR_HEURISTIC_PERIOD:-default}" \
+  "${AGLR_HEURISTIC_MIN_GAP:-default}" \
+  "${AGLR_USE_OBJECTIVE_BOUND:-default}" \
   "$selected_instances_csv" "$INSTANCE_ORDER_SEED" \
   "${SATDDD_OBJECTIVE_ENCODING:-default}" \
   "${SATDDD_USE_PRECEDENCE_GRAPH:-default}" \
@@ -320,6 +328,10 @@ else
     printf 'aglr_min_growth=%s\n' "${AGLR_MIN_GROWTH:-default}"
     printf 'aglr_fraction=%s\n' "${AGLR_FRACTION:-default}"
     printf 'aglr_max_wait=%s\n' "${AGLR_MAX_WAIT:-default}"
+    printf 'aglr_rescue_progress=%s\n' "${AGLR_RESCUE_PROGRESS:-default}"
+    printf 'aglr_heuristic_period=%s\n' "${AGLR_HEURISTIC_PERIOD:-default}"
+    printf 'aglr_heuristic_min_gap=%s\n' "${AGLR_HEURISTIC_MIN_GAP:-default}"
+    printf 'aglr_use_objective_bound=%s\n' "${AGLR_USE_OBJECTIVE_BOUND:-default}"
     printf 'selected_instance_count=%s\n' "$selected_instance_count"
     printf 'selected_instances=%s\n' "$selected_instances_csv"
     printf 'instance_order_seed=%s\n' "$INSTANCE_ORDER_SEED"
@@ -421,6 +433,18 @@ run_one() {
   fi
   if [[ -n "$AGLR_MAX_WAIT" ]]; then
     extra_args+=(--aglr-max-wait "$AGLR_MAX_WAIT")
+  fi
+  if [[ -n "$AGLR_RESCUE_PROGRESS" ]]; then
+    extra_args+=(--aglr-rescue-progress "$AGLR_RESCUE_PROGRESS")
+  fi
+  if [[ -n "$AGLR_HEURISTIC_PERIOD" ]]; then
+    extra_args+=(--aglr-heuristic-period "$AGLR_HEURISTIC_PERIOD")
+  fi
+  if [[ -n "$AGLR_HEURISTIC_MIN_GAP" ]]; then
+    extra_args+=(--aglr-heuristic-min-gap "$AGLR_HEURISTIC_MIN_GAP")
+  fi
+  if [[ -n "$AGLR_USE_OBJECTIVE_BOUND" ]]; then
+    extra_args+=(--aglr-use-objective-bound "$AGLR_USE_OBJECTIVE_BOUND")
   fi
 
   printf '%s\n' "$instance_name" >> "$order_file"

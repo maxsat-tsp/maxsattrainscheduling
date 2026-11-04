@@ -274,6 +274,7 @@ mod tests {
             min_growth,
             fraction,
             max_wait,
+            ..AglrSettings::default()
         }
     }
 
@@ -361,6 +362,7 @@ mod tests {
                 min_growth: 1,
                 fraction: 0.0,
                 max_wait: 5,
+                ..AglrSettings::default()
             },
             false,
             &mut all_history,

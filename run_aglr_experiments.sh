@@ -18,10 +18,17 @@ AUDITOR="quick_scripts/analyze/audit_aglr_campaign.py"
 CSV_BATCH="quick_scripts/analyze/json_to_csv_batch.py"
 RAM_LIMIT_KB="${RAM_LIMIT_KB:-15000000}"
 EXTERNAL_TIMEOUT_GRACE_SECS="${EXTERNAL_TIMEOUT_GRACE_SECS:-20}"
+SCREEN_PARALLELISM="${SCREEN_PARALLELISM:-2}"
+FULL_TIMEOUT_SECS="${FULL_TIMEOUT_SECS:-150}"
 ORDER_SEED_BASE="${ORDER_SEED_BASE:-20261025}"
 DEVELOPMENT_INSTANCES="${DEVELOPMENT_INSTANCES:-origA3 trackA3 stationA3 origA6 trackA6 stationA6 origA9 trackA9 stationA9 origA12 trackA12 stationA12 origB3 trackB3 stationB3 origB6 trackB6 stationB6 origB9 trackB9 stationB9 origB12 trackB12 stationB12}"
 CONFERENCE_RESULTS_DIR="${CONFERENCE_RESULTS_DIR:-results/conferences}"
+CONFERENCE_RUNTIME_MODE="${CONFERENCE_RUNTIME_MODE:-assumed-equivalent}"
 CONFERENCE_SOURCE_DATA_COMMIT="c427a104c3c6f844e515efb7f898b684553b0f3f"
+AGLR_RESCUE_PROGRESS="${AGLR_RESCUE_PROGRESS:-bound-or-heuristic}"
+AGLR_HEURISTIC_PERIOD="${AGLR_HEURISTIC_PERIOD:-1}"
+AGLR_HEURISTIC_MIN_GAP="${AGLR_HEURISTIC_MIN_GAP:-0}"
+AGLR_USE_OBJECTIVE_BOUND="${AGLR_USE_OBJECTIVE_BOUND:-false}"
 
 case "$MODE" in
   screen|promote|full|confirm) ;;
@@ -95,7 +102,12 @@ if [[ ! -s "$campaign_file" ]]; then
       printf 'conference_reference_dir=%s\n' "$CONFERENCE_RESULTS_DIR"
       printf 'conference_reference_sha256=%s\n' "$conference_reference_sha256"
       printf 'conference_reference_source_data_commit=%s\n' "$CONFERENCE_SOURCE_DATA_COMMIT"
-      printf 'conference_runtime_comparable=false\n'
+      printf 'conference_runtime_mode=%s\n' "$CONFERENCE_RUNTIME_MODE"
+      if [[ "$CONFERENCE_RUNTIME_MODE" == "assumed-equivalent" ]]; then
+        printf 'conference_runtime_comparable=true\n'
+      else
+        printf 'conference_runtime_comparable=false\n'
+      fi
     fi
     printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$campaign_file"
@@ -154,6 +166,10 @@ run_method() {
     "min_growth=$min_growth" \
     "fraction=$fraction" \
     "max_wait=$max_wait" \
+    "rescue_progress=$AGLR_RESCUE_PROGRESS" \
+    "heuristic_period=$AGLR_HEURISTIC_PERIOD" \
+    "heuristic_min_gap=$AGLR_HEURISTIC_MIN_GAP" \
+    "use_objective_bound=$AGLR_USE_OBJECTIVE_BOUND" \
     "timeout_seconds=$timeout" \
     "instances=$(tr ' ' ',' <<<"$instances")"
 
@@ -172,6 +188,10 @@ run_method() {
     AGLR_MIN_GROWTH="$min_growth" \
     AGLR_FRACTION="$fraction" \
     AGLR_MAX_WAIT="$max_wait" \
+    AGLR_RESCUE_PROGRESS="$AGLR_RESCUE_PROGRESS" \
+    AGLR_HEURISTIC_PERIOD="$AGLR_HEURISTIC_PERIOD" \
+    AGLR_HEURISTIC_MIN_GAP="$AGLR_HEURISTIC_MIN_GAP" \
+    AGLR_USE_OBJECTIVE_BOUND="$AGLR_USE_OBJECTIVE_BOUND" \
     INSTANCE_NAMES="$instances" \
     INSTANCE_ORDER_SEED="$(stable_seed "$tag-$objective")" \
     RERUN_NON_OK="${RERUN_NON_OK:-0}" \
@@ -214,11 +234,20 @@ for row in rows:
     print(*row)
 PY
   )
+  running=0
   for config in "${configs[@]}"; do
     read -r tag min_growth fraction max_wait <<< "$config"
-    run_method "$tag" maxsat_ddd_ladder_aglr exact adaptive \
-      "$min_growth" "$fraction" "$max_wait" 30 "$DEVELOPMENT_INSTANCES"
+    (
+      run_method "$tag" maxsat_ddd_ladder_aglr exact adaptive \
+        "$min_growth" "$fraction" "$max_wait" 30 "$DEVELOPMENT_INSTANCES"
+    ) &
+    ((++running))
+    if (( running >= SCREEN_PARALLELISM )); then
+      wait -n
+      ((--running))
+    fi
   done
+  wait
   python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout 30
   printf '%s\n' "$CAMPAIGN_DIR" > "$RESULTS_ROOT/latest_screen.txt"
 
@@ -274,12 +303,12 @@ PY
   )
   for method in "${methods[@]}"; do
     read -r tag solver kind policy k rho wait <<< "$method"
-    run_method "$tag" "$solver" "$kind" "$policy" "$k" "$rho" "$wait" 120 ""
+    run_method "$tag" "$solver" "$kind" "$policy" "$k" "$rho" "$wait" "$FULL_TIMEOUT_SECS" ""
   done
 
   if [[ -n "${CPLEX_RESULTS_DIR:-}" ]]; then
     mkdir -p "$CAMPAIGN_DIR/CPLEX"
-    python3 - "$CPLEX_RESULTS_DIR" "$CAMPAIGN_DIR/CPLEX" <<'PY'
+    python3 - "$CPLEX_RESULTS_DIR" "$CAMPAIGN_DIR/CPLEX" "$FULL_TIMEOUT_SECS" <<'PY'
 from pathlib import Path
 import shutil, sys
 
@@ -289,13 +318,15 @@ for objective in ("finsteps123", "infsteps180", "cont"):
     matches += sorted(source.glob(f"MILP_BigM_CPLEX_{objective}_*s.csv"))
     if not matches:
         raise SystemExit(f"ERROR: thiếu CSV CPLEX cho {objective} trong {source}")
-    shutil.copy2(matches[-1], target / f"results_bigm_{objective}_120s.csv")
+    timeout = sys.argv[3]
+    shutil.copy2(matches[-1], target / f"results_bigm_{objective}_{timeout}s.csv")
 PY
   else
     echo "LƯU Ý: chưa có CPLEX_RESULTS_DIR; auditor sẽ giữ cổng submission ở trạng thái NOT YET."
   fi
-  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout 120 \
-    --conference-reference "$CONFERENCE_RESULTS_DIR"
+  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout "$FULL_TIMEOUT_SECS" \
+    --conference-reference "$CONFERENCE_RESULTS_DIR" \
+    --conference-runtime-mode "$CONFERENCE_RUNTIME_MODE"
   printf '%s\n' "$CAMPAIGN_DIR" > "$RESULTS_ROOT/latest_full.txt"
 
 else

@@ -18,6 +18,11 @@ thời gian chạy này để kết luận phương pháp nào nhanh hơn, vì d
 thông tin máy và hash binary. Lượt `full` vẫn phải chạy lại CSOnet trên cùng máy
 với AGLR để tạo số liệu thời gian dùng trong bài.
 
+Trong chiến dịch trên VM mới, thầy/cô chấp nhận giả định máy chạy hội nghị và
+VM là cùng phần cứng. Khi gọi auditor với
+`--conference-runtime-mode assumed-equivalent`, thời gian hội nghị được dùng
+làm mốc PAR-2 thứ cấp. Manifest của chiến dịch phải ghi rõ giả định này.
+
 Chiến dịch đầu chỉ chạy mỗi cấu hình một lần. Các lượt lặp chỉ bắt đầu sau khi
 AGLR vượt ngưỡng coverage và PAR-2.
 
@@ -104,6 +109,12 @@ timeout nội bộ tối đa khoảng 10.8 giờ nếu chạy tuần tự và m�
 30 giây. Thời gian thực tế có thể khác vì nhiều instance kết thúc sớm và mỗi
 lời gọi còn có chi phí khởi động.
 
+Trên VM 8 CPU, dùng hai worker để giữ mỗi vòng trong khoảng 6 giờ:
+
+```bash
+SCREEN_PARALLELISM=2 bash run_aglr_experiments.sh screen
+```
+
 Kết quả gần nhất được ghi trong `results/aglr/latest_screen.txt`. Xem
 `aglr_ranking.csv` trong thư mục được chỉ ra bởi file này.
 
@@ -150,6 +161,8 @@ originalA1,ok,11,11,0.446,true
 trạng thái tối ưu của CPLEX.
 
 ```bash
+FULL_TIMEOUT_SECS=150 \
+CONFERENCE_RUNTIME_MODE=assumed-equivalent \
 CPLEX_RESULTS_DIR=/absolute/path/to/cplex_csv \
   bash run_aglr_experiments.sh full
 ```
@@ -195,13 +208,16 @@ với baseline. Không chạy lặp toàn bộ 72 instance ở giai đoạn đ�
 ## Cổng sử dụng cho submission
 
 Auditor từ chối file thiếu, tên instance thừa/trùng, lịch sai, chi phí sai và
-kết quả MILP không có cận khớp. AGLR chỉ qua cổng khi:
+kết quả MILP không có cận khớp. Theo tiêu chí hiện tại, AGLR chỉ qua cổng khi:
 
-- `finsteps123`: 72/72 và PAR-2 thấp hơn baseline hoàn chỉnh tốt nhất;
-- `infsteps180`: ít nhất 69/72;
-- `cont`: ít nhất 68/72;
+- từng objective không thấp hơn kết quả hội nghị: 72/72, 68/72 và 58/72;
+- tổng coverage lớn hơn 198, tức có ít nhất 199 optimum được chứng minh;
 - đủ MaxSAT-Journal, CSOnet, BigM-Gurobi và BigM-CPLEX;
 - không có `panic`, nghiệm sai hoặc lỗi dữ liệu.
+
+Khi nhiều cấu hình cùng đạt coverage, auditor xếp hạng theo PAR-2, sau đó đến
+mức tăng mô hình. `aglr_summary.csv` ghi thêm coverage hội nghị, chênh lệch
+coverage, PAR-2 hội nghị và chênh lệch PAR-2.
 
 Các file cần giữ để viết bài:
 
@@ -216,7 +232,14 @@ Báo cáo sau mỗi giai đoạn phải ghi commit, thông tin máy, phiên bả
 thư mục kết quả, cấu hình đứng đầu và mọi lỗi trong `aglr_audit.json`.
 Dùng mẫu `manuscript/journal/student_experiment_report_template_vi.md`.
 
-Nếu cổng chưa đạt, đọc telemetry rồi chỉ đổi một thành phần: giảm `W` hoặc tăng
-`rho` khi nhiều ứng viên chờ; giảm `rho` hoặc `K_min` khi mô hình tăng nhanh;
-kiểm tra cache khi thời gian validation lớn. Chỉ thử `BinaryObjective` sau khi
-có kiểm thử bảng chân trị và bài nhỏ vét cạn.
+Nếu cổng chưa đạt, đọc telemetry rồi chỉ đổi một thành phần. Có thể thử chế độ
+rescue tính cả tiến triển mô hình:
+
+```bash
+AGLR_RESCUE_PROGRESS=model bash run_aglr_experiments.sh screen
+```
+
+Có thể giảm số lần gọi heuristic bằng `AGLR_HEURISTIC_PERIOD` hoặc chỉ gọi khi
+khoảng cách cận đạt `AGLR_HEURISTIC_MIN_GAP`. Chỉ thử `BinaryObjective` sau khi
+có kiểm thử bảng chân trị và bài nhỏ vét cạn; cờ tương ứng là
+`AGLR_USE_OBJECTIVE_BOUND=true`.

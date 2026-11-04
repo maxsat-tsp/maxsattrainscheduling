@@ -312,6 +312,8 @@ struct AglrTelemetry {
     rescue_iterations: usize,
     max_age: usize,
     duplicate_clauses_skipped: usize,
+    model_progress_iterations: usize,
+    heuristic_submissions: usize,
     final_validation_time: Duration,
 }
 
@@ -361,6 +363,7 @@ struct DetectedRefinement<L: satcoder::Lit> {
 struct RefinementOutcome {
     found_travel: bool,
     found_resource: bool,
+    model_progress: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -508,13 +511,14 @@ fn detect_and_apply_aglr<L: satcoder::Lit + Copy + 'static>(
     }
     telemetry.detection_time += detect_start.elapsed();
 
-    let outcome = RefinementOutcome {
+    let mut outcome = RefinementOutcome {
         found_travel: detected
             .iter()
             .any(|item| matches!(&item.action, RefinementAction::Travel { .. })),
         found_resource: detected
             .iter()
             .any(|item| matches!(&item.action, RefinementAction::Resource { .. })),
+        model_progress: false,
     };
     telemetry.candidates_detected += detected.len();
 
@@ -551,6 +555,8 @@ fn detect_and_apply_aglr<L: satcoder::Lit + Copy + 'static>(
         telemetry.rescue_iterations += 1;
     }
 
+    let before_constraints = *n_conflict_constraints;
+    let before_time_points = new_time_points.len();
     let apply_start = Instant::now();
     let mut touched_pair_cliques: HashMap<(usize, i32), HashSet<VisitId>> = HashMap::new();
     let selected_indices = selection.indices.into_iter().collect::<HashSet<_>>();
@@ -715,6 +721,8 @@ fn detect_and_apply_aglr<L: satcoder::Lit + Copy + 'static>(
         }
     }
     telemetry.application_time += apply_start.elapsed();
+    outcome.model_progress = *n_conflict_constraints > before_constraints
+        || new_time_points.len() > before_time_points;
     outcome
 }
 
@@ -867,6 +875,22 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     );
     output_stats("aglr_fraction".to_string(), settings.aglr.fraction.into());
     output_stats("aglr_max_wait".to_string(), settings.aglr.max_wait.into());
+    output_stats(
+        "aglr_rescue_progress".to_string(),
+        settings.aglr.rescue_progress.as_str().into(),
+    );
+    output_stats(
+        "aglr_heuristic_period".to_string(),
+        settings.aglr.heuristic_period.into(),
+    );
+    output_stats(
+        "aglr_heuristic_min_gap".to_string(),
+        settings.aglr.heuristic_min_gap.into(),
+    );
+    output_stats(
+        "aglr_use_objective_bound".to_string(),
+        settings.aglr.use_objective_bound.into(),
+    );
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -1053,6 +1077,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let mut aglr_history = CandidateHistory::default();
     let mut aglr_telemetry = AglrTelemetry::default();
     let mut last_progress_iteration = 0usize;
+    let mut last_heuristic_submission_iteration = None;
 
     // Main DDD loop.
     loop {
@@ -1082,8 +1107,27 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         if is_sat {
             // If SAT, extract the solution and check for optimality via the async.
             if let Some((sol_tx, sol_rx)) = heur_thread.as_ref() {
-                let sol = extract_solution(problem, &occupations);
-                let _ = sol_tx.send(sol);
+                let period_ready = last_heuristic_submission_iteration
+                    .map(|last| {
+                        iteration.saturating_sub(last) >= settings.aglr.heuristic_period
+                    })
+                    .unwrap_or(true);
+                let gap_ready = best_heur
+                    .as_ref()
+                    .map(|(ub, _)| {
+                        (*ub - total_cost)
+                            .max(0)
+                            .try_into()
+                            .unwrap_or(usize::MAX)
+                            >= settings.aglr.heuristic_min_gap
+                    })
+                    .unwrap_or(true);
+                if period_ready && gap_ready {
+                    let sol = extract_solution(problem, &occupations);
+                    let _ = sol_tx.send(sol);
+                    last_heuristic_submission_iteration = Some(iteration);
+                    aglr_telemetry.heuristic_submissions += 1;
+                }
 
                 while let Ok((ub_cost, ub_sol)) = sol_rx.try_recv() {
                     if ub_cost < total_cost as i32 {
@@ -1446,6 +1490,13 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 );
                 found_travel_time_conflict = outcome.found_travel;
                 found_resource_conflict = outcome.found_resource;
+                if outcome.model_progress
+                    && settings.aglr.rescue_progress
+                        == super::settings::RescueProgressPolicy::Model
+                {
+                    last_progress_iteration = iteration;
+                    aglr_telemetry.model_progress_iterations += 1;
+                }
                 touched_intervals.clear();
             }
 
@@ -2050,6 +2101,14 @@ fn do_output_stats<L: satcoder::Lit>(
         "aglr_duplicate_clauses_skipped".to_string(),
         aglr.duplicate_clauses_skipped.into(),
     );
+    output_stats(
+        "aglr_model_progress_iterations".to_string(),
+        aglr.model_progress_iterations.into(),
+    );
+    output_stats(
+        "aglr_heuristic_submissions".to_string(),
+        aglr.heuristic_submissions.into(),
+    );
     let heuristic = heuristic_filter.snapshot();
     output_stats(
         "heuristic_candidates_received".to_string(),
@@ -2190,6 +2249,7 @@ mod aglr_end_to_end_tests {
             min_growth: 1,
             fraction: 0.5,
             max_wait: 2,
+            ..AglrSettings::default()
         };
         let solution = solve_with_settings(
             &quiet_env,

@@ -9,6 +9,23 @@ pub enum RefinementPolicy {
     Adaptive,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RescueProgressPolicy {
+    /// Trigger rescue only when the bound or heuristic incumbent is stuck.
+    BoundOrHeuristic,
+    /// Count newly applied refinement clauses/time points as progress.
+    Model,
+}
+
+impl RescueProgressPolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::BoundOrHeuristic => "bound-or-heuristic",
+            Self::Model => "model",
+        }
+    }
+}
+
 impl RefinementPolicy {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -25,6 +42,10 @@ pub struct AglrSettings {
     pub min_growth: usize,
     pub fraction: f64,
     pub max_wait: usize,
+    pub rescue_progress: RescueProgressPolicy,
+    pub heuristic_period: usize,
+    pub heuristic_min_gap: usize,
+    pub use_objective_bound: bool,
 }
 
 impl Default for AglrSettings {
@@ -34,6 +55,10 @@ impl Default for AglrSettings {
             min_growth: 32,
             fraction: 0.5,
             max_wait: 5,
+            rescue_progress: RescueProgressPolicy::BoundOrHeuristic,
+            heuristic_period: 1,
+            heuristic_min_gap: 0,
+            use_objective_bound: false,
         }
     }
 }

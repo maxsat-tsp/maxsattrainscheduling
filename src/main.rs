@@ -126,6 +126,22 @@ struct Opt {
     #[structopt(long)]
     aglr_max_wait: Option<usize>,
 
+    /// AGLR rescue progress mode: bound-or-heuristic or model.
+    #[structopt(long)]
+    aglr_rescue_progress: Option<String>,
+
+    /// Submit a SAT model to the AGLR heuristic every N SAT iterations. Default: 1.
+    #[structopt(long)]
+    aglr_heuristic_period: Option<usize>,
+
+    /// Minimum lower-bound gap required before submitting to the AGLR heuristic. Default: 0.
+    #[structopt(long)]
+    aglr_heuristic_min_gap: Option<usize>,
+
+    /// Enable the experimental binary objective bound for AGLR. Default: false.
+    #[structopt(long)]
+    aglr_use_objective_bound: Option<bool>,
+
     /// Objective encoding for `sat_ddd*` solvers: `scpb`, `totalizer`, or `bit_totalizer`.
     #[structopt(long)]
     satddd_objective_encoding: Option<String>,
@@ -198,6 +214,19 @@ fn parse_aglr_policy(value: &str) -> maxsat_ladder_sc::RefinementPolicy {
         "adaptive" | "aglr" => maxsat_ladder_sc::RefinementPolicy::Adaptive,
         _ => panic!(
             "Unknown AGLR policy '{}'. Supported: legacy, all-scanned, adaptive",
+            value
+        ),
+    }
+}
+
+fn parse_aglr_rescue_progress(value: &str) -> maxsat_ladder_sc::RescueProgressPolicy {
+    match value.to_ascii_lowercase().as_str() {
+        "bound-or-heuristic" | "bound_or_heuristic" | "bound" => {
+            maxsat_ladder_sc::RescueProgressPolicy::BoundOrHeuristic
+        }
+        "model" => maxsat_ladder_sc::RescueProgressPolicy::Model,
+        _ => panic!(
+            "Unknown AGLR rescue progress mode '{}'. Supported: bound-or-heuristic, model",
             value
         ),
     }
@@ -543,6 +572,15 @@ fn main() {
     if aglr_min_growth == 0 {
         panic!("--aglr-min-growth must be greater than zero");
     }
+    let aglr_heuristic_period = opt.aglr_heuristic_period.unwrap_or(1);
+    if aglr_heuristic_period == 0 {
+        panic!("--aglr-heuristic-period must be greater than zero");
+    }
+    let aglr_rescue_progress = opt
+        .aglr_rescue_progress
+        .as_deref()
+        .map(parse_aglr_rescue_progress)
+        .unwrap_or(maxsat_ladder_sc::RescueProgressPolicy::BoundOrHeuristic);
     let mut maxsat_ladder_aglr_settings = maxsat_ladder_sc_settings;
     maxsat_ladder_aglr_settings.aglr = maxsat_ladder_sc::AglrSettings {
         policy: opt
@@ -553,6 +591,10 @@ fn main() {
         min_growth: aglr_min_growth,
         fraction: aglr_fraction,
         max_wait: aglr_max_wait,
+        rescue_progress: aglr_rescue_progress,
+        heuristic_period: aglr_heuristic_period,
+        heuristic_min_gap: opt.aglr_heuristic_min_gap.unwrap_or(0),
+        use_objective_bound: opt.aglr_use_objective_bound.unwrap_or(false),
     };
     if solvers
         .iter()

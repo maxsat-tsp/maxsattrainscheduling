@@ -116,6 +116,41 @@ class AuditAglrCampaignTests(unittest.TestCase):
         self.assertEqual(comparisons[0]["comparison"], "cost-mismatch")
         self.assertEqual(len(errors), 1)
 
+    def test_gate_requires_per_objective_non_regression_and_total_gain(self):
+        conference = [
+            {"objective": "finsteps123", "verified_ok": 72, "par2_seconds": 1.0},
+            {"objective": "infsteps180", "verified_ok": 68, "par2_seconds": 2.0},
+            {"objective": "cont", "verified_ok": 58, "par2_seconds": 3.0},
+        ]
+
+        def row(tag, objective, proven):
+            return {
+                "tag": tag,
+                "objective": objective,
+                "instances": 72,
+                "proven_optimal": proven,
+                "par2_seconds": 1.0,
+            }
+
+        summary = []
+        for tag in ("AGLR", "MaxSAT-Journal", "CSOnet", "BigM-Gurobi", "BigM-CPLEX"):
+            summary.extend(
+                row(tag, objective, proven)
+                for objective, proven in (
+                    ("finsteps123", 72),
+                    ("infsteps180", 68),
+                    ("cont", 59 if tag == "AGLR" else 58),
+                )
+            )
+        gate = audit.evaluate_gate(summary, conference)
+        self.assertTrue(gate["passed"])
+        self.assertEqual(gate["total_coverage"], 199)
+
+        summary[2]["proven_optimal"] = 57
+        gate = audit.evaluate_gate(summary, conference)
+        self.assertFalse(gate["passed"])
+        self.assertTrue(any("cont" in reason for reason in gate["reasons"]))
+
 
 if __name__ == "__main__":
     unittest.main()

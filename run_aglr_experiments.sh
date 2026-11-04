@@ -20,6 +20,8 @@ RAM_LIMIT_KB="${RAM_LIMIT_KB:-15000000}"
 EXTERNAL_TIMEOUT_GRACE_SECS="${EXTERNAL_TIMEOUT_GRACE_SECS:-20}"
 ORDER_SEED_BASE="${ORDER_SEED_BASE:-20261025}"
 DEVELOPMENT_INSTANCES="${DEVELOPMENT_INSTANCES:-origA3 trackA3 stationA3 origA6 trackA6 stationA6 origA9 trackA9 stationA9 origA12 trackA12 stationA12 origB3 trackB3 stationB3 origB6 trackB6 stationB6 origB9 trackB9 stationB9 origB12 trackB12 stationB12}"
+CONFERENCE_RESULTS_DIR="${CONFERENCE_RESULTS_DIR:-results/conferences}"
+CONFERENCE_SOURCE_DATA_COMMIT="c427a104c3c6f844e515efb7f898b684553b0f3f"
 
 case "$MODE" in
   screen|promote|full|confirm) ;;
@@ -44,6 +46,28 @@ command -v gurobi_cl >/dev/null || {
   exit 2
 }
 
+conference_reference_sha256=""
+if [[ "$MODE" == "full" ]]; then
+  for objective in finsteps123 infsteps180 cont; do
+    [[ -f "$CONFERENCE_RESULTS_DIR/MaxsatScDefault_${objective}.json" ]] || {
+      echo "ERROR: thiếu dữ liệu hội nghị cho $objective trong $CONFERENCE_RESULTS_DIR" >&2
+      exit 2
+    }
+  done
+  conference_reference_sha256="$(python3 - "$CONFERENCE_RESULTS_DIR" <<'PY'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+digest = hashlib.sha256()
+for objective in ("finsteps123", "infsteps180", "cont"):
+    path = root / f"MaxsatScDefault_{objective}.json"
+    digest.update(path.name.encode())
+    digest.update(b"\0")
+    digest.update(path.read_bytes())
+print(digest.hexdigest())
+PY
+)"
+fi
+
 mkdir -p "$CAMPAIGN_DIR"
 
 if [[ "${SKIP_BUILD:-0}" == "1" ]]; then
@@ -67,15 +91,24 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'git_commit=%s\n' "$git_commit"
     printf 'binary_sha256=%s\n' "$binary_sha256"
     printf 'repetitions=1\n'
+    if [[ "$MODE" == "full" ]]; then
+      printf 'conference_reference_dir=%s\n' "$CONFERENCE_RESULTS_DIR"
+      printf 'conference_reference_sha256=%s\n' "$conference_reference_sha256"
+      printf 'conference_reference_source_data_commit=%s\n' "$CONFERENCE_SOURCE_DATA_COMMIT"
+      printf 'conference_runtime_comparable=false\n'
+    fi
     printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$campaign_file"
 else
-  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" <<'PY'
+  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" <<'PY'
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
 expected = dict(zip(("mode", "run_id", "git_commit", "binary_sha256"), sys.argv[2:]))
+if sys.argv[2] == "full":
+    expected["conference_reference_sha256"] = sys.argv[6]
+    expected["conference_reference_source_data_commit"] = sys.argv[7]
 actual = {}
 for line in path.read_text().splitlines():
     key, separator, value = line.partition("=")
@@ -261,7 +294,8 @@ PY
   else
     echo "LƯU Ý: chưa có CPLEX_RESULTS_DIR; auditor sẽ giữ cổng submission ở trạng thái NOT YET."
   fi
-  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout 120
+  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout 120 \
+    --conference-reference "$CONFERENCE_RESULTS_DIR"
   printf '%s\n' "$CAMPAIGN_DIR" > "$RESULTS_ROOT/latest_full.txt"
 
 else

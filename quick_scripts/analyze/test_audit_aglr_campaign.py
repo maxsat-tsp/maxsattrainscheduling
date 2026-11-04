@@ -81,6 +81,41 @@ class AuditAglrCampaignTests(unittest.TestCase):
         self.assertEqual(len(missing), 3)
         self.assertEqual(len(duplicates), 6)
 
+    def test_conference_reference_compares_costs_but_not_runtime(self):
+        reference_dir = Path(__file__).resolve().parents[2] / "results" / "conferences"
+        _, _, reference_records = audit.conference_audit.audit_directory(reference_dir)
+        reference = next(
+            record
+            for record in reference_records
+            if record["objective"] == "finsteps123" and record["verified"]
+        )
+        campaign_record = {
+            "tag": "AGLR",
+            "objective": reference["objective"],
+            "name": reference["name"],
+            "status": "ok",
+            "proven": True,
+            "time": 999.0,
+            "errors": [],
+            "solve": {"cost": reference["cost"]},
+            "config": {"kind": "exact"},
+        }
+
+        comparisons, errors, metadata = audit.compare_conference_reference(
+            [campaign_record], reference_dir
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(comparisons[0]["comparison"], "match")
+        self.assertNotIn("reference_time", comparisons[0])
+        self.assertFalse(metadata["runtime_used_for_gate_or_ranking"])
+
+        campaign_record["solve"]["cost"] = float(reference["cost"]) + 1
+        comparisons, errors, _ = audit.compare_conference_reference(
+            [campaign_record], reference_dir
+        )
+        self.assertEqual(comparisons[0]["comparison"], "cost-mismatch")
+        self.assertEqual(len(errors), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

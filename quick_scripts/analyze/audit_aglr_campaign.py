@@ -12,6 +12,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 import audit_journal_campaign as journal_audit
+import summarize_conference as conference_audit
 
 
 OBJECTIVES = ("finsteps123", "infsteps180", "cont")
@@ -260,7 +261,7 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         path.write_text("")
         return
     with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -369,6 +370,94 @@ def confirmation_instances(records: list[dict]) -> list[str]:
     return [name for name in canonical if name in names]
 
 
+def compare_conference_reference(
+    records: list[dict], reference_dir: Path
+) -> tuple[list[dict], list[dict], dict]:
+    """Compare proven exact-solver costs with independently verified conference costs.
+
+    Conference runtimes are deliberately not copied into ``records``.  They therefore
+    cannot affect PAR-2, configuration ranking, or the submission gate.
+    """
+    _, reference_audit, reference_records = conference_audit.audit_directory(
+        reference_dir
+    )
+    errors = [
+        {
+            "tag": "Conference-reference",
+            "objective": "<all>",
+            "name": "<reference>",
+            "status": "invalid-reference",
+            "errors": [message],
+        }
+        for message in reference_audit["errors"]
+    ]
+    reference_by_key = {
+        (record["objective"], record["name"]): record
+        for record in reference_records
+    }
+    comparisons: list[dict] = []
+    for record in records:
+        if record.get("config", {}).get("kind", "exact") != "exact":
+            continue
+        reference = reference_by_key.get((record["objective"], record["name"]))
+        if reference is None:
+            outcome = "missing-reference"
+            reference_status = "missing"
+            reference_verified = False
+            reference_cost = ""
+        else:
+            reference_status = reference["status"]
+            reference_verified = reference["verified"]
+            reference_cost = reference["cost"] if reference_verified else ""
+            if reference_verified and record["proven"]:
+                if journal_audit.same_number(
+                    record["solve"].get("cost"), reference["cost"]
+                ):
+                    outcome = "match"
+                else:
+                    outcome = "cost-mismatch"
+                    errors.append(
+                        {
+                            "tag": record["tag"],
+                            "objective": record["objective"],
+                            "name": record["name"],
+                            "status": "cost-mismatch",
+                            "errors": [
+                                "proven cost "
+                                f"{record['solve'].get('cost')} differs from verified "
+                                f"conference cost {reference['cost']}"
+                            ],
+                        }
+                    )
+            elif reference_verified:
+                outcome = "campaign-not-proven"
+            else:
+                outcome = "reference-not-proven"
+        comparisons.append(
+            {
+                "tag": record["tag"],
+                "objective": record["objective"],
+                "name": record["name"],
+                "reference_status": reference_status,
+                "reference_verified": reference_verified,
+                "reference_cost": reference_cost,
+                "campaign_status": record["status"],
+                "campaign_proven": record["proven"],
+                "campaign_cost": record["solve"].get("cost", ""),
+                "comparison": outcome,
+            }
+        )
+    metadata = {
+        "source_data_commit": reference_audit["source_data_commit"],
+        "source_directory": reference_audit["source_directory"],
+        "runtime_comparable": False,
+        "runtime_used_for_gate_or_ranking": False,
+        "verified_optima": reference_audit["verified_optima"],
+        "warnings": reference_audit["warnings"],
+    }
+    return comparisons, errors, metadata
+
+
 def audit_confirmations(records: list[dict], reference_full: Path, timeout: float) -> list[dict]:
     """Require every repeated run to reproduce each proven AGLR optimum."""
     config_path = reference_full / "AGLR" / "config.txt"
@@ -437,6 +526,7 @@ def main() -> int:
     parser.add_argument("campaign_dir", type=Path)
     parser.add_argument("--timeout", type=float, required=True)
     parser.add_argument("--reference-full", type=Path)
+    parser.add_argument("--conference-reference", type=Path)
     args = parser.parse_args()
     campaign_dir = args.campaign_dir.resolve()
 
@@ -464,6 +554,13 @@ def main() -> int:
         errors.extend(
             audit_confirmations(records, args.reference_full.resolve(), args.timeout)
         )
+    conference_metadata = None
+    if args.conference_reference is not None:
+        comparisons, comparison_errors, conference_metadata = compare_conference_reference(
+            records, args.conference_reference
+        )
+        errors.extend(comparison_errors)
+        write_csv(campaign_dir / "conference_reference_comparison.csv", comparisons)
     gate = evaluate_gate(summary) if any(row["tag"] == "AGLR" for row in summary) else None
     if gate is not None and errors:
         gate["passed"] = False
@@ -472,7 +569,15 @@ def main() -> int:
     write_csv(campaign_dir / "aglr_summary.csv", summary)
     write_csv(campaign_dir / "aglr_ranking.csv", ranked)
     (campaign_dir / "aglr_audit.json").write_text(
-        json.dumps({"errors": errors, "gate": gate}, indent=2)
+        json.dumps(
+            {
+                "errors": errors,
+                "gate": gate,
+                "conference_reference": conference_metadata,
+            },
+            indent=2,
+        )
+        + "\n"
     )
     confirm = confirmation_instances(records)
     (campaign_dir / "confirm_instances.txt").write_text("\n".join(confirm) + ("\n" if confirm else ""))

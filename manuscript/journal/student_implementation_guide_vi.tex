@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.1}
+\fancyhead[R]{\small Phiên bản 5.2}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -49,7 +49,7 @@ trong mỗi vòng DDD, xử lý trước những xung đột có ích và chưa 
 quá nhanh.
 
 Kết quả RC2+B+R trước đây chỉ còn vai trò chẩn đoán. Cấu hình đó tốt hơn
-RC2-Base một ít với \code{finsteps123}, nhưng kém hơn ở hai objective còn lại.
+RC2-Base một ít với \code{finsteps123}, nhưng kém hơn ở hai hàm mục tiêu còn lại.
 Không dùng các số đó làm kết quả chính của bài tạp chí.
 
 Mã, kiểm thử và script cho AGLR đã được chuẩn bị. Giai đoạn đầu cần Gurobi;
@@ -57,8 +57,12 @@ lượt so sánh đầy đủ cần thêm kết quả CPLEX đã kiểm tra. Kh�
 Results hoặc Conclusion của bài báo
 cho đến khi bộ kiểm toán báo rằng kết quả đã qua cổng chất lượng.
 
+Kết quả CSOnet của bài hội nghị cũng đã được nhập và kiểm tra lại. Có thể dùng
+ngay các chi phí tối ưu này để phát hiện lỗi. Không dùng thời gian chạy cũ để
+kết luận AGLR nhanh hơn, vì dữ liệu không ghi đủ thông tin về máy và binary.
+
 \vfill
-{\normalsize Phiên bản 5.1, tháng 10 năm 2026\par}
+{\normalsize Phiên bản 5.2, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -69,13 +73,15 @@ cho đến khi bộ kiểm toán báo rằng kết quả đã qua cổng chất 
 
 Phương pháp AGLR đã được cài. Nhiệm vụ trước mắt của sinh viên là kiểm tra môi
 trường và chạy thí nghiệm, không phải viết lại thuật toán. Chỉ sửa mã khi kết
-quả và telemetry chỉ ra một vấn đề cụ thể, và mỗi lần chỉ sửa một thành phần.
+quả và các số đo trong log chỉ ra một vấn đề cụ thể. Mỗi lần chỉ sửa một thành
+phần.
 
 Lần làm việc đầu tiên chỉ gồm các bước sau:
 
 \begin{enumerate}
 \item Chuyển sang nhánh \code{journal-aglr}, cập nhật mã và ghi lại commit.
-\item Kiểm tra rằng cây Git sạch, dependencies đúng vị trí và Gurobi hoạt động.
+\item Kiểm tra rằng cây Git sạch, các thư viện phụ thuộc đúng vị trí và Gurobi
+      hoạt động.
 \item Chạy toàn bộ test AGLR trên máy Linux.
 \item Chạy giai đoạn \code{screen} đúng một lần cho mỗi cấu hình.
 \item Gửi lại thư mục kết quả và các file tóm tắt; chưa tự đổi tham số và chưa
@@ -116,6 +122,46 @@ Nếu auditor báo lỗi, gửi thêm file \code{*.stderr.log} của instance li
 Không sửa CSV hoặc JSON bằng tay. Toàn bộ thư mục \file{results/aglr/} phải được
 giữ nguyên và sao lưu, dù thư mục này không được commit lên Git.
 
+\section{Kết quả hội nghị đã có và cách sử dụng}
+
+Dữ liệu CSOnet của bài hội nghị nằm trong
+\file{results/conferences/}. Dữ liệu được nhập nguyên trạng từ commit nguồn
+\code{c427a104c3c6f844e515efb7f898b684553b0f3f}. Đây là commit chứa file kết
+quả, không phải commit dùng để biên dịch chương trình đã chạy.
+
+Auditor đã dựng lại và kiểm tra mọi lịch có \code{status=ok}. Kết quả là:
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Hàm mục tiêu & Tối ưu đã kiểm tra & Timeout \\
+\midrule
+\code{finsteps123} & 72/72 & 0 \\
+\code{infsteps180} & 68/72 & 4 \\
+\code{cont} & 58/72 & 14 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Toàn bộ 198 lịch \code{ok} đều hợp lệ và có \code{cost=lb=ub}. Vì vậy, sinh
+viên có thể dùng các chi phí này làm đáp án tham chiếu: nếu một lượt chạy mới
+chứng minh tối ưu nhưng cho chi phí khác, phải dừng và tìm lỗi.
+
+Chạy lại kiểm tra bằng lệnh:
+
+\begin{verbatim}
+python3 quick_scripts/analyze/summarize_conference.py results/conferences
+\end{verbatim}
+
+Lệnh phải tạo \file{conference_audit.json} với danh sách lỗi rỗng. Không sửa
+JSON hoặc CSV để làm cho kết quả khớp. Bốn timeout của \code{infsteps180} và 14
+timeout của \code{cont} phải được giữ nguyên với các cận hiện có.
+
+Thời gian cũ chỉ dùng để tham khảo. Dữ liệu không có bản ghi về máy, môi trường
+và hash của tệp chạy, nên chưa đủ để so tốc độ. Ở giai đoạn \code{full}, script
+vẫn chạy lại CSOnet cùng điều kiện với AGLR. Đây mới là thời gian dùng cho bảng
+so sánh chính của bài báo.
+
 \section{Những phần đã thay đổi trong mã}
 
 Sinh viên cần biết vị trí của thay đổi để đọc log và xử lý lỗi:
@@ -135,6 +181,10 @@ tra lại cùng một lịch. \\
 tục sau khi bị ngắt. \\
 \file{audit_aglr_campaign.py} & Kiểm tra độc lập lịch, chi phí, cận và điều kiện
 dùng kết quả cho submission. \\
+\file{summarize_conference.py} & Kiểm tra lại dữ liệu hội nghị và tạo bảng tóm
+tắt từ \file{total_time}. \\
+\file{results/conferences/} & Dữ liệu hội nghị giữ nguyên, báo cáo kiểm tra và
+đáp án chi phí để phát hiện lỗi hồi quy. \\
 \bottomrule
 \end{tabularx}
 
@@ -417,6 +467,14 @@ qua bộ kiểm tra nghiệm, và có cận dưới bằng cận trên. CSV cũ 
 \code{valid} chỉ dùng để tham khảo.
 Nếu chưa có CPLEX, script vẫn chạy nhưng cổng submission sẽ báo thiếu baseline.
 
+Trong cùng lượt chạy, auditor tự đọc \file{results/conferences/} và đối chiếu
+chi phí của các solver chính xác với kết quả hội nghị đã kiểm tra. Kết quả nằm
+trong \file{conference_reference_comparison.csv}. Cột \code{comparison} phải là
+\code{match} khi cả hai lượt đều đã chứng minh tối ưu. Nếu dữ liệu hội nghị
+được đặt ở vị trí khác, chỉ rõ bằng
+\file{CONFERENCE_RESULTS_DIR=/duong/dan/den/thu_muc}; không sao chép rồi sửa
+file bằng tay.
+
 CSV CPLEX tối thiểu có dạng:
 
 \begin{verbatim}
@@ -447,7 +505,7 @@ không được xem là 72 mẫu độc lập hoàn toàn.
 \section{Cách đọc kết quả}
 
 \file{quick_scripts/analyze/audit_aglr_campaign.py} tự đọc toàn bộ JSON/CSV và
-tạo ba file:
+tạo bốn file cho mọi giai đoạn:
 
 \begin{itemize}
 \item \file{aglr_summary.csv}: coverage, median, PAR-2 và số đo tăng mô hình;
@@ -456,6 +514,11 @@ tạo ba file:
 \item \file{confirm_instances.txt}: danh sách instance cần chạy xác nhận nếu
       lượt đầy đủ đã đạt ngưỡng.
 \end{itemize}
+
+Riêng lượt \code{full} còn có
+\file{conference_reference_comparison.csv}. File này chỉ đối chiếu chi phí.
+Thời gian hội nghị không được đưa vào PAR-2, xếp hạng cấu hình hoặc cổng
+submission.
 
 Auditor dựng lại instance từ file văn bản và tự kiểm tra mọi lịch MaxSAT/Gurobi.
 Với MILP, \code{status=ok} chưa đủ. Chỉ tính optimum khi cận dưới và cận trên
@@ -509,7 +572,8 @@ Chỉ cập nhật Abstract, Results và Conclusion sau khi:
 \item auditor không báo lỗi;
 \item cổng submission báo \code{PASS};
 \item các instance quan trọng đã được chạy xác nhận;
-\item baseline hội nghị có commit, cấu hình và môi trường đủ rõ;
+\item chi phí mới khớp với đáp án hội nghị đã kiểm tra; thời gian dùng trong
+      bảng chính đến từ các solver chạy cùng môi trường;
 \item bảng và hình được sinh tự động từ dữ liệu đã lưu.
 \end{enumerate}
 

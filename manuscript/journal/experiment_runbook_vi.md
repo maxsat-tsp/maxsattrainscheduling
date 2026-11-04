@@ -7,6 +7,17 @@ AGLR đã được cài trực tiếp trên solver CSOnet. Tên solver mới là
 `legacy`. Các kết quả RC2+B+R trước đây chỉ dùng để chẩn đoán và không đi vào
 bảng chính.
 
+Kết quả CSOnet của bài hội nghị đã được nhập nguyên trạng từ commit dữ liệu
+`c427a104c3c6f844e515efb7f898b684553b0f3f`. Auditor đã kiểm tra lại độc lập
+mọi lịch có `status=ok`. Số instance đã chứng minh tối ưu lần lượt là 72/72,
+68/72 và 58/72 cho `finsteps123`, `infsteps180` và `cont`. Không có lịch sai,
+sai chi phí hoặc `panic`.
+
+Có thể dùng ngay các chi phí đã kiểm tra để phát hiện lỗi hồi quy. Không dùng
+thời gian chạy này để kết luận phương pháp nào nhanh hơn, vì dữ liệu chưa có
+thông tin máy và hash binary. Lượt `full` vẫn phải chạy lại CSOnet trên cùng máy
+với AGLR để tạo số liệu thời gian dùng trong bài.
+
 Chiến dịch đầu chỉ chạy mỗi cấu hình một lần. Các lượt lặp chỉ bắt đầu sau khi
 AGLR vượt ngưỡng coverage và PAR-2.
 
@@ -33,6 +44,31 @@ Khi hoàn tất, gửi lại đường dẫn thư mục chiến dịch cùng `ca
 `aglr_ranking.csv`, `aglr_summary.csv`, `aglr_audit.json` và
 `latest_screen.txt`. Nếu có lỗi, gửi thêm `*.stderr.log` của instance liên
 quan. Giữ và sao lưu toàn bộ `results/aglr/`; thư mục này không được commit.
+
+## Kết quả hội nghị dùng như thế nào
+
+Dữ liệu gốc nằm trong `results/conferences/`. Không sửa các JSON hoặc CSV trong
+thư mục này. Hai file sau giải thích và ghi lại kết quả kiểm tra:
+
+- `results/conferences/README.md`: nguồn dữ liệu và giới hạn sử dụng;
+- `results/conferences/conference_audit.json`: số lịch đã kiểm tra và mọi lỗi
+  phát hiện được.
+
+Có thể chạy lại kiểm tra bằng lệnh:
+
+```bash
+python3 quick_scripts/analyze/summarize_conference.py results/conferences
+```
+
+Lệnh này kiểm tra đủ đúng 72 tên instance cho mỗi objective, dựng lại mọi lịch
+`ok`, kiểm tra `cost=lb=ub`, rồi tạo lại `summary_conference.csv`. Bốn timeout
+của `infsteps180` và 14 timeout của `cont` được giữ nguyên; chúng không được
+đổi thành nghiệm tối ưu.
+
+Trong giai đoạn `full`, script tự đưa thư mục này cho auditor. File
+`conference_reference_comparison.csv` cho biết chi phí của mỗi nghiệm mới có
+khớp với chi phí hội nghị đã kiểm tra hay không. File này chỉ so chi phí. Thời
+gian hội nghị không tham gia xếp hạng, PAR-2 hoặc cổng submission.
 
 ## Chuẩn bị máy
 
@@ -127,6 +163,10 @@ Lượt đầy đủ chạy và kiểm tra:
 - Big-M Gurobi;
 - Big-M CPLEX nhập từ thư mục trên.
 
+Lượt này còn tự đối chiếu chi phí của các solver chính xác với kết quả hội nghị
+trong `results/conferences/`. Nếu cần đặt dữ liệu ở nơi khác, dùng biến
+`CONFERENCE_RESULTS_DIR`; không thay nội dung file để làm cho chi phí khớp.
+
 Có thể khóa tham số bằng tay nếu cần tái tạo một cấu hình đã chọn:
 
 ```bash
@@ -168,6 +208,7 @@ Các file cần giữ để viết bài:
 - `aglr_summary.csv`;
 - `aglr_ranking.csv`;
 - `aglr_audit.json`;
+- `conference_reference_comparison.csv` của lượt `full`;
 - `confirm_instances.txt`;
 - mọi JSON, manifest và log instance trong cùng thư mục chiến dịch.
 

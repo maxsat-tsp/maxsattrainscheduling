@@ -2,9 +2,10 @@
 
 **Tệp:** `manuscript/journal/cor/main.tex`
 
-**Ngày rà soát:** 25-10-2026
+**Ngày rà soát:** 05-11-2026
 
-**Trạng thái:** Methods đã khớp với mã AGLR; chưa có kết quả để nộp.
+**Trạng thái:** Methods đã khớp với mã AGLR; kết quả hội nghị đã được kiểm tra
+làm mốc chi phí; chưa có kết quả AGLR để nộp.
 
 ## Kết luận hiện tại
 
@@ -15,6 +16,12 @@ chứng. Phần Methods không còn mô tả một mô hình utility dự kiến
 Bản thảo vẫn chưa sẵn sàng để nộp vì Abstract để trống, phần Results chưa có
 chiến dịch AGLR và Conclusion chỉ được phép ghi trạng thái tạm thời. Đây là chủ
 ý đúng: không được biến kết quả RC2+B+R cũ thành bằng chứng cho AGLR.
+
+Kết quả CSOnet của bài hội nghị đã được nhập từ commit dữ liệu `c427a10` và
+kiểm tra độc lập. Số instance tối ưu đã xác nhận là 72/72, 68/72 và 58/72. Toàn
+bộ 198 lịch `ok` hợp lệ và có `cost=lb=ub`. Các chi phí này được dùng làm mốc
+phát hiện lỗi hồi quy. Thời gian chạy chưa được dùng trong bản thảo vì thiếu
+thông tin máy và hash của tệp chạy.
 
 ## Những phần đã đạt
 
@@ -36,8 +43,8 @@ chiến dịch AGLR và Conclusion chỉ được phép ghi trạng thái tạm 
 |---|---|---|
 | P0 | Chưa có kết quả AGLR trên máy thực nghiệm. | Chạy `screen`, `promote`, `full`, rồi `confirm` nếu qua cổng. |
 | P0 | Chưa xác nhận `legacy` tái tạo CSOnet trên môi trường cuối. | So objective và trạng thái tối ưu; lưu commit, binary hash và log. |
-| P0 | Baseline CPLEX có thể thiếu hoặc khác môi trường. | Chạy lại hoặc chỉ dùng dữ liệu có provenance, `valid=true`, cận khớp và giới hạn tài nguyên tương đương. |
-| P0 | Chưa có baseline hội nghị với provenance đầy đủ. | Nhập file khi nhóm cung cấp; không ghép thời gian từ máy khác. |
+| P0 | Baseline CPLEX có thể thiếu hoặc khác môi trường. | Chạy lại hoặc chỉ dùng dữ liệu có nguồn gốc rõ ràng, `valid=true`, cận khớp và giới hạn tài nguyên tương đương. |
+| P0 | Thời gian hội nghị thiếu thông tin máy và hash của tệp chạy. | Chạy lại CSOnet cùng máy, timeout và giới hạn tài nguyên với AGLR; chỉ dùng dữ liệu cũ để kiểm tra chi phí. |
 | P0 | Abstract và Results trống. | Chỉ viết sau khi `gate.passed=true` và lượt xác nhận hoàn tất. |
 | P1 | CRediT, competing interests, funding và acknowledgements chưa xác nhận. | Các tác giả chốt trước khi nộp. |
 

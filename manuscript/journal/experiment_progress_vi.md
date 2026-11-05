@@ -114,6 +114,12 @@ liệu. Mọi cách đều phải kiểm tra toàn bộ điều kiện trước 
 Script `run_maxsat_core_experiments.sh` ghi cấu hình, commit, hash binary,
 hash dữ liệu và mã thoát; dùng cùng auditor để kiểm tra lịch và chi phí.
 
+Vòng `fb85033` đã xong. Ở 30 giây, legacy/full/geometric lần lượt đạt
+`(24,22,17)`, `(24,22,17)`, `(24,22,18)`. Cả full và geometric chỉ đạt
+`(24,22,18)` khi tăng lên 120 giây, dưới mốc `(24,22,20)`. 360 kết quả đều
+qua audit; không chạy full hướng này. Dữ liệu và manifest đã lưu trong
+`results/sat_research/core_v1_20261105/`.
+
 Đã triển khai thêm một phép thử độc lập: biểu diễn chi phí chỉ bằng các mức
 DDD đã tạo, không tự thêm các mức nguyên trung gian. Mặc định của baseline
 giữ nguyên. Ví dụ hai mức 3 và 7 có thể dùng trọng số 3 và 4 thay vì bảy

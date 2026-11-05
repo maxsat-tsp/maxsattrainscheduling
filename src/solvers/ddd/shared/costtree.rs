@@ -5,6 +5,7 @@ use satcoder::Bool;
 #[derive(Debug)]
 pub struct CostTree<L: satcoder::Lit> {
     nodes: Vec<CostTreeNode<L>>,
+    expand_small_steps: bool,
 }
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
@@ -16,7 +17,14 @@ struct CostTreeNode<L: satcoder::Lit> {
 
 impl<L: satcoder::Lit + std::fmt::Debug> CostTree<L> {
     pub fn new() -> Self {
-        CostTree { nodes: Vec::new() }
+        CostTree { nodes: Vec::new(), expand_small_steps: true }
+    }
+
+    /// Encode only costs actually introduced by DDD, without filling small
+    /// gaps with synthetic unit-cost nodes. The default constructor retains
+    /// the published solvers' original behavior.
+    pub fn new_sparse() -> Self {
+        CostTree { nodes: Vec::new(), expand_small_steps: false }
     }
 
     pub fn add_cost(
@@ -44,7 +52,7 @@ impl<L: satcoder::Lit + std::fmt::Debug> CostTree<L> {
                 .map(|(i, _n)| i);
 
             let dist_prev = cost - parent_node_idx.map(|i| self.nodes[i].cost).unwrap_or(0);
-            let linear_mode = dist_prev < 10;
+            let linear_mode = self.expand_small_steps && dist_prev < 10;
             // let linear_mode = false;
 
             if linear_mode && parent_node_idx.map(|i| self.nodes[i].cost).unwrap_or(0) + 1 != cost {

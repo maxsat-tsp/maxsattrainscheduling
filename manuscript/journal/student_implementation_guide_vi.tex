@@ -637,6 +637,25 @@ số lời gọi SAT có giảm hay không. Chỉ khóa một cấu hình để 
 instance sau khi xem kết quả; không ghép các nghiệm tốt nhất từ nhiều cấu
 hình thành một solver.
 
+Phép thử tiếp theo là bỏ những mức chi phí trung gian chưa cần dùng. Ví dụ,
+nếu DDD lần lượt tạo hai mức chi phí 3 và 7, cách mới dùng hai trọng số 3 và
+4. Khi chọn mức 7, cả hai hạng tử phải được trả nên tổng vẫn là $3+4=7$.
+Cách cũ có thể tạo bảy hạng tử trọng số 1. Mục đích là giảm số biến và số
+bước xử lý chi phí. Cờ \code{--maxsat-ladder-sc-sparse-costs true} bật phép
+thử này; mặc định là tắt.
+
+\begin{verbatim}
+EXPERIMENT_SET=costs RUN_ID=cost-screen-v2 \
+  timeout -k 30 21600 bash run_maxsat_core_experiments.sh screen
+EXPERIMENT_SET=costs RUN_ID=cost-promote-v2 \
+  timeout -k 30 21600 bash run_maxsat_core_experiments.sh promote
+\end{verbatim}
+
+Ở lượt này, giữ cách gửi điều kiện \code{legacy} và refinement CSOnet.
+Trường \code{maxsat\_cost\_terms} ghi số hạng tử chi phí đã tạo. Cách mới đã
+qua kiểm thử các mức đến không theo thứ tự và bài nhỏ vét cạn; sinh viên
+vẫn phải kiểm tra coverage và chi phí trước khi kết luận có lợi.
+
 \subsection{Cách chọn thay đổi tiếp theo}
 
 Mỗi vòng chỉ thay đổi một thành phần. Đọc telemetry trước khi sửa:

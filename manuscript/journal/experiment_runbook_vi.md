@@ -373,3 +373,40 @@ Kết quả nằm tại `results/aglr/<RUN_ID>/aglr_summary.csv`. Cột `assumpt
 cho biết phương án đã thử. Các thư mục `Core-*` là lượt phát triển; tag
 `AGLR` trong mode `candidate` giữ tương thích với cổng đánh giá hiện có.
 Manifest ghi rõ policy `legacy`, vì lượt này giữ refinement CSOnet.
+
+Một phép thử tiếp theo chỉ thay cách biểu diễn chi phí. Mặc định, mã tạo thêm
+các mức chi phí nguyên ở giữa hai mức gần nhau, dù DDD chưa cần dùng chúng.
+Cờ `--maxsat-ladder-sc-sparse-costs true` giữ các mức thực sự được DDD đưa
+vào. Ví dụ, khi lần lượt xuất hiện chi phí 3 và 7, có thể biểu diễn bằng hai
+trọng số 3 và 4 thay vì bảy trọng số 1. Lựa chọn mức 7 vẫn phải trả đủ 7.
+
+```bash
+EXPERIMENT_SET=costs RUN_ID=cost-screen-v2 timeout -k 30 21600 \
+  bash run_maxsat_core_experiments.sh screen
+EXPERIMENT_SET=costs RUN_ID=cost-promote-v2 timeout -k 30 21600 \
+  bash run_maxsat_core_experiments.sh promote
+CORE_VARIANT=sparse RUN_ID=cost-full-v2 timeout -k 30 21600 \
+  bash run_maxsat_core_experiments.sh candidate
+```
+
+Lượt này dùng cách gửi điều kiện `legacy` và refinement CSOnet để đo riêng
+biểu diễn chi phí. Không kết hợp với `full`/`geometric` trước khi có đối chứng.
+Trường `maxsat_cost_terms` đếm số hạng tử chi phí đã sinh. Tính đúng đắn đã
+được kiểm thử trên mọi tổ hợp của các mức `[7,3,11,5,7]` với cận từ 0 đến 12,
+cùng các bài lịch tàu nhỏ vét cạn. Hiệu năng vẫn cần thực nghiệm.
+
+Để máy tự chạy một vòng tối đa 6 giờ:
+
+```bash
+EXPERIMENT_SET=costs CYCLE_ID=cost-cycle-v2 \
+  bash run_maxsat_core_cycle.sh
+```
+
+Script chạy screen rồi promote. Chỉ khi một cấu hình giữ được coverage
+`(24,22,20)` trên tập phát triển ở 120 giây, script mới chạy cấu hình đó trên
+72 instance. Nếu full vượt cổng coverage hội nghị, script chạy ba lần các
+instance cần xác nhận. Quyết định chọn cấu hình được ghi trong
+`core_selection.json`; tuyệt đối không ghép các cấu hình theo từng instance.
+Nếu hết 6 giờ, chạy lại với cùng `CYCLE_ID`, commit và binary để dùng lại các
+lượt đã xong. Vượt cổng hội nghị vẫn cần đối chiếu đủ baseline trước khi tuyên
+bố vượt SOTA.

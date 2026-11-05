@@ -114,6 +114,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_assumptions: Option<String>,
 
+    /// Keep only discovered cost levels instead of expanding small gaps into unit costs.
+    #[structopt(long)]
+    maxsat_ladder_sc_sparse_costs: Option<bool>,
+
     /// AGLR refinement policy: legacy, all-scanned, or adaptive.
     #[structopt(long)]
     aglr_policy: Option<String>,
@@ -554,6 +558,7 @@ fn main() {
     // Empirically best on this benchmark; can be overridden via the
     // matching --maxsat-ladder-sc-* flags.
     let maxsat_ladder_sc_settings = maxsat_ladder_sc::MaxSatDddLadderScSettings {
+        sparse_costs: opt.maxsat_ladder_sc_sparse_costs.unwrap_or(false),
         assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
             "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
             "full" => maxsat_ladder_sc::AssumptionStrategy::Full,

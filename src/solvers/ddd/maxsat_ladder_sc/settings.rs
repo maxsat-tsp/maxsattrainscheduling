@@ -102,6 +102,7 @@ impl Default for AglrSettings {
 #[derive(Clone, Copy, Debug)]
 pub struct MaxSatDddLadderScSettings {
     pub assumption_strategy: AssumptionStrategy,
+    pub sparse_costs: bool,
     pub use_precedence_graph: bool,
     pub use_sc_amo: bool,
     pub use_touched_clique_amo: bool,
@@ -124,6 +125,7 @@ impl Default for MaxSatDddLadderScSettings {
     fn default() -> Self {
         Self {
             assumption_strategy: AssumptionStrategy::Legacy,
+            sparse_costs: false,
             use_precedence_graph: true,
             use_eager_chain_expansion: false,
             use_sc_amo: true,

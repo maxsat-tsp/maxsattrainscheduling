@@ -79,6 +79,7 @@ pub enum IterationType {
 pub struct SolveStats {
     pub sat_calls: usize,
     pub partial_sat_calls: usize,
+    pub cost_terms: usize,
     pub n_sat: usize,
     pub n_unsat: usize,
     pub n_travel: usize,
@@ -913,6 +914,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     );
     output_stats("aglr_filter_duplicates".to_string(), settings.aglr.filter_duplicates.into());
     output_stats("maxsat_assumptions".to_string(), settings.assumption_strategy.as_str().into());
+    output_stats("maxsat_sparse_costs".to_string(), settings.sparse_costs.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -952,7 +954,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
             occupations.push(Occ {
                 cost: vec![true.into()],
-                cost_tree: CostTree::new(),
+                cost_tree: if settings.sparse_costs { CostTree::new_sparse() } else { CostTree::new() },
                 delays: vec![(true.into(), earliest), (false.into(), i32::MAX)],
                 incumbent_idx: 0,
             });
@@ -1672,6 +1674,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                         new_timepoint_var,
                         new_timepoint_cost,
                         &mut |weight, cost_var| {
+                            stats.cost_terms += 1;
                             soft_constraints.insert(!cost_var, (Soft::Primary, weight, weight));
                             if binary_objective.is_some() {
                                 new_objective_terms.push((cost_var, weight));
@@ -2054,6 +2057,7 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("iterations".to_string(), iteration.into());
     output_stats("maxsat_sat_calls".to_string(), stats.sat_calls.into());
     output_stats("maxsat_partial_sat_calls".to_string(), stats.partial_sat_calls.into());
+    output_stats("maxsat_cost_terms".to_string(), stats.cost_terms.into());
     output_stats(
         "objective_iters".to_string(),
         (*iteration_types.get(&IterationType::Objective).unwrap_or(&0)).into(),
@@ -2350,6 +2354,38 @@ mod binary_objective_tests {
             }
         }
     }
+
+    #[test]
+    fn sparse_cost_tree_matches_all_threshold_subsets_and_bounds() {
+        // Costs arrive out of order, include a duplicate and several gaps
+        // that the legacy tree would expand into unit-cost nodes.
+        let costs = [7, 3, 11, 5, 7];
+        for upper in 0..=12 {
+            let mut solver = satcoder::solvers::minisat::Solver::new();
+            let mut objective = BinaryObjective::new(&mut solver, upper);
+            let mut tree = CostTree::new_sparse();
+            let mut inputs = Vec::new();
+            for &cost in &costs {
+                let input = SatInstance::new_var(&mut solver);
+                inputs.push(input);
+                let mut terms = Vec::new();
+                tree.add_cost(&mut solver, input, cost, &mut |weight, lit| terms.push((lit, weight)));
+                for (literal, weight) in terms {
+                    objective.add_term(&mut solver, literal, weight);
+                }
+            }
+            for mask in 0..(1 << costs.len()) {
+                let required = costs.iter().enumerate()
+                    .filter(|(i, _)| mask & (1 << i) != 0)
+                    .map(|(_, cost)| *cost).max().unwrap_or(0);
+                let result = SatSolverWithCore::solve_with_assumptions(&mut solver,
+                    inputs.iter().enumerate().map(|(i, literal)|
+                        if mask & (1 << i) != 0 { *literal } else { !*literal }));
+                assert_eq!(matches!(result, satcoder::SatResultWithCore::Sat(_)), required <= upper,
+                           "sparse upper={upper}, mask={mask}, required={required}");
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2473,14 +2509,17 @@ mod aglr_end_to_end_tests {
             for policy in [RefinementPolicy::Legacy, RefinementPolicy::Adaptive] {
                 for strategy in [AssumptionStrategy::Legacy, AssumptionStrategy::Full,
                                  AssumptionStrategy::Geometric] {
+                  for sparse_costs in [false, true] {
                     let mut settings = MaxSatDddLadderScSettings::default();
                     settings.assumption_strategy = strategy;
+                    settings.sparse_costs = sparse_costs;
                     settings.aglr.policy = policy;
                     let (solution, _) = solve_with_settings(
                         &quiet_env, satcoder::solvers::minisat::Solver::new(), &problem,
                         30.0, objective, settings, |_, _| {},
                     ).unwrap();
                     assert_eq!(problem.verify_solution(&solution, objective), Some(optimum));
+                  }
                 }
             }
         }

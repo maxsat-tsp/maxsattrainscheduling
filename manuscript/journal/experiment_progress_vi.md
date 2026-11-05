@@ -114,6 +114,13 @@ liệu. Mọi cách đều phải kiểm tra toàn bộ điều kiện trước 
 Script `run_maxsat_core_experiments.sh` ghi cấu hình, commit, hash binary,
 hash dữ liệu và mã thoát; dùng cùng auditor để kiểm tra lịch và chi phí.
 
+Đã triển khai thêm một phép thử độc lập: biểu diễn chi phí chỉ bằng các mức
+DDD đã tạo, không tự thêm các mức nguyên trung gian. Mặc định của baseline
+giữ nguyên. Ví dụ hai mức 3 và 7 có thể dùng trọng số 3 và 4 thay vì bảy
+trọng số 1. Bộ kiểm thử Linux có 28 tests, gồm mọi tổ hợp của các mức
+`[7,3,11,5,7]` với cận 0..12 và bài lịch tàu nhỏ với ba objective. Phép thử
+hiệu năng dùng `EXPERIMENT_SET=costs`; chưa có số liệu để kết luận thắng.
+
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 
 Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio

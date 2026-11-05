@@ -19,6 +19,7 @@ CSV_BATCH="quick_scripts/analyze/json_to_csv_batch.py"
 RAM_LIMIT_KB="${RAM_LIMIT_KB:-15000000}"
 EXTERNAL_TIMEOUT_GRACE_SECS="${EXTERNAL_TIMEOUT_GRACE_SECS:-20}"
 SCREEN_PARALLELISM="${SCREEN_PARALLELISM:-2}"
+ABLATE_PARALLELISM="${ABLATE_PARALLELISM:-$SCREEN_PARALLELISM}"
 FULL_TIMEOUT_SECS="${FULL_TIMEOUT_SECS:-120}"
 ORDER_SEED_BASE="${ORDER_SEED_BASE:-20261025}"
 DEVELOPMENT_INSTANCES="${DEVELOPMENT_INSTANCES:-origA3 trackA3 stationA3 origA6 trackA6 stationA6 origA9 trackA9 stationA9 origA12 trackA12 stationA12 origB3 trackB3 stationB3 origB6 trackB6 stationB6 origB9 trackB9 stationB9 origB12 trackB12 stationB12}"
@@ -48,6 +49,10 @@ case "$MODE" in
 esac
 [[ "$SCREEN_PARALLELISM" =~ ^[1-9][0-9]*$ ]] || {
   echo "ERROR: SCREEN_PARALLELISM phải là số nguyên dương." >&2
+  exit 2
+}
+[[ "$ABLATE_PARALLELISM" =~ ^[1-9][0-9]*$ ]] || {
+  echo "ERROR: ABLATE_PARALLELISM phải là số nguyên dương." >&2
   exit 2
 }
 [[ "$FULL_TIMEOUT_SECS" =~ ^[1-9][0-9]*$ ]] || {
@@ -124,6 +129,7 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'binary_sha256=%s\n' "$binary_sha256"
     printf 'repetitions=1\n'
     printf 'screen_parallelism=%s\n' "$SCREEN_PARALLELISM"
+    printf 'ablate_parallelism=%s\n' "$ABLATE_PARALLELISM"
     printf 'full_timeout_seconds=%s\n' "$FULL_TIMEOUT_SECS"
     printf 'rescue_progress=%s\n' "$AGLR_RESCUE_PROGRESS"
     printf 'heuristic_period=%s\n' "$AGLR_HEURISTIC_PERIOD"
@@ -145,7 +151,7 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$campaign_file"
 else
-  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" "$CONFERENCE_RUNTIME_MODE" "$SCREEN_PARALLELISM" "$FULL_TIMEOUT_SECS" "$AGLR_RESCUE_PROGRESS" "$AGLR_HEURISTIC_PERIOD" "$AGLR_HEURISTIC_MIN_GAP" "$AGLR_USE_OBJECTIVE_BOUND" "$AGLR_FILTER_DUPLICATES" "$CONFERENCE_PROFILE" <<'PY'
+  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" "$CONFERENCE_RUNTIME_MODE" "$SCREEN_PARALLELISM" "$ABLATE_PARALLELISM" "$FULL_TIMEOUT_SECS" "$AGLR_RESCUE_PROGRESS" "$AGLR_HEURISTIC_PERIOD" "$AGLR_HEURISTIC_MIN_GAP" "$AGLR_USE_OBJECTIVE_BOUND" "$AGLR_FILTER_DUPLICATES" "$CONFERENCE_PROFILE" <<'PY'
 from pathlib import Path
 import sys
 
@@ -155,8 +161,8 @@ if sys.argv[6]:
     expected["conference_reference_sha256"] = sys.argv[6]
     expected["conference_reference_source_data_commit"] = sys.argv[7]
     expected["conference_runtime_mode"] = sys.argv[8]
-expected.update(zip(("screen_parallelism", "full_timeout_seconds", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound", "filter_duplicates"), sys.argv[9:]))
-expected["conference_profile"] = sys.argv[16]
+expected.update(zip(("screen_parallelism", "ablate_parallelism", "full_timeout_seconds", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound", "filter_duplicates"), sys.argv[9:]))
+expected["conference_profile"] = sys.argv[17]
 actual = {}
 for line in path.read_text().splitlines():
     key, separator, value = line.partition("=")
@@ -296,11 +302,28 @@ elif [[ "$MODE" == "ablate" ]]; then
     "Filter-duplicates bound-or-heuristic 1 0 false true"
     "Objective-bound bound-or-heuristic 1 0 true false"
   )
+  ablate_parallelism="${ABLATE_PARALLELISM:-$SCREEN_PARALLELISM}"
+  [[ "$ablate_parallelism" =~ ^[1-9][0-9]*$ ]] || {
+    echo "ERROR: ABLATE_PARALLELISM phải là số nguyên dương." >&2
+    exit 2
+  }
+  worker_pids=()
+  trap 'for worker in "${worker_pids[@]}"; do kill "$worker" 2>/dev/null || true; done' EXIT
   for variant in "${variants[@]}"; do
-    read -r tag AGLR_RESCUE_PROGRESS AGLR_HEURISTIC_PERIOD AGLR_HEURISTIC_MIN_GAP AGLR_USE_OBJECTIVE_BOUND AGLR_FILTER_DUPLICATES <<< "$variant"
-    run_method "$tag" maxsat_ddd_ladder_aglr exact adaptive \
-      "${AGLR_MIN_GROWTH:-16}" "${AGLR_FRACTION:-0.25}" "${AGLR_MAX_WAIT:-5}" 30 "$DEVELOPMENT_INSTANCES"
+    (
+      read -r tag AGLR_RESCUE_PROGRESS AGLR_HEURISTIC_PERIOD AGLR_HEURISTIC_MIN_GAP AGLR_USE_OBJECTIVE_BOUND AGLR_FILTER_DUPLICATES <<< "$variant"
+      run_method "$tag" maxsat_ddd_ladder_aglr exact adaptive \
+        "${AGLR_MIN_GROWTH:-16}" "${AGLR_FRACTION:-0.25}" "${AGLR_MAX_WAIT:-5}" 30 "$DEVELOPMENT_INSTANCES"
+    ) &
+    worker_pids+=("$!")
+    if (( ${#worker_pids[@]} >= ablate_parallelism )); then
+      for worker in "${worker_pids[@]}"; do wait "$worker"; done
+      worker_pids=()
+    fi
   done
+  for worker in "${worker_pids[@]}"; do wait "$worker"; done
+  worker_pids=()
+  trap - EXIT
   audit_campaign 30
 elif [[ "$MODE" == "screen" ]]; then
   configs=()

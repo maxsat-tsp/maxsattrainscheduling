@@ -319,6 +319,15 @@ có kiểm thử bảng chân trị và bài nhỏ vét cạn; cờ tương ứn
 `ablate` chạy Control và năm biến thể. Mỗi biến thể chỉ đổi đúng một thành
 phần: rescue, chu kỳ heuristic, ngưỡng gap, lọc trùng hoặc giới hạn objective.
 `AGLR_FILTER_DUPLICATES=true` bỏ hành động đã mã hóa trước khi tính ngân sách.
+Các biến thể độc lập có thể chạy song song tối đa hai nhánh trên VM 8 CPU:
+
+```bash
+SCREEN_PARALLELISM=2 ABLATE_PARALLELISM=2 \
+  bash run_aglr_experiments.sh ablate
+```
+
+Mỗi biến thể vẫn ghi thư mục và manifest riêng; không chạy song song ở giai
+đoạn `full` để giữ thời gian so sánh công bằng.
 
 Runner ghi `process_exit_code` kể cả khi solver đã ghi JSON. Nếu mã thoát khác
 0, kết quả không được tính tối ưu. JSON trước crash được giữ thành

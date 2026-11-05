@@ -2316,6 +2316,33 @@ mod binary_objective_tests {
             }
         }
     }
+
+    #[test]
+    fn bound_preserves_cost_tree_choices_when_thresholds_arrive_out_of_order() {
+        let costs = [7, 3, 11, 5, 7];
+        for upper in 0..=12 {
+            let mut solver = satcoder::solvers::minisat::Solver::new();
+            let mut objective = BinaryObjective::new(&mut solver, upper);
+            let mut tree = CostTree::new();
+            let mut inputs = Vec::new();
+            for &cost in &costs {
+                let input = SatInstance::new_var(&mut solver);
+                inputs.push(input);
+                let mut terms = Vec::new();
+                tree.add_cost(&mut solver, input, cost, &mut |weight, lit| terms.push((lit, weight)));
+                for (literal, weight) in terms {
+                    objective.add_term(&mut solver, literal, weight);
+                }
+            }
+            for mask in 0..(1 << costs.len()) {
+                let required = costs.iter().enumerate().filter(|(i, _)| mask & (1 << i) != 0).map(|(_, c)| *c).max().unwrap_or(0);
+                let result = SatSolverWithCore::solve_with_assumptions(&mut solver,
+                    inputs.iter().enumerate().map(|(i, lit)| if mask & (1 << i) != 0 { *lit } else { !*lit }));
+                assert_eq!(matches!(result, satcoder::SatResultWithCore::Sat(_)), required <= upper,
+                           "upper={upper}, mask={mask}, required={required}");
+            }
+        }
+    }
 }
 
 #[cfg(test)]

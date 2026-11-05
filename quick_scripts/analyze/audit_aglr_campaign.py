@@ -138,6 +138,16 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append(f"nonzero process exit {solve['process_exit_code']}")
             if config.get("process_exit_required") == "true" and "process_exit_code" not in solve:
                 errors.append("process exit evidence is missing")
+            if config.get("process_exit_required") == "true" and config.get("policy") in {"adaptive", "all-scanned"}:
+                for key in ("policy", "min_growth", "fraction", "max_wait", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound", "filter_duplicates"):
+                    if key not in config:
+                        continue
+                    actual = solve.get(f"aglr_{key}")
+                    expected = config[key]
+                    numeric = key in {"min_growth", "fraction", "max_wait", "heuristic_period", "heuristic_min_gap"}
+                    matches = journal_audit.same_number(actual, expected) if numeric else str(actual).lower() == str(expected).lower()
+                    if not matches:
+                        errors.append(f"aglr_{key} differs from the locked configuration")
             if not journal_audit.same_number(solve.get("timeout_seconds"), timeout):
                 errors.append(f"timeout_seconds does not match campaign cutoff {timeout}")
             if status == "ok":
@@ -270,8 +280,12 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
                 "conference_coverage": "",
                 "coverage_delta": "",
                 "conference_par2_seconds": "",
+                "conference_par2": "",
                 "par2_delta_seconds": "",
+                "par2_delta": "",
                 "paired_runtime_seconds": "",
+                "paired_runtime": "",
+                "paired_instances": 0,
             }
         )
     return rows
@@ -302,13 +316,19 @@ def add_conference_metrics(
             if subset else float(ref["par2_seconds"])
         )
         row["conference_par2_seconds"] = reference_par2
+        row["conference_par2"] = reference_par2
         row["par2_delta_seconds"] = float(row["par2_seconds"]) - float(
             reference_par2
         )
+        row["par2_delta"] = row["par2_delta_seconds"]
         by_name = {r["name"]: r for r in subset if r["verified"]}
         pairs = [(r["time"], by_name[r["name"]]["total_time"]) for r in selected if r["proven"] and r["name"] in by_name]
         if pairs:
             row["paired_runtime_seconds"] = statistics.fmean(a - b for a, b in pairs)
+            row["paired_instances"] = len(pairs)
+            positive = [(a, b) for a, b in pairs if a > 0 and b > 0]
+            if positive:
+                row["paired_runtime"] = math.exp(statistics.fmean(math.log(b / a) for a, b in positive))
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
@@ -548,6 +568,8 @@ def compare_conference_reference(
         "source_data_commit": reference_audit["source_data_commit"],
         "source_directory": reference_audit["source_directory"],
         "runtime_comparable": runtime_mode == "assumed-equivalent",
+        "runtime_comparability_assumed": runtime_mode == "assumed-equivalent",
+        "runtime_provenance_verified": reference_audit["runtime_comparable"],
         "runtime_used_for_gate_or_ranking": runtime_mode == "assumed-equivalent",
         "runtime_mode": runtime_mode,
         "summary": reference_summary,

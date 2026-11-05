@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.2}
+\fancyhead[R]{\small Phiên bản 5.3}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -58,11 +58,12 @@ Results hoặc Conclusion của bài báo
 cho đến khi bộ kiểm toán báo rằng kết quả đã qua cổng chất lượng.
 
 Kết quả CSOnet của bài hội nghị cũng đã được nhập và kiểm tra lại. Có thể dùng
-ngay các chi phí tối ưu này để phát hiện lỗi. Không dùng thời gian chạy cũ để
-kết luận AGLR nhanh hơn, vì dữ liệu không ghi đủ thông tin về máy và binary.
+ngay các chi phí tối ưu này để phát hiện lỗi. Theo quyết định của nhóm, thời
+gian hội nghị cũng được dùng làm mốc so sánh với giả định VM có cùng phần cứng.
+Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.2, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.3, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -76,16 +77,21 @@ trường và chạy thí nghiệm, không phải viết lại thuật toán. Ch
 quả và các số đo trong log chỉ ra một vấn đề cụ thể. Mỗi lần chỉ sửa một thành
 phần.
 
-Lần làm việc đầu tiên chỉ gồm các bước sau:
+Lưới 18 cấu hình và ba cấu hình được chọn đã chạy trên VM. Kết quả tốt nhất
+trên 24 instance phát triển là $(24,22,19)$ cho ba objective. Đây chưa phải
+coverage trên toàn bộ 72 instance. Tiến độ và vị trí dữ liệu được ghi tại
+\file{manuscript/journal/experiment_progress_vi.md}.
+
+Khi tiếp tục công việc, thực hiện các bước sau:
 
 \begin{enumerate}
 \item Chuyển sang nhánh \code{journal-aglr}, cập nhật mã và ghi lại commit.
 \item Kiểm tra rằng cây Git sạch, các thư viện phụ thuộc đúng vị trí và Gurobi
       hoạt động.
 \item Chạy toàn bộ test AGLR trên máy Linux.
-\item Chạy giai đoạn \code{screen} đúng một lần cho mỗi cấu hình.
-\item Gửi lại thư mục kết quả và các file tóm tắt; chưa tự đổi tham số và chưa
-      chạy \code{full}.
+\item Dùng script chu kỳ để thử riêng từng cải tiến, chọn cấu hình rồi chạy
+      toàn bộ dataset. Mỗi chu kỳ tối đa 6 giờ và có thể tiếp tục nếu bị ngắt.
+\item Gửi lại thư mục kết quả, file tóm tắt và lỗi audit; không sửa JSON/CSV.
 \end{enumerate}
 
 Các lệnh chuẩn bị là:
@@ -157,10 +163,10 @@ Lệnh phải tạo \file{conference_audit.json} với danh sách lỗi rỗng. 
 JSON hoặc CSV để làm cho kết quả khớp. Bốn timeout của \code{infsteps180} và 14
 timeout của \code{cont} phải được giữ nguyên với các cận hiện có.
 
-Thời gian cũ chỉ dùng để tham khảo. Dữ liệu không có bản ghi về máy, môi trường
-và hash của tệp chạy, nên chưa đủ để so tốc độ. Ở giai đoạn \code{full}, script
-vẫn chạy lại CSOnet cùng điều kiện với AGLR. Đây mới là thời gian dùng cho bảng
-so sánh chính của bài báo.
+Chế độ \code{assumed-equivalent} cho phép so sánh runtime hội nghị với VM theo
+giả định cùng phần cứng. Dữ liệu gốc vẫn không có manifest máy hoặc hash
+binary; không ghi rằng những thông tin đó đã được xác minh. Chế độ
+\code{diagnostic} chỉ dùng coverage và chi phí.
 
 \section{Những phần đã thay đổi trong mã}
 
@@ -486,8 +492,9 @@ Mỗi objective cần một file riêng. Giá trị \code{valid=true} phải do 
 trình kiểm tra lịch sinh ra, không được điền tay chỉ vì CPLEX báo tối ưu.
 
 Phần chạy tại repository gồm năm phương pháp, nên giai đoạn \code{full} có
-$5\times72\times3=1080$ lời gọi solver. Với timeout 120 giây, tổng timeout nội
-bộ tối đa là khoảng 36 giờ nếu chạy tuần tự. Dữ liệu CPLEX được nhập vào, không
+$5\times72\times3=1080$ lời gọi solver. Với timeout 150 giây, tổng timeout nội
+bộ tối đa là khoảng 45 giờ nếu chạy tuần tự. Lệnh giới hạn 6 giờ có thể dừng
+giữa chừng; chạy lại cùng \code{RUN\_ID} để tiếp tục. Dữ liệu CPLEX được nhập vào, không
 được tính trong 1080 lời gọi này.
 
 \subsection{Bước 4: xác nhận các instance quan trọng}
@@ -516,9 +523,9 @@ tạo bốn file cho mọi giai đoạn:
 \end{itemize}
 
 Riêng lượt \code{full} còn có
-\file{conference_reference_comparison.csv}. File này chỉ đối chiếu chi phí.
-Thời gian hội nghị không được đưa vào PAR-2, xếp hạng cấu hình hoặc cổng
-submission.
+\file{conference_reference_comparison.csv}. File này đối chiếu chi phí và ghi
+thời gian hội nghị riêng. Ở chế độ \code{assumed-equivalent}, bảng tóm tắt có
+PAR-2 hội nghị, chênh lệch coverage và thời gian ghép cặp trên cùng tập solved.
 
 Auditor dựng lại instance từ file văn bản và tự kiểm tra mọi lịch MaxSAT/Gurobi.
 Với MILP, \code{status=ok} chưa đủ. Chỉ tính optimum khi cận dưới và cận trên
@@ -528,13 +535,48 @@ thừa hoặc trùng.
 AGLR chỉ đạt yêu cầu khi đồng thời có:
 
 \begin{itemize}
-\item không có lịch sai, sai chi phí, panic hoặc file thiếu;
-\item \code{finsteps123}: 72/72 và PAR-2 thấp hơn baseline đầy đủ tốt nhất;
-\item \code{infsteps180}: ít nhất 69/72;
-\item \code{cont}: ít nhất 68/72;
+\item không có lịch sai, sai chi phí, panic, tiến trình crash hoặc file thiếu;
+\item coverage từng objective không thấp hơn $(72,68,58)$ của hội nghị;
+\item tổng coverage ít nhất 199, so với 198 của hội nghị; PAR-2 dùng khi
+      các cấu hình có cùng coverage;
 \item đủ bốn baseline: MaxSAT-DDD tạp chí trước, CSOnet, Big-M Gurobi và
       Big-M CPLEX.
 \end{itemize}
+
+Trường \code{gate.coverage\_passed} chỉ cho biết đã vượt coverage hội nghị.
+Trường \code{gate.passed} còn yêu cầu đủ mọi baseline. Có thể xác nhận ba lần
+sau khi vượt coverage, nhưng chỉ chốt bảng submission khi đủ baseline.
+
+\subsection{Chạy các cải tiến mới}
+
+Sau khi build, chạy một chu kỳ bằng:
+
+\begin{verbatim}
+cargo build --release --locked --bin ddd
+CYCLE_ID=cycle-new bash run_aglr_research_cycle.sh
+\end{verbatim}
+
+Script thử Control và năm biến thể. Mỗi biến thể chỉ đổi một thành phần:
+rescue, chu kỳ heuristic, ngưỡng gap, lọc trùng hoặc giới hạn objective.
+Ba cấu hình tốt nhất chạy tiếp ở 120 giây; một cấu hình được khóa để chạy
+đủ 72 instance ở 150 giây. Nếu vượt coverage, script chạy ba lượt xác nhận.
+Khi bị ngắt, dùng lại đúng \code{CYCLE\_ID}, commit và binary.
+
+Giới hạn objective dùng chi phí $c_i$ và biến Boolean $z_i$ của mô hình:
+\[
+\sum_i c_i z_i \le U,
+\]
+với $U$ là chi phí của một lịch đã kiểm tra hợp lệ. Mỗi hạng tử gốc chỉ được
+tính một lần; không cộng lại các biến phụ dùng để xử lý core. Ví dụ có hai
+hạng tử trọng số 3 và 5, cận $U=6$ cho phép chọn riêng một hạng tử nhưng không
+cho phép chọn cả hai. Khi có lịch tốt hơn với $U=4$, hạng tử trọng số 5 phải
+sai. Phải kiểm thử các trường hợp này trước khi dùng cờ
+\code{--aglr-use-objective-bound true}.
+
+Runner ghi \code{process\_exit\_code} cho mọi lần chạy. JSON ghi xong nhưng
+tiến trình còn crash vẫn được tính là lỗi; bản JSON trước crash được giữ lại
+thành \code{*.raw.json}. Không dùng screen/promote cũ thiếu mã thoát làm bằng
+chứng rằng chương trình không crash.
 
 \section{Nếu kết quả chưa đạt}
 

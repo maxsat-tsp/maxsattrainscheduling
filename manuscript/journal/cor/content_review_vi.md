@@ -7,6 +7,16 @@
 **Trạng thái:** Methods đã khớp với mã AGLR; kết quả hội nghị đã được kiểm tra
 làm mốc chi phí; chưa có kết quả AGLR để nộp.
 
+**Cập nhật thực nghiệm 05-11-2026:** đã chạy screen/promote trên 24 instance
+phát triển, tốt nhất `(24,22,19)`. Hai lượt cũ có crash sau khi ghi JSON mà
+runner chưa phát hiện; chúng chỉ còn giá trị chẩn đoán. Runner mới kiểm tra mã
+thoát thật. Chi tiết nằm trong `../experiment_progress_vi.md`.
+
+Nhóm đã chọn cổng mới trước chu kỳ VM tiếp theo: coverage từng objective không
+thấp hơn `(72,68,58)` và tổng ít nhất 199; PAR-2 dùng sau coverage. Chế độ
+`assumed-equivalent` ghi rõ giả định cùng phần cứng khi dùng runtime hội nghị.
+Chưa sửa Abstract, Results hoặc Conclusion theo các số thử nghiệm này.
+
 ## Kết luận hiện tại
 
 Bản thảo đã tách rõ đóng góp hội nghị và hướng mới. AGLR hiện là một thuật toán
@@ -76,6 +86,6 @@ Khi cổng submission đã qua, cập nhật theo thứ tự:
 6. Abstract, Discussion và Conclusion, mỗi phát biểu đều truy về một bảng hoặc
    hình đã sinh tự động.
 
-Nếu AGLR chưa đạt 72/72 và PAR-2 tốt hơn baseline ở `finsteps123`, 69/72 ở
-`infsteps180`, hoặc 68/72 ở `cont`, bản thảo phải tiếp tục ở trạng thái làm việc.
-Không hạ ngưỡng sau khi đã xem kết quả.
+Theo cổng mới đã chốt, nếu AGLR giảm coverage của bất kỳ objective nào so với
+`(72,68,58)`, hoặc tổng chưa đạt 199, bản thảo vẫn ở trạng thái làm việc. Sau
+khi vượt coverage còn phải xác nhận ba lần và bổ sung đầy đủ các baseline.

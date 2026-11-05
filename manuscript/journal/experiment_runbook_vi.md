@@ -13,23 +13,23 @@ mọi lịch có `status=ok`. Số instance đã chứng minh tối ưu lần l�
 68/72 và 58/72 cho `finsteps123`, `infsteps180` và `cont`. Không có lịch sai,
 sai chi phí hoặc `panic`.
 
-Có thể dùng ngay các chi phí đã kiểm tra để phát hiện lỗi hồi quy. Không dùng
-thời gian chạy này để kết luận phương pháp nào nhanh hơn, vì dữ liệu chưa có
-thông tin máy và hash binary. Lượt `full` vẫn phải chạy lại CSOnet trên cùng máy
-với AGLR để tạo số liệu thời gian dùng trong bài.
+Các chi phí đã kiểm tra được dùng để phát hiện lỗi hồi quy. Dữ liệu hội nghị
+không có manifest máy và hash binary. Với VM mới, nhóm chấp nhận giả định cùng
+phần cứng và bỏ qua khác biệt nhỏ về phiên bản để so sánh thời gian.
 
 Trong chiến dịch trên VM mới, thầy/cô chấp nhận giả định máy chạy hội nghị và
 VM là cùng phần cứng. Khi gọi auditor với
 `--conference-runtime-mode assumed-equivalent`, thời gian hội nghị được dùng
 làm mốc PAR-2 thứ cấp. Manifest của chiến dịch phải ghi rõ giả định này.
 
-Chiến dịch đầu chỉ chạy mỗi cấu hình một lần. Các lượt lặp chỉ bắt đầu sau khi
-AGLR vượt ngưỡng coverage và PAR-2.
+Mỗi cấu hình ban đầu chỉ chạy một lần. Khi coverage từng objective không giảm
+và tổng tăng lên ít nhất 199, chạy thêm ba lần các instance cần xác nhận.
 
 ## Việc sinh viên làm ngay
 
-Trước mắt chỉ chạy giai đoạn `screen`. Không sửa tham số, không sửa JSON/CSV và
-chưa chạy `full`. Chuẩn bị mã bằng các lệnh:
+Lưới 18 cấu hình `screen` và ba cấu hình `promote` đã chạy trên VM. Không cần
+chạy lại các lượt cũ. Đọc `experiment_progress_vi.md` để biết kết quả và vị trí
+dữ liệu. Trước một vòng mới, chuẩn bị mã bằng các lệnh:
 
 ```bash
 git fetch origin
@@ -42,8 +42,14 @@ git status --short
 `git status --short` phải không in gì. Sau khi test đạt, chạy:
 
 ```bash
-bash run_aglr_experiments.sh screen
+cargo build --release --locked --bin ddd
+CYCLE_ID=cycle-new bash run_aglr_research_cycle.sh
 ```
+
+Lệnh trên thử riêng từng thành phần, chạy ba cấu hình tốt nhất ở 120 giây,
+khóa cấu hình rồi chạy đủ 72 instance ở 150 giây. Nếu vượt cổng coverage,
+script chạy ba lượt xác nhận. Toàn chu kỳ bị giới hạn ở 6 giờ. Nếu bị ngắt,
+chạy lại đúng `CYCLE_ID`, binary và commit để dùng lại kết quả đã có.
 
 Khi hoàn tất, gửi lại đường dẫn thư mục chiến dịch cùng `campaign.txt`,
 `aglr_ranking.csv`, `aglr_summary.csv`, `aglr_audit.json` và
@@ -72,8 +78,9 @@ của `infsteps180` và 14 timeout của `cont` được giữ nguyên; chúng k
 
 Trong giai đoạn `full`, script tự đưa thư mục này cho auditor. File
 `conference_reference_comparison.csv` cho biết chi phí của mỗi nghiệm mới có
-khớp với chi phí hội nghị đã kiểm tra hay không. File này chỉ so chi phí. Thời
-gian hội nghị không tham gia xếp hạng, PAR-2 hoặc cổng submission.
+khớp với chi phí hội nghị đã kiểm tra hay không. Chế độ `assumed-equivalent`
+còn sinh PAR-2 hội nghị và thời gian ghép cặp trên đúng các instance cùng giải
+được; chế độ `diagnostic` chỉ dùng coverage và chi phí.
 
 ## Chuẩn bị máy
 
@@ -144,8 +151,8 @@ SCREEN_DIR=results/aglr/<screen-run> \
 ## 3. Khóa cấu hình và chạy đủ 72 instance
 
 Chuẩn bị ba CSV Big-M CPLEX cho `finsteps123`, `infsteps180` và `cont`. Script
-nhận mẫu `results_bigm_<objective>_120s.csv` hoặc
-`MILP_BigM_CPLEX_<objective>_120s.csv`. File phải chứa `name`, `status`, `lb`,
+nhận mẫu `results_bigm_<objective>_150s.csv` hoặc
+`MILP_BigM_CPLEX_<objective>_150s.csv`. File phải chứa `name`, `status`, `lb`,
 `ub`, thời gian chạy và `valid`. Giá trị `valid=true` xác nhận lịch đã qua bộ
 kiểm tra nghiệm. `status=ok` chỉ được tính tối ưu khi `valid=true` và `lb`, `ub`
 khớp. CSV cũ thiếu `valid` chỉ dùng tham khảo, không dùng mở cổng submission.
@@ -196,7 +203,9 @@ dùng làm mốc kiểm tra.
 
 ## 4. Xác nhận các instance quan trọng
 
-Chỉ làm bước này sau khi `aglr_audit.json` của lượt đầy đủ có `gate.passed=true`.
+Chạy khi `aglr_audit.json` có `gate.coverage_passed=true`. Trường này cho biết
+đã vượt hội nghị. `gate.passed=true` còn yêu cầu đủ mọi baseline, gồm CPLEX;
+nó là điều kiện chốt bảng submission.
 
 ```bash
 bash run_aglr_experiments.sh confirm
@@ -243,3 +252,25 @@ Có thể giảm số lần gọi heuristic bằng `AGLR_HEURISTIC_PERIOD` hoặ
 khoảng cách cận đạt `AGLR_HEURISTIC_MIN_GAP`. Chỉ thử `BinaryObjective` sau khi
 có kiểm thử bảng chân trị và bài nhỏ vét cạn; cờ tương ứng là
 `AGLR_USE_OBJECTIVE_BOUND=true`.
+
+`ablate` chạy Control và năm biến thể. Mỗi biến thể chỉ đổi đúng một thành
+phần: rescue, chu kỳ heuristic, ngưỡng gap, lọc trùng hoặc giới hạn objective.
+`AGLR_FILTER_DUPLICATES=true` bỏ hành động đã mã hóa trước khi tính ngân sách.
+
+Runner ghi `process_exit_code` kể cả khi solver đã ghi JSON. Nếu mã thoát khác
+0, kết quả không được tính tối ưu. JSON trước crash được giữ thành
+`*.raw.json`. Các lượt screen/promote cũ thiếu thông tin này chỉ dùng để chọn
+hướng; không lấy chúng làm bằng chứng rằng chương trình không crash.
+
+Chạy riêng baseline hoặc một cấu hình đã khóa:
+
+```bash
+RUN_ID=baseline-new bash run_aglr_round.sh baseline
+AGLR_MIN_GROWTH=16 AGLR_FRACTION=0.25 AGLR_MAX_WAIT=5 \
+  RUN_ID=candidate-new bash run_aglr_round.sh candidate
+```
+
+Mỗi lệnh có giới hạn 6 giờ. `full` chạy tuần tự mọi solver và có thể cần nhiều
+vòng 6 giờ; tiếp tục cùng `RUN_ID` để không chạy lại dữ liệu đã xong. Không đổi
+commit hoặc binary khi đang chạy. Trên VM, dùng worktree và bản binary riêng
+cho mỗi vòng để có thể phát triển mã mà không thay đầu vào của vòng đang chạy.

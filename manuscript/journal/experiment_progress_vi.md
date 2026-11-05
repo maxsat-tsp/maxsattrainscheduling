@@ -56,6 +56,27 @@ Hai thư mục này chứa kết quả mới trên VM:
 ~/projects/experiment-audit/rounds/cycle-20261105-cb839c7-*/
 ```
 
+## Chu kỳ 120 giây đã khởi động
+
+Commit `20bd54d` đã chạy lại 25 Rust tests; 60 lần chạy ngắn xen kẽ legacy và
+AGLR đều thoát bình thường. Sửa lỗi khởi tạo môi trường Gurobi thừa đã được áp
+dụng cho cả worker cũ, giữ nguyên phép tính heuristic và cách refinement.
+
+VM đang chạy dịch vụ `aglr-paper120-20bd54d`: baseline 120 giây, sau đó ablation
+từng thành phần, promote, một cấu hình khóa trên toàn bộ tập và xác nhận nếu
+đạt coverage. Toàn dịch vụ giới hạn 6 giờ. Worktree và binary được giữ riêng.
+
+```text
+~/projects/experiment-audit/rounds/baseline-paper120-20bd54d/
+~/projects/experiment-audit/rounds/cycle-paper120-20bd54d-*/
+```
+
+Mốc 120 giây có coverage `(72,68,60)` và PAR-2 lần lượt khoảng
+`0.0230`, `13.7854`, `44.0667` giây. Đây là thời gian từ CSV đã công bố,
+được so sánh theo giả định cùng phần cứng của nhóm. CSV không có lịch để kiểm
+tra độc lập. Trên 24 instance phát triển, mốc này là `(24,22,20)`; vì vậy các
+lượt cũ đạt `(24,22,19)` chưa vượt mốc chính dù giải thêm được `trackB12/cont`.
+
 Objective bound đã qua bảng chân trị, kiểm tra tổng trọng số khi giảm UB,
 và bài toán nhỏ vét cạn. Bộ kiểm thử Linux có 25 Rust tests; bộ Python sau
 sửa profile 120 giây có 16 tests.

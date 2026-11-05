@@ -4,7 +4,7 @@
 set -euo pipefail
 export CYCLE_ID="${CYCLE_ID:-cycle-$(date -u +%Y%m%dT%H%M%SZ)}"
 export RESULTS_ROOT="${RESULTS_ROOT:-results/aglr}"
-export FULL_TIMEOUT_SECS="${FULL_TIMEOUT_SECS:-150}"
+export FULL_TIMEOUT_SECS="${FULL_TIMEOUT_SECS:-120}"
 export CONFERENCE_RUNTIME_MODE="${CONFERENCE_RUNTIME_MODE:-assumed-equivalent}"
 if [[ "${AGLR_CYCLE_BOUNDED:-0}" != 1 ]]; then
   export AGLR_CYCLE_BOUNDED=1

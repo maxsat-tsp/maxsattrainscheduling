@@ -13,11 +13,12 @@ from pathlib import Path
 
 import audit_journal_campaign as journal_audit
 import summarize_conference as conference_audit
+import published_conference_reference as published_reference
 
 
 OBJECTIVES = ("finsteps123", "infsteps180", "cont")
 FATAL_STATUSES = journal_audit.FATAL_STATUSES
-DEFAULT_CONFERENCE_COVERAGE = {"finsteps123": 72, "infsteps180": 68, "cont": 58}
+DEFAULT_CONFERENCE_COVERAGE = {"finsteps123": 72, "infsteps180": 68, "cont": 60}
 
 
 def read_config(path: Path) -> dict[str, str]:
@@ -488,12 +489,14 @@ def confirmation_instances(records: list[dict], conference_comparisons: list[dic
 
 
 def compare_conference_reference(
-    records: list[dict], reference_dir: Path, runtime_mode: str = "diagnostic"
+    records: list[dict], reference_dir: Path, runtime_mode: str = "diagnostic", profile: str = "auto"
 ) -> tuple[list[dict], list[dict], dict]:
     """Compare exact results with conference costs and, optionally, runtimes."""
-    reference_summary, reference_audit, reference_records = conference_audit.audit_directory(
-        reference_dir
-    )
+    use_published = profile == "published-csv-120" or (profile == "auto" and (reference_dir / "MaxSAT_Default_RC2_cont_120s.csv").is_file())
+    if use_published:
+        reference_summary, reference_audit, reference_records = published_reference.audit_directory(reference_dir)
+    else:
+        reference_summary, reference_audit, reference_records = conference_audit.audit_directory(reference_dir)
     errors = [
         {
             "tag": "Conference-reference",
@@ -572,6 +575,8 @@ def compare_conference_reference(
         "runtime_provenance_verified": reference_audit["runtime_comparable"],
         "runtime_used_for_gate_or_ranking": runtime_mode == "assumed-equivalent",
         "runtime_mode": runtime_mode,
+        "profile": "published-csv-120" if use_published else "imported-json-150",
+        "verification_scope": reference_audit.get("verification_scope", "independent schedules, costs and bounds"),
         "summary": reference_summary,
         "records": reference_records,
         "verified_optima": reference_audit["verified_optima"],
@@ -651,6 +656,7 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, required=True)
     parser.add_argument("--reference-full", type=Path)
     parser.add_argument("--conference-reference", type=Path)
+    parser.add_argument("--conference-profile", choices=("auto", "published-csv-120", "imported-json-150"), default="auto")
     parser.add_argument(
         "--conference-runtime-mode",
         choices=("diagnostic", "assumed-equivalent"),
@@ -673,7 +679,7 @@ def main() -> int:
     comparisons: list[dict] = []
     if args.conference_reference is not None:
         comparisons, comparison_errors, conference_metadata = compare_conference_reference(
-            records, args.conference_reference, args.conference_runtime_mode
+            records, args.conference_reference, args.conference_runtime_mode, args.conference_profile
         )
         conference_summary = conference_metadata.get("summary", [])
         add_conference_metrics(summary, conference_summary, records,

@@ -1,7 +1,8 @@
 # Tiến độ thử nghiệm trên VM, 05-11-2026
 
-Mốc hội nghị là `(72, 68, 58)`, tổng 198 optimum. Tiêu chí được nhóm chốt
-trước chu kỳ mới: không giảm coverage ở từng objective và tổng ít nhất 199;
+Đối chiếu lại camera-ready theo ý kiến của thầy/cô: mốc đúng là **120 giây**,
+`(72,68,60)`, tổng 200 optimum. Bộ JSON 150 giây `(72,68,58)` là lượt khác;
+không dùng làm mốc chính. Tiêu chí: không giảm coverage ở từng objective và tổng ít nhất 201;
 PAR-2 là tiêu chí xếp hạng tiếp theo. Đây là cổng thực nghiệm nội bộ, không
 phải bảo đảm bài được tạp chí chấp nhận.
 
@@ -41,13 +42,12 @@ trình crash không được tính thành công. Sau sửa, 40 lần chạy ng�
 `cost=lb=ub=10`. Đây là kiểm tra hồi quy ngắn; mọi campaign sau vẫn phải kiểm
 tra mã thoát trên từng instance.
 
-## Chu kỳ đang triển khai
+## Lượt 150 giây đã dừng để sửa mốc so sánh
 
-Baseline riêng ở commit `8226f5a`, timeout 150 giây. Binary và worktree được
-giữ cố định; mã `legacy` vẫn dùng quy trình của CSOnet. Chu kỳ sau ở commit
-`cb839c7` đợi baseline kết thúc rồi thử sáu cấu hình, promote ba cấu hình,
-khóa một cấu hình và chạy toàn bộ 72 instance. Chỉ lặp xác nhận nếu vượt
-coverage. Các cờ mới mặc định tắt hoặc giữ hành vi ban đầu.
+Baseline ở commit `8226f5a`, timeout 150 giây, đã được giữ lại làm chẩn đoán.
+Hai objective đầu hoàn tất `(72,68)`, mọi mã thoát bằng 0; `cont` đang chạy
+thì được dừng khi phát hiện camera-ready dùng 120 giây. Không đổi nhãn bộ dữ
+liệu này thành 120 giây. Lượt AGLR 150 giây xếp hàng đã được hủy trước khi chạy.
 
 Hai thư mục này chứa kết quả mới trên VM:
 
@@ -57,9 +57,11 @@ Hai thư mục này chứa kết quả mới trên VM:
 ```
 
 Objective bound đã qua bảng chân trị, kiểm tra tổng trọng số khi giảm UB,
-và bài toán nhỏ vét cạn. Bộ kiểm thử Linux hiện có 24 Rust tests và 14 Python
-tests. Chưa điền số AGLR mới vào Abstract, Results hoặc Conclusion.
+và bài toán nhỏ vét cạn. Bộ kiểm thử Linux có 25 Rust tests; bộ Python sau
+sửa profile 120 giây có 16 tests.
+Chưa điền số AGLR mới vào Abstract, Results hoặc Conclusion.
 
-CPLEX trên VM chưa có; các CSV CPLEX cũ là 120 giây. Không đổi tên chúng thành
-150 giây. Cổng submission đầy đủ cần kết quả CPLEX đúng timeout, có nghiệm
-được kiểm tra và cận khớp.
+CPLEX trên VM chưa có; các CSV CPLEX cũ là 120 giây nhưng thiếu lịch/\`valid\`.
+Cổng submission đầy đủ cần nghiệm được kiểm tra và cận khớp. Không yêu cầu
+chạy CPLEX 150 giây. Liên kết IBM Academic đã được cung cấp; đây là cổng web
+chứ chưa phải file cài đặt Linux.

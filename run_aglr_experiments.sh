@@ -19,12 +19,23 @@ CSV_BATCH="quick_scripts/analyze/json_to_csv_batch.py"
 RAM_LIMIT_KB="${RAM_LIMIT_KB:-15000000}"
 EXTERNAL_TIMEOUT_GRACE_SECS="${EXTERNAL_TIMEOUT_GRACE_SECS:-20}"
 SCREEN_PARALLELISM="${SCREEN_PARALLELISM:-2}"
-FULL_TIMEOUT_SECS="${FULL_TIMEOUT_SECS:-150}"
+FULL_TIMEOUT_SECS="${FULL_TIMEOUT_SECS:-120}"
 ORDER_SEED_BASE="${ORDER_SEED_BASE:-20261025}"
 DEVELOPMENT_INSTANCES="${DEVELOPMENT_INSTANCES:-origA3 trackA3 stationA3 origA6 trackA6 stationA6 origA9 trackA9 stationA9 origA12 trackA12 stationA12 origB3 trackB3 stationB3 origB6 trackB6 stationB6 origB9 trackB9 stationB9 origB12 trackB12 stationB12}"
-CONFERENCE_RESULTS_DIR="${CONFERENCE_RESULTS_DIR:-results/conferences}"
+CONFERENCE_RESULTS_DIR="${CONFERENCE_RESULTS_DIR:-results}"
+CONFERENCE_PROFILE="${CONFERENCE_PROFILE:-published-csv-120}"
 CONFERENCE_RUNTIME_MODE="${CONFERENCE_RUNTIME_MODE:-assumed-equivalent}"
-CONFERENCE_SOURCE_DATA_COMMIT="c427a104c3c6f844e515efb7f898b684553b0f3f"
+CONFERENCE_SOURCE_DATA_COMMIT="db0b16f20d97045501e63e4b432a879218a0c180"
+if [[ "$CONFERENCE_PROFILE" == "imported-json-150" ]]; then
+  CONFERENCE_SOURCE_DATA_COMMIT="c427a104c3c6f844e515efb7f898b684553b0f3f"
+elif [[ "$CONFERENCE_PROFILE" != "published-csv-120" ]]; then
+  echo "ERROR: CONFERENCE_PROFILE không hợp lệ." >&2
+  exit 2
+fi
+if [[ "$CONFERENCE_PROFILE" == "published-csv-120" && "$FULL_TIMEOUT_SECS" != 120 ]]; then
+  echo "ERROR: mốc camera-ready dùng 120 giây; không dùng nó làm mốc chính cho cutoff khác." >&2
+  exit 2
+fi
 AGLR_RESCUE_PROGRESS="${AGLR_RESCUE_PROGRESS:-bound-or-heuristic}"
 AGLR_HEURISTIC_PERIOD="${AGLR_HEURISTIC_PERIOD:-1}"
 AGLR_HEURISTIC_MIN_GAP="${AGLR_HEURISTIC_MIN_GAP:-0}"
@@ -65,17 +76,22 @@ command -v gurobi_cl >/dev/null || {
 conference_reference_sha256=""
 if [[ -d "$CONFERENCE_RESULTS_DIR" ]]; then
   for objective in finsteps123 infsteps180 cont; do
-    [[ -f "$CONFERENCE_RESULTS_DIR/MaxsatScDefault_${objective}.json" ]] || {
+    if [[ "$CONFERENCE_PROFILE" == "published-csv-120" ]]; then
+      reference_file="$CONFERENCE_RESULTS_DIR/MaxSAT_Default_RC2_${objective}_120s.csv"
+    else
+      reference_file="$CONFERENCE_RESULTS_DIR/MaxsatScDefault_${objective}.json"
+    fi
+    [[ -f "$reference_file" ]] || {
       echo "ERROR: thiếu dữ liệu hội nghị cho $objective trong $CONFERENCE_RESULTS_DIR" >&2
       exit 2
     }
   done
-  conference_reference_sha256="$(python3 - "$CONFERENCE_RESULTS_DIR" <<'PY'
+  conference_reference_sha256="$(python3 - "$CONFERENCE_RESULTS_DIR" "$CONFERENCE_PROFILE" <<'PY'
 import hashlib, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 digest = hashlib.sha256()
 for objective in ("finsteps123", "infsteps180", "cont"):
-    path = root / f"MaxsatScDefault_{objective}.json"
+    path = root / (f"MaxSAT_Default_RC2_{objective}_120s.csv" if sys.argv[2] == "published-csv-120" else f"MaxsatScDefault_{objective}.json")
     digest.update(path.name.encode())
     digest.update(b"\0")
     digest.update(path.read_bytes())
@@ -114,6 +130,7 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'heuristic_min_gap=%s\n' "$AGLR_HEURISTIC_MIN_GAP"
     printf 'use_objective_bound=%s\n' "$AGLR_USE_OBJECTIVE_BOUND"
     printf 'filter_duplicates=%s\n' "$AGLR_FILTER_DUPLICATES"
+    printf 'conference_profile=%s\n' "$CONFERENCE_PROFILE"
     if [[ -n "$conference_reference_sha256" ]]; then
       printf 'conference_reference_dir=%s\n' "$CONFERENCE_RESULTS_DIR"
       printf 'conference_reference_sha256=%s\n' "$conference_reference_sha256"
@@ -128,7 +145,7 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$campaign_file"
 else
-  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" "$CONFERENCE_RUNTIME_MODE" "$SCREEN_PARALLELISM" "$FULL_TIMEOUT_SECS" "$AGLR_RESCUE_PROGRESS" "$AGLR_HEURISTIC_PERIOD" "$AGLR_HEURISTIC_MIN_GAP" "$AGLR_USE_OBJECTIVE_BOUND" "$AGLR_FILTER_DUPLICATES" <<'PY'
+  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" "$CONFERENCE_RUNTIME_MODE" "$SCREEN_PARALLELISM" "$FULL_TIMEOUT_SECS" "$AGLR_RESCUE_PROGRESS" "$AGLR_HEURISTIC_PERIOD" "$AGLR_HEURISTIC_MIN_GAP" "$AGLR_USE_OBJECTIVE_BOUND" "$AGLR_FILTER_DUPLICATES" "$CONFERENCE_PROFILE" <<'PY'
 from pathlib import Path
 import sys
 
@@ -139,6 +156,7 @@ if sys.argv[6]:
     expected["conference_reference_source_data_commit"] = sys.argv[7]
     expected["conference_runtime_mode"] = sys.argv[8]
 expected.update(zip(("screen_parallelism", "full_timeout_seconds", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound", "filter_duplicates"), sys.argv[9:]))
+expected["conference_profile"] = sys.argv[16]
 actual = {}
 for line in path.read_text().splitlines():
     key, separator, value = line.partition("=")
@@ -257,6 +275,7 @@ PY
 audit_campaign() {
   python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout "$1" \
     --conference-reference "$CONFERENCE_RESULTS_DIR" \
+    --conference-profile "$CONFERENCE_PROFILE" \
     --conference-runtime-mode "$CONFERENCE_RUNTIME_MODE"
 }
 
@@ -398,6 +417,7 @@ PY
   fi
   python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout "$FULL_TIMEOUT_SECS" \
     --conference-reference "$CONFERENCE_RESULTS_DIR" \
+    --conference-profile "$CONFERENCE_PROFILE" \
     --conference-runtime-mode "$CONFERENCE_RUNTIME_MODE"
   printf '%s\n' "$CAMPAIGN_DIR" > "$RESULTS_ROOT/latest_full.txt"
 

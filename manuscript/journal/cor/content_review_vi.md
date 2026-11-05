@@ -12,8 +12,9 @@ phát triển, tốt nhất `(24,22,19)`. Hai lượt cũ có crash sau khi ghi 
 runner chưa phát hiện; chúng chỉ còn giá trị chẩn đoán. Runner mới kiểm tra mã
 thoát thật. Chi tiết nằm trong `../experiment_progress_vi.md`.
 
-Nhóm đã chọn cổng mới trước chu kỳ VM tiếp theo: coverage từng objective không
-thấp hơn `(72,68,58)` và tổng ít nhất 199; PAR-2 dùng sau coverage. Chế độ
+Đã sửa mốc theo camera-ready: timeout 120 giây, coverage từng objective không
+thấp hơn `(72,68,60)` và tổng ít nhất 201; PAR-2 dùng sau coverage. Bộ JSON
+150 giây có `(72,68,58)` là dữ liệu chẩn đoán khác với số đã công bố. Chế độ
 `assumed-equivalent` ghi rõ giả định cùng phần cứng khi dùng runtime hội nghị.
 Chưa sửa Abstract, Results hoặc Conclusion theo các số thử nghiệm này.
 
@@ -87,5 +88,5 @@ Khi cổng submission đã qua, cập nhật theo thứ tự:
    hình đã sinh tự động.
 
 Theo cổng mới đã chốt, nếu AGLR giảm coverage của bất kỳ objective nào so với
-`(72,68,58)`, hoặc tổng chưa đạt 199, bản thảo vẫn ở trạng thái làm việc. Sau
+`(72,68,60)`, hoặc tổng chưa đạt 201, bản thảo vẫn ở trạng thái làm việc. Sau
 khi vượt coverage còn phải xác nhận ba lần và bổ sung đầy đủ các baseline.

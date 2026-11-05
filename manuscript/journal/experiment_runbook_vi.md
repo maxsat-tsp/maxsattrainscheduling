@@ -1,5 +1,11 @@
 # Runbook thực nghiệm AGLR
 
+Mốc chính đã được sửa theo camera-ready: **120 giây**, MaxSAT-Default
+`(72,68,60)`, tổng 200 optimum. Dùng ba CSV
+`results/MaxSAT_Default_RC2_<objective>_120s.csv`. Bộ JSON trong
+`results/conferences/` là lượt chạy khác ở 150 giây, chỉ còn dùng để chẩn đoán.
+Không cắt, đổi nhãn hoặc trộn lượt 150 giây thành kết quả 120 giây.
+
 ## Trạng thái
 
 AGLR đã được cài trực tiếp trên solver CSOnet. Tên solver mới là
@@ -7,7 +13,7 @@ AGLR đã được cài trực tiếp trên solver CSOnet. Tên solver mới là
 `legacy`. Các kết quả RC2+B+R trước đây chỉ dùng để chẩn đoán và không đi vào
 bảng chính.
 
-Kết quả CSOnet của bài hội nghị đã được nhập nguyên trạng từ commit dữ liệu
+Một bộ kết quả CSOnet 150 giây đã được nhập nguyên trạng từ commit dữ liệu
 `c427a104c3c6f844e515efb7f898b684553b0f3f`. Auditor đã kiểm tra lại độc lập
 mọi lịch có `status=ok`. Số instance đã chứng minh tối ưu lần lượt là 72/72,
 68/72 và 58/72 cho `finsteps123`, `infsteps180` và `cont`. Không có lịch sai,
@@ -23,7 +29,7 @@ VM là cùng phần cứng. Khi gọi auditor với
 làm mốc PAR-2 thứ cấp. Manifest của chiến dịch phải ghi rõ giả định này.
 
 Mỗi cấu hình ban đầu chỉ chạy một lần. Khi coverage từng objective không giảm
-và tổng tăng lên ít nhất 199, chạy thêm ba lần các instance cần xác nhận.
+so với `(72,68,60)` và tổng ít nhất 201, chạy thêm ba lần để xác nhận.
 
 ## Việc sinh viên làm ngay
 
@@ -47,7 +53,7 @@ CYCLE_ID=cycle-new bash run_aglr_research_cycle.sh
 ```
 
 Lệnh trên thử riêng từng thành phần, chạy ba cấu hình tốt nhất ở 120 giây,
-khóa cấu hình rồi chạy đủ 72 instance ở 150 giây. Nếu vượt cổng coverage,
+khóa cấu hình rồi chạy đủ 72 instance ở 120 giây. Nếu vượt cổng coverage,
 script chạy ba lượt xác nhận. Toàn chu kỳ bị giới hạn ở 6 giờ. Nếu bị ngắt,
 chạy lại đúng `CYCLE_ID`, binary và commit để dùng lại kết quả đã có.
 
@@ -57,6 +63,12 @@ Khi hoàn tất, gửi lại đường dẫn thư mục chiến dịch cùng `ca
 quan. Giữ và sao lưu toàn bộ `results/aglr/`; thư mục này không được commit.
 
 ## Kết quả hội nghị dùng như thế nào
+
+Profile mặc định là `published-csv-120`; các CSV chứa chi phí, cận và thời
+gian nhưng không có lịch. Auditor kiểm tra cấu trúc/cận của mốc cũ, đồng thời
+vẫn kiểm tra độc lập lịch của mọi lần chạy mới. Không gọi các lịch cũ trong
+CSV là đã được kiểm tra độc lập. Các đoạn tiếp theo mô tả riêng bộ JSON 150
+giây được giữ làm mốc chi phí phụ.
 
 Dữ liệu gốc nằm trong `results/conferences/`. Không sửa các JSON hoặc CSV trong
 thư mục này. Hai file sau giải thích và ghi lại kết quả kiểm tra:
@@ -151,8 +163,8 @@ SCREEN_DIR=results/aglr/<screen-run> \
 ## 3. Khóa cấu hình và chạy đủ 72 instance
 
 Chuẩn bị ba CSV Big-M CPLEX cho `finsteps123`, `infsteps180` và `cont`. Script
-nhận mẫu `results_bigm_<objective>_150s.csv` hoặc
-`MILP_BigM_CPLEX_<objective>_150s.csv`. File phải chứa `name`, `status`, `lb`,
+nhận mẫu `results_bigm_<objective>_120s.csv` hoặc
+`MILP_BigM_CPLEX_<objective>_120s.csv`. File phải chứa `name`, `status`, `lb`,
 `ub`, thời gian chạy và `valid`. Giá trị `valid=true` xác nhận lịch đã qua bộ
 kiểm tra nghiệm. `status=ok` chỉ được tính tối ưu khi `valid=true` và `lb`, `ub`
 khớp. CSV cũ thiếu `valid` chỉ dùng tham khảo, không dùng mở cổng submission.
@@ -168,7 +180,7 @@ originalA1,ok,11,11,0.446,true
 trạng thái tối ưu của CPLEX.
 
 ```bash
-FULL_TIMEOUT_SECS=150 \
+FULL_TIMEOUT_SECS=120 \
 CONFERENCE_RUNTIME_MODE=assumed-equivalent \
 CPLEX_RESULTS_DIR=/absolute/path/to/cplex_csv \
   bash run_aglr_experiments.sh full
@@ -219,8 +231,8 @@ với baseline. Không chạy lặp toàn bộ 72 instance ở giai đoạn đ�
 Auditor từ chối file thiếu, tên instance thừa/trùng, lịch sai, chi phí sai và
 kết quả MILP không có cận khớp. Theo tiêu chí hiện tại, AGLR chỉ qua cổng khi:
 
-- từng objective không thấp hơn kết quả hội nghị: 72/72, 68/72 và 58/72;
-- tổng coverage lớn hơn 198, tức có ít nhất 199 optimum được chứng minh;
+- từng objective không thấp hơn kết quả đã công bố: 72/72, 68/72 và 60/72;
+- tổng coverage lớn hơn 200, tức có ít nhất 201 optimum được chứng minh;
 - đủ MaxSAT-Journal, CSOnet, BigM-Gurobi và BigM-CPLEX;
 - không có `panic`, nghiệm sai hoặc lỗi dữ liệu.
 

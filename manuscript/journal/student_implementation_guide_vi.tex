@@ -130,6 +130,16 @@ giữ nguyên và sao lưu, dù thư mục này không được commit lên Git.
 
 \section{Kết quả hội nghị đã có và cách sử dụng}
 
+\textbf{Mốc chính là 120 giây.} Bản camera-ready và bài MaxSAT-DDD trước đó
+đều dùng 2 phút. Ba CSV
+\file{results/MaxSAT_Default_RC2_<objective>_120s.csv} ghi coverage
+$(72,68,60)$, tổng 200 optimum. Các CSV không có lịch, nên chỉ kiểm tra được
+chi phí và cận của mốc cũ. Mọi lịch do solver mới trả về vẫn phải được kiểm
+tra độc lập.
+
+Bộ JSON 150 giây dưới đây là một lượt chạy khác, được giữ để kiểm tra chi phí
+và chẩn đoán. Không lấy $(72,68,58)$ của bộ này thay cho bảng camera-ready.
+
 Dữ liệu CSOnet của bài hội nghị nằm trong
 \file{results/conferences/}. Dữ liệu được nhập nguyên trạng từ commit nguồn
 \code{c427a104c3c6f844e515efb7f898b684553b0f3f}. Đây là commit chứa file kết
@@ -492,8 +502,8 @@ Mỗi objective cần một file riêng. Giá trị \code{valid=true} phải do 
 trình kiểm tra lịch sinh ra, không được điền tay chỉ vì CPLEX báo tối ưu.
 
 Phần chạy tại repository gồm năm phương pháp, nên giai đoạn \code{full} có
-$5\times72\times3=1080$ lời gọi solver. Với timeout 150 giây, tổng timeout nội
-bộ tối đa là khoảng 45 giờ nếu chạy tuần tự. Lệnh giới hạn 6 giờ có thể dừng
+$5\times72\times3=1080$ lời gọi solver. Với timeout 120 giây, tổng timeout nội
+bộ tối đa là khoảng 36 giờ nếu chạy tuần tự. Lệnh giới hạn 6 giờ có thể dừng
 giữa chừng; chạy lại cùng \code{RUN\_ID} để tiếp tục. Dữ liệu CPLEX được nhập vào, không
 được tính trong 1080 lời gọi này.
 
@@ -536,8 +546,8 @@ AGLR chỉ đạt yêu cầu khi đồng thời có:
 
 \begin{itemize}
 \item không có lịch sai, sai chi phí, panic, tiến trình crash hoặc file thiếu;
-\item coverage từng objective không thấp hơn $(72,68,58)$ của hội nghị;
-\item tổng coverage ít nhất 199, so với 198 của hội nghị; PAR-2 dùng khi
+\item coverage từng objective không thấp hơn $(72,68,60)$ của camera-ready;
+\item tổng coverage ít nhất 201, so với 200 của hội nghị; PAR-2 dùng khi
       các cấu hình có cùng coverage;
 \item đủ bốn baseline: MaxSAT-DDD tạp chí trước, CSOnet, Big-M Gurobi và
       Big-M CPLEX.
@@ -559,7 +569,7 @@ CYCLE_ID=cycle-new bash run_aglr_research_cycle.sh
 Script thử Control và năm biến thể. Mỗi biến thể chỉ đổi một thành phần:
 rescue, chu kỳ heuristic, ngưỡng gap, lọc trùng hoặc giới hạn objective.
 Ba cấu hình tốt nhất chạy tiếp ở 120 giây; một cấu hình được khóa để chạy
-đủ 72 instance ở 150 giây. Nếu vượt coverage, script chạy ba lượt xác nhận.
+đủ 72 instance ở 120 giây. Nếu vượt coverage, script chạy ba lượt xác nhận.
 Khi bị ngắt, dùng lại đúng \code{CYCLE\_ID}, commit và binary.
 
 Giới hạn objective dùng chi phí $c_i$ và biến Boolean $z_i$ của mô hình:

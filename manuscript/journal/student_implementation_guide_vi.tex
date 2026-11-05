@@ -739,6 +739,36 @@ ba lượt hợp lệ và so với vét cạn trên bài ba tàu ở cả ba obj
 Sinh viên cần báo coverage, PAR-2, số bộ ba, số biến và thời gian SAT;
 chưa kết luận cải thiện chỉ từ việc số mệnh đề tăng.
 
+\subsection{Phương án dự phòng: dùng lịch tốt nhất để giới hạn chi phí}
+
+Nếu đã có lịch hợp lệ chi phí $U$, không cần tìm lịch đắt hơn $U$ để chứng
+minh tối ưu. Gọi $x_\ell$ là một điều kiện phải trả chi phí và $w_\ell$ là
+trọng số ban đầu của nó. Thêm vào SAT:
+\[
+F_k=\sum_{\ell\in T_k} w_\ell x_\ell\le U,
+\]
+trong đó $T_k$ gồm các hạng tử chi phí DDD đã tạo. Chẳng hạn, với hai hạng
+tử trọng số 3 và 4, cận $U=5$ không cho phép chọn cả hai; cận $U=7$ cho phép.
+Khi DDD tạo hạng tử mới, thêm nó vào tổng. Khi tìm được lịch hợp lệ tốt hơn,
+giảm $U$. Không lấy chi phí hội nghị làm cận đầu vào cho solver.
+
+Dùng trọng số ban đầu, không dùng trọng số còn lại sau khi RC2 đã xử lý một
+mâu thuẫn. Mỗi hạng tử chỉ được cộng một lần. Mã hiện có biểu diễn tổng bằng
+các bit nhị phân, nên không cần tạo một biến cho mỗi đơn vị chi phí. RC2
+vẫn tìm optimum như trước; điều kiện mới chỉ bỏ các lựa chọn đắt hơn lịch
+đã biết. Chỉ giảm cận bằng một lịch đã kiểm tra đầy đủ để giữ nghiệm tối ưu.
+
+Phép thử dự phòng là \code{EXPERIMENT\_SET=bounds}; đối chứng là orders cũ,
+cấu hình mới là \code{orders-bound}. Giữ cây chi phí cũ và tắt điều kiện bộ
+ba để đo riêng tác động của cận. Cờ trực tiếp là
+\code{--maxsat-ladder-sc-use-objective-bound true}; mặc định tắt. Cần kiểm
+tra lại trên Linux trước khi chạy, gồm bảng chân trị, giảm cận, thêm hạng tử
+không theo thứ tự và optimum vét cạn ở cả ba objective. Theo dõi số hạng tử,
+số lần giảm cận và thời gian tạo điều kiện qua các trường
+\code{maxsat\_objective\_bound\_terms},
+\code{maxsat\_objective\_bound\_updates},
+\code{maxsat\_objective\_bound\_time}.
+
 Mỗi vòng chỉ thay đổi một thành phần. Đọc telemetry trước khi sửa:
 
 \begin{tabularx}{\textwidth}{@{}p{50mm}X@{}}
@@ -753,8 +783,8 @@ bảng chân trị và vét cạn trước khi bật giới hạn objective. \\
 \bottomrule
 \end{tabularx}
 
-Không bật \code{BinaryObjective} trong chiến dịch đầu. Đây là bước mở rộng dự
-phòng và chỉ được dùng sau khi có kiểm thử riêng. Khi thay đổi phương pháp, chạy
+Không bật \code{BinaryObjective} trong chiến dịch đầu. Phép thử cận nêu trên
+là bước mở rộng sau đó và chỉ được dùng sau khi có kiểm thử riêng. Khi thay đổi phương pháp, chạy
 lại \code{screen}; không dùng kết quả của hai phiên bản mã như cùng một cấu hình.
 Báo cáo mỗi vòng phải ghi commit, máy, phiên bản solver, giai đoạn, thư mục kết
 quả, cấu hình đứng đầu và mọi lỗi trong \file{aglr_audit.json}.

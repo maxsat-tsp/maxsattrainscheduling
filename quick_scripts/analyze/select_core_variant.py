@@ -16,10 +16,15 @@ def variant_for(row: dict) -> str:
     sparse = row.get("sparse_costs") == "true"
     orders = row.get("resource_orders") == "true"
     transitive = row.get("order_transitivity") == "true"
+    bound = row.get("objective_bound") == "true"
+    if bound and (not orders or sparse or transitive):
+        raise ValueError("objective-bound trial requires the explicitly tested orders configuration")
     if transitive and (not orders or sparse):
         raise ValueError("transitivity requires orders and an explicitly tested cost configuration")
-    if (sparse or orders or transitive) and row["assumptions"] != "legacy":
+    if (sparse or orders or transitive or bound) and row["assumptions"] != "legacy":
         raise ValueError("combined mechanisms require an explicit new variant")
+    if bound:
+        return "orders-bound"
     if transitive:
         return "orders-transitive"
     if orders:
@@ -43,7 +48,7 @@ def select(rows: list[dict], audit: dict) -> dict:
         if len(variants) != 1:
             raise ValueError(f"{tag}: objective rows have different variants")
         variant = variants.pop()
-        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive"}:
+        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive", "orders-bound"}:
             raise ValueError(f"unsupported variant {variant}")
         par2 = sum(float(r["par2_seconds"]) for r in items)
         if not math.isfinite(par2) or par2 < 0:

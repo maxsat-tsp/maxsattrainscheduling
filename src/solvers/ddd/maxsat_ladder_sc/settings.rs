@@ -106,6 +106,8 @@ pub struct MaxSatDddLadderScSettings {
     pub resource_orders: bool,
     /// Close three-way cycles only among resource-order bits already created.
     pub order_transitivity: bool,
+    /// Restrict original weighted cost terms by a verified feasible upper bound.
+    pub use_objective_bound: bool,
     pub use_precedence_graph: bool,
     pub use_sc_amo: bool,
     pub use_touched_clique_amo: bool,
@@ -131,6 +133,7 @@ impl Default for MaxSatDddLadderScSettings {
             sparse_costs: false,
             resource_orders: false,
             order_transitivity: false,
+            use_objective_bound: false,
             use_precedence_graph: true,
             use_eager_chain_expansion: false,
             use_sc_amo: true,

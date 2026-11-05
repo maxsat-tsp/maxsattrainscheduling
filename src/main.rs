@@ -126,6 +126,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_order_transitivity: Option<bool>,
 
+    /// Bound original weighted costs by the best verified schedule (default false).
+    #[structopt(long)]
+    maxsat_ladder_sc_use_objective_bound: Option<bool>,
+
     /// AGLR refinement policy: legacy, all-scanned, or adaptive.
     #[structopt(long)]
     aglr_policy: Option<String>,
@@ -569,6 +573,7 @@ fn main() {
         sparse_costs: opt.maxsat_ladder_sc_sparse_costs.unwrap_or(false),
         resource_orders: opt.maxsat_ladder_sc_resource_orders.unwrap_or(false),
         order_transitivity: opt.maxsat_ladder_sc_order_transitivity.unwrap_or(false),
+        use_objective_bound: opt.maxsat_ladder_sc_use_objective_bound.unwrap_or(false),
         assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
             "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
             "full" => maxsat_ladder_sc::AssumptionStrategy::Full,

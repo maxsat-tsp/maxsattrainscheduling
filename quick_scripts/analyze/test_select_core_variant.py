@@ -46,6 +46,21 @@ class SelectionTests(unittest.TestCase):
                           + rows("geom", "geometric", (24, 22, 19)), {"errors": []})
         self.assertIsNone(decision["selected"])
 
+    def test_objective_bound_does_not_silently_combine_with_other_trials(self):
+        source = rows("bound", "legacy", (24, 22, 20))
+        for row in source:
+            row["objective_bound"] = "true"
+        with self.assertRaises(ValueError):
+            select(source, {"errors": []})
+        for row in source:
+            row["resource_orders"] = "true"
+        self.assertEqual(select(source, {"errors": []})["selected"]["variant"], "orders-bound")
+        for extra in ("sparse_costs", "order_transitivity"):
+            source[0][extra] = "true"
+            with self.assertRaises(ValueError):
+                select(source, {"errors": []})
+            del source[0][extra]
+
     def test_coverage_precedes_speed_and_equal_coverage_uses_par2(self):
         result = select(rows("full", "full", (24, 22, 20), 1)
                         + rows("geom", "geometric", (24, 23, 20), 100), {"errors": []})

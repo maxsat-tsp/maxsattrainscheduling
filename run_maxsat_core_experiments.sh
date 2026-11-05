@@ -13,7 +13,7 @@ RESULTS_ROOT="${RESULTS_ROOT:-results/aglr}"
 BIN="${BIN:-./target/release/ddd}"
 SCREEN_PARALLELISM="${SCREEN_PARALLELISM:-2}"
 EXPERIMENT_SET="${EXPERIMENT_SET:-assumptions}"
-[[ "$EXPERIMENT_SET" =~ ^(assumptions|costs|orders|orders-sparse|transitivity)$ ]] || exit 2
+[[ "$EXPERIMENT_SET" =~ ^(assumptions|costs|orders|orders-sparse|transitivity|bounds)$ ]] || exit 2
 [[ "$SCREEN_PARALLELISM" =~ ^[1-9][0-9]*$ ]] || exit 2
 development="origA3 trackA3 stationA3 origA6 trackA6 stationA6 origA9 trackA9 stationA9 origA12 trackA12 stationA12 origB3 trackB3 stationB3 origB6 trackB6 stationB6 origB9 trackB9 stationB9 origB12 trackB12 stationB12"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
@@ -29,6 +29,7 @@ if [[ "$mode" == screen ]]; then
     [[ "$EXPERIMENT_SET" != orders ]] || strategies=(legacy orders)
     [[ "$EXPERIMENT_SET" != orders-sparse ]] || strategies=(orders-sparse)
     [[ "$EXPERIMENT_SET" != transitivity ]] || strategies=(orders orders-transitive)
+    [[ "$EXPERIMENT_SET" != bounds ]] || strategies=(orders orders-bound)
     cutoff=30
     instances="$development"
     parallelism="$SCREEN_PARALLELISM"
@@ -38,6 +39,7 @@ elif [[ "$mode" == promote ]]; then
     [[ "$EXPERIMENT_SET" != orders ]] || strategies=(orders)
     [[ "$EXPERIMENT_SET" != orders-sparse ]] || strategies=(orders-sparse)
     [[ "$EXPERIMENT_SET" != transitivity ]] || strategies=(orders-transitive)
+    [[ "$EXPERIMENT_SET" != bounds ]] || strategies=(orders-bound)
     cutoff=120
     instances="$development"
     parallelism=1
@@ -60,10 +62,9 @@ current_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True
 binary_hash = hashlib.sha256(pathlib.Path(sys.argv[2]).read_bytes()).hexdigest()
 if values["git_commit"] != current_commit or values["binary_sha256"] != binary_hash:
     raise SystemExit("ERROR: repeats must use the original full-candidate source and binary")
-print("orders-transitive" if values.get("order_transitivity") == "true" else
-      "orders-sparse" if values.get("resource_orders") == "true" and values.get("sparse_costs") == "true" else
-      "orders" if values.get("resource_orders") == "true" else
-      "sparse" if values.get("sparse_costs") == "true" else values["assumptions"])
+sys.path.insert(0, "quick_scripts/analyze")
+from select_core_variant import variant_for
+print(variant_for(values))
 PY
 )"
     strategies=("$selected_variant")
@@ -75,8 +76,8 @@ fi
 
 run_strategy() {
     local strategy="$1" tag="${2:-Core-$1}"
-    [[ "$strategy" =~ ^(legacy|full|geometric|sparse|orders|orders-sparse|orders-transitive)$ ]] || exit 2
-    local assumptions="$strategy" sparse_costs=false resource_orders=false order_transitivity=false
+    [[ "$strategy" =~ ^(legacy|full|geometric|sparse|orders|orders-sparse|orders-transitive|orders-bound)$ ]] || exit 2
+    local assumptions="$strategy" sparse_costs=false resource_orders=false order_transitivity=false objective_bound=false
     if [[ "$strategy" == sparse ]]; then
         assumptions=legacy
         sparse_costs=true
@@ -95,20 +96,25 @@ run_strategy() {
         resource_orders=true
         order_transitivity=true
     fi
+    if [[ "$strategy" == orders-bound ]]; then
+        assumptions=legacy
+        resource_orders=true
+        objective_bound=true
+    fi
     [[ "$mode" != candidate ]] || tag=AGLR
     local dir="$root/$tag"
     mkdir -p "$dir"
     # Exact match on resume; never mix a configuration with earlier outputs.
-    python3 - "$dir/config.txt" "$tag" "$assumptions" "$cutoff" "$instances" "$BIN" "$parallelism" "$sparse_costs" "$resource_orders" "$order_transitivity" <<'PY'
+    python3 - "$dir/config.txt" "$tag" "$assumptions" "$cutoff" "$instances" "$BIN" "$parallelism" "$sparse_costs" "$resource_orders" "$order_transitivity" "$objective_bound" <<'PY'
 import hashlib
 import pathlib
 import subprocess
 import sys
 path = pathlib.Path(sys.argv[1])
-tag, strategy, cutoff, instances, binary, parallelism, sparse_costs, resource_orders, order_transitivity = sys.argv[2:]
+tag, strategy, cutoff, instances, binary, parallelism, sparse_costs, resource_orders, order_transitivity, objective_bound = sys.argv[2:]
 values = dict(tag=tag, kind="exact", solver="maxsat_ddd_ladder_sc", policy="legacy",
               assumptions=strategy, sparse_costs=sparse_costs, resource_orders=resource_orders,
-              order_transitivity=order_transitivity, timeout_seconds=cutoff,
+              order_transitivity=order_transitivity, objective_bound=objective_bound, timeout_seconds=cutoff,
               instances=",".join(instances.split()), process_exit_required="true",
               git_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
               binary_sha256=hashlib.sha256(pathlib.Path(binary).read_bytes()).hexdigest(),
@@ -128,6 +134,7 @@ PY
         MAXSATDDD_ASSUMPTIONS="$assumptions" MAXSATDDD_SPARSE_COSTS="$sparse_costs" \
         MAXSATDDD_RESOURCE_ORDERS="$resource_orders" \
         MAXSATDDD_ORDER_TRANSITIVITY="$order_transitivity" \
+        MAXSATDDD_OBJECTIVE_BOUND="$objective_bound" \
         JSON_OUT="$dir/$objective.json" RUN_LOG_DIR="$dir/$objective.logs" \
             bash quick_scripts/run_all_txt_instances_limited.sh
     done

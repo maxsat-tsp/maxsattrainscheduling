@@ -83,6 +83,9 @@ pub struct SolveStats {
     pub resource_order_pairs: usize,
     pub resource_order_rows: usize,
     pub resource_order_triangles: usize,
+    pub core_literals: usize,
+    pub max_core_size: usize,
+    pub unit_weight_cores: usize,
     pub n_sat: usize,
     pub n_unsat: usize,
     pub n_travel: usize,
@@ -892,6 +895,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             "resource-order experiments currently require legacy refinement");
     assert!(!settings.order_transitivity || settings.resource_orders,
             "order transitivity requires resource-order decisions");
+    let use_objective_bound = settings.use_objective_bound
+        || (settings.aglr.use_objective_bound && settings.aglr.policy != RefinementPolicy::Legacy);
 
     output_stats(
         "aglr_policy".to_string(),
@@ -924,6 +929,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_sparse_costs".to_string(), settings.sparse_costs.into());
     output_stats("maxsat_resource_orders".to_string(), settings.resource_orders.into());
     output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
+    output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -1110,9 +1116,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
     let mut aglr_history = CandidateHistory::default();
     let mut aglr_telemetry = AglrTelemetry::default();
-    let mut binary_objective = if settings.aglr.use_objective_bound
-        && settings.aglr.policy != RefinementPolicy::Legacy
-    {
+    let mut binary_objective = if use_objective_bound {
         let upper = best_heur.as_ref().ok_or_else(|| SolverError::InvalidSolution(
             "objective bound requires a verified initial feasible schedule".to_string()
         ))?.0;
@@ -1177,7 +1181,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
                 while let Ok((ub_cost, ub_sol)) = sol_rx.try_recv() {
                     if ub_cost < total_cost as i32 {
-                        if settings.aglr.policy != RefinementPolicy::Legacy {
+                        if settings.aglr.policy != RefinementPolicy::Legacy || use_objective_bound {
                             return Err(SolverError::InvalidSolution(format!(
                                 "verified AGLR heuristic upper bound {} is below lower bound {}",
                                 ub_cost, total_cost
@@ -1587,7 +1591,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     panic!()
                 };
 
-                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders {
+                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders || use_objective_bound {
                     let validation_start = Instant::now();
                     let verified_cost = problem.verify_solution(&trains, delay_cost_type);
                     aglr_telemetry.final_validation_time += validation_start.elapsed();
@@ -1986,6 +1990,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
             let min_weight = core.iter().map(|c| soft_constraints[c].1).min().unwrap();
             assert!(min_weight >= 1);
+            stats.core_literals += core.len();
+            stats.max_core_size = stats.max_core_size.max(core.len());
+            stats.unit_weight_cores += usize::from(min_weight == 1);
 
             for c in core.iter() {
                 let (soft, cost, original_cost) = soft_constraints.remove(c).unwrap();
@@ -2088,6 +2095,12 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_resource_order_pairs".to_string(), stats.resource_order_pairs.into());
     output_stats("maxsat_resource_order_rows".to_string(), stats.resource_order_rows.into());
     output_stats("maxsat_resource_order_triangles".to_string(), stats.resource_order_triangles.into());
+    output_stats("maxsat_core_literals".to_string(), stats.core_literals.into());
+    output_stats("maxsat_core_max_size".to_string(), stats.max_core_size.into());
+    output_stats("maxsat_unit_weight_cores".to_string(), stats.unit_weight_cores.into());
+    output_stats("maxsat_objective_bound_terms".to_string(), aglr.objective_bound_terms.into());
+    output_stats("maxsat_objective_bound_updates".to_string(), aglr.objective_bound_updates.into());
+    output_stats("maxsat_objective_bound_time".to_string(), aglr.objective_bound_time.as_secs_f64().into());
     output_stats(
         "objective_iters".to_string(),
         (*iteration_types.get(&IterationType::Objective).unwrap_or(&0)).into(),
@@ -2530,15 +2543,25 @@ mod aglr_end_to_end_tests {
             assert_ne!(optimum, i32::MAX);
             for transitivity in [false, true] {
                 for sparse in [false, true] {
+                  for use_bound in [false, true] {
                     let mut settings = MaxSatDddLadderScSettings::default();
                     settings.resource_orders = true;
                     settings.order_transitivity = transitivity;
                     settings.sparse_costs = sparse;
+                    settings.use_objective_bound = use_bound;
+                    let mut telemetry = BTreeMap::new();
                     let (solution, _) = solve_with_settings(
                         &quiet_env, satcoder::solvers::minisat::Solver::new(),
-                        &problem, 30.0, objective, settings, |_, _| {},
+                        &problem, 30.0, objective, settings, |key, value| {
+                            telemetry.insert(key, value);
+                        },
                     ).unwrap();
                     assert_eq!(problem.verify_solution(&solution, objective), Some(optimum));
+                    if use_bound {
+                        assert!(telemetry["maxsat_objective_bound"].as_bool().unwrap());
+                        assert!(telemetry["maxsat_objective_bound_terms"].as_u64().unwrap() > 0);
+                    }
+                  }
                 }
             }
         }

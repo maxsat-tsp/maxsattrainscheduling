@@ -495,3 +495,26 @@ dịch lại. Kiểm thử CLI cũ `samescore_all_instances` cần
 `instances/Instance3.xml`, `Instance4.xml`, `Instance5.xml`; các file này
 không có trong checkout, nên lượt `cargo test --bin ddd` còn lỗi thiếu
 fixture. Không gọi đây là kết quả toàn bộ test suite đã qua.
+
+## Phương án dự phòng: giới hạn tổng chi phí bằng nghiệm hợp lệ
+
+`EXPERIMENT_SET=bounds` so orders với orders-bound. Cách mới thêm điều kiện
+`sum(original_weight * cost_literal) <= verified_UB`, dùng bộ mã nhị phân
+`BinaryObjective` đã có. Mỗi hạng tử gốc chỉ thêm một lần; không dùng trọng
+số RC2 đã bị giảm và không đưa đáp án hội nghị vào solver. Khi có lịch hợp
+lệ tốt hơn thì giảm UB. Cây chi phí và giả định vẫn là `legacy`; không kết
+hợp thêm điều kiện bộ ba trong phép thử này.
+
+Cờ mới `--maxsat-ladder-sc-use-objective-bound true` mặc định tắt.
+Config, fingerprint, manifest và auditor đều ghi/kiểm tra cờ này. Theo dõi
+`maxsat_objective_bound_terms`, `maxsat_objective_bound_updates`,
+`maxsat_objective_bound_time`, số biến/mệnh đề và coverage. Phải chạy lại
+kiểm thử Linux trước khi khởi động vòng bounds. Việc kiểm thử được xếp sau
+vòng transitivity để tránh ảnh hưởng phép đo runtime.
+
+Telemetry cũng ghi kích thước các tập điều kiện chi phí gây mâu thuẫn:
+`maxsat_core_literals` là tổng số điều kiện qua các lần xử lý,
+`maxsat_core_max_size` là kích thước lớn nhất, và
+`maxsat_unit_weight_cores` đếm các lần chỉ tăng được cận dưới một đơn vị.
+Các số này giúp quyết định có cần thu nhỏ tập mâu thuẫn ở vòng sau; chưa
+thay đổi cách RC2 xử lý chúng trong vòng bounds.

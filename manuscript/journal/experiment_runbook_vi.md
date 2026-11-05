@@ -4,7 +4,58 @@ Mốc chính đã được sửa theo camera-ready: **120 giây**, MaxSAT-Defaul
 `(72,68,60)`, tổng 200 optimum. Dùng ba CSV
 `results/MaxSAT_Default_RC2_<objective>_120s.csv`. Bộ JSON trong
 `results/conferences/` là lượt chạy khác ở 150 giây, chỉ còn dùng để chẩn đoán.
-Không cắt, đổi nhãn hoặc trộn lượt 150 giây thành kết quả 120 giây.
+Có thể dùng lại lượt 150 giây bằng cách tạo bảng dẫn xuất ở cutoff 120 giây.
+Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt chạy lại.
+
+## Tái sử dụng dữ liệu 150 giây ở cutoff 120 giây
+
+Với cùng cách đo `total_time` theo giây, lịch tối ưu hoàn tất trong 120 giây
+được giữ. Lịch hoàn tất sau 120 giây và các ca còn timeout được tính chưa giải
+được ở cutoff mới; PAR-2 phạt mỗi ca đó 240 giây. Không đổi panic/segfault
+thành timeout. Không chọn kết quả tốt nhất của nhiều lượt rồi gọi là một lượt.
+
+```bash
+python3 quick_scripts/analyze/censor_results.py \
+  results/conferences results/aglr/reused150-at120/CSOnet-censored \
+  --cutoff 120 --pattern 'MaxsatScDefault_{objective}.json'
+python3 quick_scripts/analyze/audit_aglr_campaign.py \
+  results/aglr/reused150-at120 --timeout 120 \
+  --conference-reference results --conference-profile published-csv-120 \
+  --conference-runtime-mode assumed-equivalent
+```
+
+Script kiểm tra độc lập nghiệm gốc, lưu hash đầu vào và tạo
+`censor_manifest.json`. Các ca bị cắt không giữ LB/UB hoặc lịch chỉ có sau
+cutoff; nếu không có log tại giây 120 thì gap tại 120 được để là chưa biết.
+`--allow-partial` dùng lại những objective đã có, nhưng không biến dữ liệu
+thiếu thành timeout hoặc thành kết quả đầy đủ 72 instance.
+
+Bộ JSON 150 giây đã nhập cho kết quả dẫn xuất `(72,68,57)`; PAR-2 là
+`0.120001`, `15.240171`, `53.547450` giây. `trackB4/cont` hoàn tất ở
+123.462673 giây nên được chuyển thành timeout. Mốc camera-ready `(72,68,60)`
+vẫn được giữ riêng làm kết quả đã công bố.
+
+## CPLEX đã cài trên VM
+
+CPLEX Optimization Studio 22.2.0 nằm tại
+`~/opt/ibm/ILOG/CPLEX_Studio2220`. Trong môi trường Conda `gurobi`, có cả lệnh
+`cplex`, `cpoptimizer` và Python API `cplex`. Python API đã được nâng cấp từ
+bản academic bằng `docplex config --upgrade`; thư viện native trùng hash với
+bộ cài IBM. Cả CLI và Python đã giải thành công bài 1201 biến, vượt ngưỡng
+Community, với objective kiểm tra bằng 1201.
+
+```bash
+source "$HOME/miniconda3/etc/profile.d/conda.sh"
+conda activate gurobi
+cplex -c quit
+python -c 'import cplex; print(cplex.Cplex().get_version())'
+```
+
+Script `quick_scripts/setup/download_ibm_academic.py` tải bộ cài bằng tùy chọn
+HTTP của cổng IBM. URL có ticket chỉ truyền lúc chạy; không lưu vào Git hoặc
+manifest. Manifest bộ cài và log kiểm tra nằm ở `~/installers/` và
+`~/projects/experiment-audit/cplex-install/`. Việc cài xong chưa thay thế các
+CSV CPLEX cần có lịch được kiểm tra và cận khớp cho bảng submission.
 
 ## Trạng thái
 

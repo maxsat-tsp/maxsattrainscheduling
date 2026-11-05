@@ -82,7 +82,21 @@ và bài toán nhỏ vét cạn. Bộ kiểm thử Linux có 25 Rust tests; bộ
 sửa profile 120 giây có 16 tests.
 Chưa điền số AGLR mới vào Abstract, Results hoặc Conclusion.
 
-CPLEX trên VM chưa có; các CSV CPLEX cũ là 120 giây nhưng thiếu lịch/\`valid\`.
-Cổng submission đầy đủ cần nghiệm được kiểm tra và cận khớp. Không yêu cầu
-chạy CPLEX 150 giây. Liên kết IBM Academic đã được cung cấp; đây là cổng web
-chứ chưa phải file cài đặt Linux.
+## CPLEX và tái sử dụng dữ liệu đã hoàn tất
+
+Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio
+22.2.0 cho Linux x86-64 (part `M113NML`). Cài tại
+`~/opt/ibm/ILOG/CPLEX_Studio2220`; CLI và Python API đều chạy trong Conda
+environment `gurobi`. `docplex config --upgrade` đã dùng thư viện từ bản cài
+academic; native library và Python library có cùng SHA-256. CLI giải bài 1201
+biến/1201 ràng buộc, Python giải bài 1201 biến, cả hai cho optimum 1201.
+
+Installer SHA-256:
+`34963192dabe3b5fad22272a3b10a8207629c5674766da1b345f858d2d667f1b`.
+Ticket và signed download URL không được đưa vào manifest hoặc Git.
+
+Đã thêm phép cắt cutoff 150 xuống 120 giây, có kiểm tra nghiệm và hash nguồn.
+Kết quả từ bộ JSON nhập là `(72,68,57)`, PAR-2 `(0.120001,15.240171,53.547450)`
+giây. `trackB4/cont` mất 123.462673 giây nên bị chuyển thành timeout. LB/UB
+sau cutoff được bỏ khỏi các ca bị cắt. Các CSV CPLEX cũ vẫn thiếu lịch/`valid`;
+cài xong phần mềm chưa có nghĩa đã hoàn tất bảng thực nghiệm CPLEX mới.

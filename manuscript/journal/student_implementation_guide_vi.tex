@@ -139,6 +139,15 @@ tra độc lập.
 
 Bộ JSON 150 giây dưới đây là một lượt chạy khác, được giữ để kiểm tra chi phí
 và chẩn đoán. Không lấy $(72,68,58)$ của bộ này thay cho bảng camera-ready.
+Vẫn có thể tái sử dụng lượt này tại cutoff 120 giây: giữ optimum hoàn tất
+trong 120 giây; ca hoàn tất muộn hơn được tính timeout và nhận phạt PAR-2
+bằng 240 giây. Script \file{quick_scripts/analyze/censor_results.py} tạo bảng
+dẫn xuất, giữ nguyên dữ liệu gốc và hash nguồn. Nếu không có log tại giây
+120, không dùng LB/UB cuối ở giây 150 để tính gap ở giây 120.
+
+Bộ dữ liệu này sau quy đổi cho $(72,68,57)$; riêng \code{trackB4/cont} hoàn
+tất ở 123.46 giây nên không còn được tính tối ưu tại 120 giây. Bảng dẫn xuất
+được báo riêng với mốc camera-ready $(72,68,60)$, không gọi là một lượt chạy mới.
 
 Dữ liệu CSOnet của bài hội nghị nằm trong
 \file{results/conferences/}. Dữ liệu được nhập nguyên trạng từ commit nguồn

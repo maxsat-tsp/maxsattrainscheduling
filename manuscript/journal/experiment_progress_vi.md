@@ -144,6 +144,12 @@ phí 23 và 98, nên không dùng hai cận CPLEX này làm oracle. Báo cáo �
 `reviews/published_baselines_20261105/README.md`; dữ liệu gốc giữ nguyên.
 Việc này không dừng các vòng cải tiến SAT đang chạy.
 
+Đã chuẩn bị phép thử thứ ba: dùng chung biến thứ tự qua các mốc của một cặp
+xung đột. Chỉ tạo biến cho cặp đã xung đột; refinement CSOnet, cách gửi điều
+kiện và cây chi phí cũ được giữ làm đối chứng. 31 Rust tests đã qua, gồm
+bảng chân trị tương đương mệnh đề cũ ở một mốc, tính đúng khi dùng nhiều
+mốc và bài lịch tàu nhỏ vét cạn. Chỉ chạy sau khi xem kết quả vòng chi phí.
+
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 
 Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio

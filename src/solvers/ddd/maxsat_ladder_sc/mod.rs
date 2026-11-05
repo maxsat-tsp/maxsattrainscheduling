@@ -16,6 +16,7 @@
 
 mod aglr;
 mod precedence;
+mod resource_orders;
 mod sc_amo;
 mod settings;
 mod solve;

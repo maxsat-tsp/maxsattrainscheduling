@@ -144,6 +144,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append("maxsat_assumptions differs from the locked configuration")
             if "sparse_costs" in config and str(solve.get("maxsat_sparse_costs")).lower() != config["sparse_costs"].lower():
                 errors.append("maxsat_sparse_costs differs from the locked configuration")
+            if "resource_orders" in config and str(solve.get("maxsat_resource_orders")).lower() != config["resource_orders"].lower():
+                errors.append("maxsat_resource_orders differs from the locked configuration")
             if config.get("process_exit_required") == "true" and config.get("policy") in {"adaptive", "all-scanned"}:
                 for key in ("policy", "min_growth", "fraction", "max_wait", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound", "filter_duplicates"):
                     if key not in config:
@@ -286,6 +288,7 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
                 "filter_duplicates": config.get("filter_duplicates", "false"),
                 "assumptions": config.get("assumptions", "legacy"),
                 "sparse_costs": config.get("sparse_costs", "false"),
+                "resource_orders": config.get("resource_orders", "false"),
                 "conference_coverage": "",
                 "coverage_delta": "",
                 "conference_par2_seconds": "",

@@ -11,6 +11,17 @@ def rows(tag, variant, coverage, par2=10):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_sparse_and_order_variants_are_preserved_without_silent_combination(self):
+        for field, variant in (("sparse_costs", "sparse"), ("resource_orders", "orders")):
+            source = rows(variant, "legacy", (24, 22, 20))
+            for row in source:
+                row[field] = "true"
+            self.assertEqual(select(source, {"errors": []})["selected"]["variant"], variant)
+            for row in source:
+                row["sparse_costs"] = row["resource_orders"] = "true"
+            with self.assertRaises(ValueError):
+                select(source, {"errors": []})
+
     def test_does_not_combine_different_winners_or_promote_regression(self):
         decision = select(rows("full", "full", (24, 21, 21))
                           + rows("geom", "geometric", (24, 22, 19)), {"errors": []})

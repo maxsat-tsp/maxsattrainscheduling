@@ -24,11 +24,16 @@ def select(rows: list[dict], audit: dict) -> dict:
             raise ValueError(f"{tag}: expected exactly three objective rows")
         if any(int(r["instances"]) != 24 for r in items):
             raise ValueError(f"{tag}: expected the locked 24-instance development set")
-        variants = {"sparse" if r.get("sparse_costs") == "true" else r["assumptions"] for r in items}
+        for row in items:
+            mechanisms = int(row.get("sparse_costs") == "true") + int(row.get("resource_orders") == "true")
+            if mechanisms > 1 or (mechanisms and row["assumptions"] != "legacy"):
+                raise ValueError(f"{tag}: combined mechanisms require an explicit new variant")
+        variants = {"orders" if r.get("resource_orders") == "true" else
+                    "sparse" if r.get("sparse_costs") == "true" else r["assumptions"] for r in items}
         if len(variants) != 1:
             raise ValueError(f"{tag}: objective rows have different variants")
         variant = variants.pop()
-        if variant not in {"legacy", "full", "geometric", "sparse"}:
+        if variant not in {"legacy", "full", "geometric", "sparse", "orders"}:
             raise ValueError(f"unsupported variant {variant}")
         par2 = sum(float(r["par2_seconds"]) for r in items)
         if not math.isfinite(par2) or par2 < 0:

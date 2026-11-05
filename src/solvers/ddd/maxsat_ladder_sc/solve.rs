@@ -80,6 +80,8 @@ pub struct SolveStats {
     pub sat_calls: usize,
     pub partial_sat_calls: usize,
     pub cost_terms: usize,
+    pub resource_order_pairs: usize,
+    pub resource_order_rows: usize,
     pub n_sat: usize,
     pub n_unsat: usize,
     pub n_travel: usize,
@@ -885,6 +887,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         "AGLR fraction must be finite and between zero and one"
     );
     assert!(settings.aglr.max_wait > 0, "AGLR max_wait must be positive");
+    assert!(!settings.resource_orders || settings.aglr.policy == RefinementPolicy::Legacy,
+            "resource-order experiments currently require legacy refinement");
 
     output_stats(
         "aglr_policy".to_string(),
@@ -915,6 +919,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("aglr_filter_duplicates".to_string(), settings.aglr.filter_duplicates.into());
     output_stats("maxsat_assumptions".to_string(), settings.assumption_strategy.as_str().into());
     output_stats("maxsat_sparse_costs".to_string(), settings.sparse_costs.into());
+    output_stats("maxsat_resource_orders".to_string(), settings.resource_orders.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -1005,6 +1010,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     // Rows already added for fixed-precedence encoding: (visit_id, time).
     let mut fixed_prec_rows: HashSet<(VisitId, i32)> = HashSet::new();
     let mut encoded_refinement_clauses = HashSet::<AglrClauseKey>::new();
+    let mut resource_orders = super::resource_orders::ResourceOrders::new();
 
     // Optional: seed fixed-precedence (travel-time) constraints from the earliest
     // time points to reduce the number of "travel-time conflict" iterations.
@@ -1433,11 +1439,27 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                                     .map(|v| occupations[v].delays[occupations[v].incumbent_idx].0)
                                     .unwrap_or_else(|| true.into());
 
-                                n_conflict_constraints += 1;
-                                SatInstance::add_clause(
-                                    &mut solver,
-                                    vec![!t1_out_lit, !t2_out_lit, delay_t1, delay_t2],
-                                );
+                                if settings.resource_orders {
+                                    // A last visit has no next-time variable: its exit
+                                    // threshold is guarded by its own entry threshold.
+                                    let first_guard = next_visit.map(|_| t1_out_lit)
+                                        .unwrap_or(occupations[visit_id].delays[occupations[visit_id].incumbent_idx].0);
+                                    let second_guard = other_next_visit.map(|_| t2_out_lit)
+                                        .unwrap_or(occupations[other_visit].delays[occupations[other_visit].incumbent_idx].0);
+                                    let (created, rows) = resource_orders.add(
+                                        &mut solver, visit_id.0, other_visit.0, t1_out, t2_out,
+                                        first_guard, second_guard, delay_t1, delay_t2,
+                                    );
+                                    stats.resource_order_pairs += usize::from(created);
+                                    stats.resource_order_rows += rows;
+                                    n_conflict_constraints += rows;
+                                } else {
+                                    n_conflict_constraints += 1;
+                                    SatInstance::add_clause(
+                                        &mut solver,
+                                        vec![!t1_out_lit, !t2_out_lit, delay_t1, delay_t2],
+                                    );
+                                }
 
                                 // Touched-clique-AMO aggregation: record
                                 // both visits at the (resource, tau_plus_1)
@@ -1560,7 +1582,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     panic!()
                 };
 
-                if settings.aglr.policy != RefinementPolicy::Legacy {
+                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders {
                     let validation_start = Instant::now();
                     let verified_cost = problem.verify_solution(&trains, delay_cost_type);
                     aglr_telemetry.final_validation_time += validation_start.elapsed();
@@ -2058,6 +2080,8 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_sat_calls".to_string(), stats.sat_calls.into());
     output_stats("maxsat_partial_sat_calls".to_string(), stats.partial_sat_calls.into());
     output_stats("maxsat_cost_terms".to_string(), stats.cost_terms.into());
+    output_stats("maxsat_resource_order_pairs".to_string(), stats.resource_order_pairs.into());
+    output_stats("maxsat_resource_order_rows".to_string(), stats.resource_order_rows.into());
     output_stats(
         "objective_iters".to_string(),
         (*iteration_types.get(&IterationType::Objective).unwrap_or(&0)).into(),
@@ -2510,15 +2534,23 @@ mod aglr_end_to_end_tests {
                 for strategy in [AssumptionStrategy::Legacy, AssumptionStrategy::Full,
                                  AssumptionStrategy::Geometric] {
                   for sparse_costs in [false, true] {
+                   for resource_orders in [false, true] {
+                    if resource_orders && policy != RefinementPolicy::Legacy { continue; }
                     let mut settings = MaxSatDddLadderScSettings::default();
                     settings.assumption_strategy = strategy;
                     settings.sparse_costs = sparse_costs;
+                    settings.resource_orders = resource_orders;
                     settings.aglr.policy = policy;
-                    let (solution, _) = solve_with_settings(
+                    let (solution, stats) = solve_with_settings(
                         &quiet_env, satcoder::solvers::minisat::Solver::new(), &problem,
                         30.0, objective, settings, |_, _| {},
                     ).unwrap();
                     assert_eq!(problem.verify_solution(&solution, objective), Some(optimum));
+                    if resource_orders {
+                        assert!(stats.resource_order_pairs > 0);
+                        assert!(stats.resource_order_rows > 0);
+                    }
+                   }
                   }
                 }
             }

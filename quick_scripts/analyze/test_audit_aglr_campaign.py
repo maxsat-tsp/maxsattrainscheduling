@@ -32,6 +32,9 @@ class AuditAglrCampaignTests(unittest.TestCase):
             config["sparse_costs"] = "true"
             self.assertTrue(all(any("maxsat_sparse_costs" in error for error in r["errors"])
                                 for r in audit.load_json_method(root, config, 30)))
+            config["resource_orders"] = "true"
+            self.assertTrue(all(any("maxsat_resource_orders" in error for error in r["errors"])
+                                for r in audit.load_json_method(root, config, 30)))
 
     def test_cplex_names_are_normalized(self):
         self.assertEqual(audit.canonical_name("addtrackA3"), "trackA3")

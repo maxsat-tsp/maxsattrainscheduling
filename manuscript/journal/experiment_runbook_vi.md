@@ -431,3 +431,23 @@ Hiện có hai chi phí CPLEX mâu thuẫn với lịch hợp lệ đã kiểm t
 `manuscript/journal/reviews/published_baselines_20261105/README.md`.
 Auditor báo lỗi ở bảng tham chiếu và giữ cổng cuối chưa đạt cho đến khi
 hai trường hợp này được xử lý. Không sửa trực tiếp CSV gốc.
+
+## Phép thử thứ tự nhất quán của một cặp xung đột
+
+Lượt tiếp theo giữ một biến thứ tự cho mỗi cặp lượt chiếm tài nguyên đã
+phát hiện xung đột. Nếu SAT chọn lượt A đi trước lượt B, những ràng buộc
+ở các mốc sau của cùng cặp sẽ cùng dùng quyết định đó. Mỗi cặp chỉ có một
+biến, được tạo khi xuất hiện xung đột đầu tiên. Cờ là
+`--maxsat-ladder-sc-resource-orders true`; mặc định tắt.
+
+```bash
+EXPERIMENT_SET=orders CYCLE_ID=orders-cycle-v3 \
+  bash run_maxsat_core_cycle.sh
+```
+
+Đối chứng là CSOnet. Lượt này giữ cách gửi điều kiện `legacy`, biểu diễn chi
+phí cũ và policy refinement `legacy`; không kết hợp thêm thay đổi khác.
+Theo dõi `maxsat_resource_order_pairs`, `maxsat_resource_order_rows`, coverage,
+PAR-2 và kích thước mô hình. Tính đúng đắn được kiểm tra bằng bảng chân trị,
+lịch khả thi theo cả hai thứ tự, và so với vét cạn trên bài nhỏ. Bộ kiểm thử
+Linux có 31 tests. Chưa có kết quả hiệu năng để kết luận cải thiện.

@@ -672,6 +672,28 @@ vẫn phải kiểm tra coverage và chi phí trước khi kết luận có lợ
 
 \subsection{Cách chọn thay đổi tiếp theo}
 
+Một hướng đang được chuẩn bị là giữ cùng một quyết định thứ tự qua các vòng
+DDD. Với hai lượt chiếm tài nguyên $i,j$, SAT chọn biến $p_{ij}$: đúng là
+$i$ đi trước $j$. Gọi $s_i,e_i$ là thời điểm vào và ra của lượt $i$.
+Khi phát hiện xung đột, thêm:
+\[
+\begin{aligned}
+p_{ij}\land(e_i\ge\tau)&\Rightarrow s_j\ge\tau,\\
+\neg p_{ij}\land(e_j\ge\sigma)&\Rightarrow s_i\ge\sigma.
+\end{aligned}
+\]
+Các mốc $\tau,\sigma$ lấy từ thời điểm ra trong xung đột vừa phát hiện.
+Những vòng sau dùng lại $p_{ij}$. Mọi lịch hợp lệ đều có ít nhất một thứ tự
+thỏa các điều kiện này, nên các ràng buộc không loại lịch tối ưu. Với lượt
+cuối, dùng $e_i=s_i+\text{thời gian di chuyển}$ để tạo điều kiện ở vế trái.
+
+Phép thử dùng \code{EXPERIMENT\_SET=orders} với
+\file{run_maxsat_core_cycle.sh}. Chỉ tạo biến khi cặp đó xung đột lần đầu.
+Các trường \code{maxsat\_resource\_order\_pairs} và
+\code{maxsat\_resource\_order\_rows} ghi số cặp và số ràng buộc đã tạo.
+Giữ cách gửi điều kiện và chi phí cũ để đo riêng tác động của quyết định
+thứ tự; không bật cùng AGLR adaptive trong lượt này.
+
 Mỗi vòng chỉ thay đổi một thành phần. Đọc telemetry trước khi sửa:
 
 \begin{tabularx}{\textwidth}{@{}p{50mm}X@{}}

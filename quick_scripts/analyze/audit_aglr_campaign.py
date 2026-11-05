@@ -14,6 +14,7 @@ from pathlib import Path
 import audit_journal_campaign as journal_audit
 import summarize_conference as conference_audit
 import published_conference_reference as published_reference
+import published_baselines
 
 
 OBJECTIVES = ("finsteps123", "infsteps180", "cont")
@@ -274,6 +275,7 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
                 if selected_growth
                 else "",
                 "policy": config.get("policy", ""),
+                "result_source": config.get("result_source", "independently-audited-json"),
                 "min_growth": config.get("min_growth", ""),
                 "fraction": config.get("fraction", ""),
                 "max_wait": config.get("max_wait", ""),
@@ -685,6 +687,8 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, required=True)
     parser.add_argument("--reference-full", type=Path)
     parser.add_argument("--conference-reference", type=Path)
+    parser.add_argument("--reuse-published-baselines", type=Path,
+                        help="Reuse published CSV baselines with explicit reported-validation scope")
     parser.add_argument("--conference-profile", choices=("auto", "published-csv-120", "imported-json-150"), default="auto")
     parser.add_argument(
         "--conference-runtime-mode",
@@ -692,6 +696,10 @@ def main() -> int:
         default="diagnostic",
     )
     args = parser.parse_args()
+    if args.reuse_published_baselines is not None and (
+        args.timeout != 120 or args.conference_runtime_mode != "assumed-equivalent"
+    ):
+        parser.error("published baselines require cutoff 120 and runtime mode assumed-equivalent")
     campaign_dir = args.campaign_dir.resolve()
 
     records: list[dict] = []
@@ -700,6 +708,18 @@ def main() -> int:
         if "tag" in config:
             records.extend(load_json_method(config_path.parent, config, args.timeout))
     records.extend(load_cplex(campaign_dir, args.timeout))
+    published_metadata = None
+    published_errors = []
+    if args.reuse_published_baselines is not None:
+        references, published_metadata = published_baselines.load_directory(args.reuse_published_baselines)
+        published_errors.extend(published_baselines.compare_new_costs(records, references))
+        existing = {(r["tag"], r["objective"]) for r in records}
+        reused = [r for r in references if (r["tag"], r["objective"]) not in existing]
+        records.extend(reused)
+        published_metadata["reused_method_objectives"] = sorted({(r["tag"], r["objective"]) for r in reused})
+        published_errors.extend(dict(tag="published-baselines", objective="<reference>",
+                                     name="<reference>", status="reference-data-error", errors=[error])
+                                for error in published_metadata["errors"])
 
     summary = summarize(records, args.timeout)
     conference_metadata = None
@@ -738,6 +758,7 @@ def main() -> int:
             audit_confirmations(records, args.reference_full.resolve(), args.timeout)
         )
     errors.extend(comparison_errors)
+    errors.extend(published_errors)
     if args.conference_reference is not None:
         write_csv(campaign_dir / "conference_reference_comparison.csv", comparisons)
     gate = (
@@ -749,7 +770,7 @@ def main() -> int:
         gate["passed"] = False
         gate["coverage_passed"] = False
         gate["baseline_comparison_passed"] = False
-        gate["reasons"].insert(0, f"Independent audit found {len(errors)} invalid/fatal records")
+        gate["reasons"].insert(0, f"Audit found {len(errors)} invalid/fatal records or reference-data errors")
 
     write_csv(campaign_dir / "aglr_summary.csv", summary)
     write_csv(campaign_dir / "aglr_ranking.csv", ranked)
@@ -759,6 +780,7 @@ def main() -> int:
                 "errors": errors,
                 "gate": gate,
                 "conference_reference": conference_metadata,
+                "published_baselines": published_metadata,
             },
             indent=2,
         )
@@ -775,7 +797,7 @@ def main() -> int:
             f"PAR2 sum={ranked[0]['par2_sum']:.3f})"
         )
     if errors:
-        print(f"Audit found {len(errors)} invalid/fatal records")
+        print(f"Audit found {len(errors)} invalid/fatal records or reference-data errors")
         return 2
     if gate is not None:
         print("Submission gate: " + ("PASS" if gate["passed"] else "NOT YET"))

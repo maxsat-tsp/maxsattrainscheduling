@@ -131,6 +131,13 @@ coverage hội nghị.
 coverage với từng baseline, rồi PAR-2 nếu coverage bằng nhau. Bước này tách
 khỏi cổng coverage hội nghị; các kết quả và bảng từng objective vẫn giữ riêng.
 
+Tái sử dụng bảng hội nghị cho biết Big-M Gurobi có tổng 206 optimum. Tuy
+nhiên hai dòng CPLEX báo chi phí không khớp: `trackA1/finsteps123` là 24 thay
+vì 23, `stationB12/infsteps180` là 120 thay vì 98. Đã có lịch mới hợp lệ chi
+phí 23 và 98, nên không dùng hai cận CPLEX này làm oracle. Báo cáo ở
+`reviews/published_baselines_20261105/README.md`; dữ liệu gốc giữ nguyên.
+Việc này không dừng các vòng cải tiến SAT đang chạy.
+
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 
 Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio

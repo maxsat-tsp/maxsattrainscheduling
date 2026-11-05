@@ -510,6 +510,15 @@ originalA1,ok,11,11,0.446,true
 Mỗi objective cần một file riêng. Giá trị \code{valid=true} phải do chương
 trình kiểm tra lịch sinh ra, không được điền tay chỉ vì CPLEX báo tối ưu.
 
+Nếu tái sử dụng bảng hội nghị, dùng cờ auditor
+\code{--reuse-published-baselines results}. Cách này ghi rõ phạm vi kiểm tra
+bảng cũ; không điền thêm \code{valid=true} vào CSV gốc. Hiện hai dòng CPLEX
+cần kiểm tra lại: \code{trackA1/finsteps123} ghi 24 nhưng đã có lịch hợp lệ
+chi phí 23; \code{stationB12/infsteps180} ghi 120 nhưng đã có lịch hợp lệ
+chi phí 98. Giữ nguyên dữ liệu gốc và đọc báo cáo
+\file{manuscript/journal/reviews/published_baselines_20261105/README.md}.
+Các phép thử SAT vẫn tiếp tục trong khi xử lý hai trường hợp này.
+
 Phần chạy tại repository gồm năm phương pháp, nên giai đoạn \code{full} có
 $5\times72\times3=1080$ lời gọi solver. Với timeout 120 giây, tổng timeout nội
 bộ tối đa là khoảng 36 giờ nếu chạy tuần tự. Lệnh giới hạn 6 giờ có thể dừng

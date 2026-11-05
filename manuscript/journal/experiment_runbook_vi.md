@@ -418,3 +418,16 @@ bằng nhau, đúng tiêu chí đã chọn. Ví dụ tổng 201 vượt mốc h�
 vẫn thua Big-M Gurobi nếu baseline đó có 206. `gate.passed` yêu cầu cả hai
 mốc đều đạt và không có lỗi audit. Không dùng việc có đủ file baseline thay
 cho việc vượt kết quả baseline.
+
+Theo yêu cầu tái sử dụng kết quả hội nghị, auditor có cờ
+`--reuse-published-baselines results`, dùng kèm cutoff 120 và
+`--conference-runtime-mode assumed-equivalent`. Cờ này giữ metadata rằng
+lịch cũ được báo cáo hợp lệ trong thí nghiệm công bố, còn việc kiểm tra lại
+chỉ bao gồm tên, chi phí, cận và thời gian. Các lịch mới vẫn được kiểm tra
+độc lập. Khi đã có kết quả mới cho một baseline/objective, auditor dùng toàn
+bộ kết quả mới của objective đó.
+
+Hiện có hai chi phí CPLEX mâu thuẫn với lịch hợp lệ đã kiểm tra; xem
+`manuscript/journal/reviews/published_baselines_20261105/README.md`.
+Auditor báo lỗi ở bảng tham chiếu và giữ cổng cuối chưa đạt cho đến khi
+hai trường hợp này được xử lý. Không sửa trực tiếp CSV gốc.

@@ -77,6 +77,8 @@ pub enum IterationType {
 
 #[derive(Default)]
 pub struct SolveStats {
+    pub sat_calls: usize,
+    pub partial_sat_calls: usize,
     pub n_sat: usize,
     pub n_unsat: usize,
     pub n_travel: usize,
@@ -910,6 +912,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         settings.aglr.use_objective_bound.into(),
     );
     output_stats("aglr_filter_duplicates".to_string(), settings.aglr.filter_duplicates.into());
+    output_stats("maxsat_assumptions".to_string(), settings.assumption_strategy.as_str().into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -1697,7 +1700,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
         //Solve
         //Build asssumption
-        let mut n_assumps = 20;
+        let mut n_assumps = settings.assumption_strategy.initial(soft_constraints.len());
         let mut assumptions = soft_constraints
             .iter()
             .map(|(k, (_, w, _))| (*k, *w))
@@ -1713,6 +1716,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
         //grow assumptions
         let core = loop {
+            stats.sat_calls += 1;
             let solve_start = Instant::now();
             let result = {
                 let _p = hprof::enter("sat check");
@@ -1726,7 +1730,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             //Update incumbent
             match result {
                 satcoder::SatResultWithCore::Sat(_) if n_assumps < soft_constraints.len() => {
-                    n_assumps += 20;
+                    stats.partial_sat_calls += 1;
+                    n_assumps = settings.assumption_strategy.next(n_assumps, soft_constraints.len());
                 }
                 satcoder::SatResultWithCore::Sat(model) => {
                     is_sat = true;
@@ -2047,6 +2052,8 @@ fn do_output_stats<L: satcoder::Lit>(
     heuristic_filter: &heuristic::HeuristicFilter,
 ) {
     output_stats("iterations".to_string(), iteration.into());
+    output_stats("maxsat_sat_calls".to_string(), stats.sat_calls.into());
+    output_stats("maxsat_partial_sat_calls".to_string(), stats.partial_sat_calls.into());
     output_stats(
         "objective_iters".to_string(),
         (*iteration_types.get(&IterationType::Objective).unwrap_or(&0)).into(),
@@ -2427,6 +2434,56 @@ mod aglr_end_to_end_tests {
         assert_eq!(solve_cost(&problem, RefinementPolicy::Legacy), optimum);
         assert_eq!(solve_cost(&problem, RefinementPolicy::Adaptive), optimum);
         assert_eq!(solve_cost_with_bound(&problem, RefinementPolicy::Adaptive, true), optimum);
+    }
+
+    #[test]
+    fn assumption_strategies_match_enumeration_with_travel_and_resource_conflicts() {
+        use super::super::settings::AssumptionStrategy;
+        let visits = vec![
+            Visit { resource_id: 0, earliest: 0, aimed: Some(0), travel_time: 2 },
+            Visit { resource_id: 1, earliest: 2, aimed: Some(2), travel_time: 2 },
+        ];
+        let problem = Problem {
+            name: "assumptions-exhaustive".to_string(),
+            trains: vec![Train { visits: visits.clone() }, Train { visits }],
+            conflicts: vec![(0, 0), (1, 1)],
+        };
+        for objective in [DelayCostType::Continuous, DelayCostType::FiniteSteps123,
+                          DelayCostType::InfiniteSteps180] {
+            // Enumerate all feasible integer schedules in [0, 8]. A schedule
+            // of cost 4 (continuous), or 2 (step objectives), is attainable
+            // here, so a later start outside this interval cannot improve it.
+            let mut optimum = i32::MAX;
+            for a in 0..=8 {
+                for b in (a + 2)..=8 {
+                    for c in 0..=8 {
+                        for d in (c + 2)..=8 {
+                            if !(b <= c || d <= a) || !(b + 2 <= d || d + 2 <= b) {
+                                continue;
+                            }
+                            let solution = vec![vec![a, b, b + 2], vec![c, d, d + 2]];
+                            if let Some(cost) = problem.verify_solution(&solution, objective) {
+                                optimum = optimum.min(cost);
+                            }
+                        }
+                    }
+                }
+            }
+            assert_ne!(optimum, i32::MAX);
+            for policy in [RefinementPolicy::Legacy, RefinementPolicy::Adaptive] {
+                for strategy in [AssumptionStrategy::Legacy, AssumptionStrategy::Full,
+                                 AssumptionStrategy::Geometric] {
+                    let mut settings = MaxSatDddLadderScSettings::default();
+                    settings.assumption_strategy = strategy;
+                    settings.aglr.policy = policy;
+                    let (solution, _) = solve_with_settings(
+                        &quiet_env, satcoder::solvers::minisat::Solver::new(), &problem,
+                        30.0, objective, settings, |_, _| {},
+                    ).unwrap();
+                    assert_eq!(problem.verify_solution(&solution, objective), Some(optimum));
+                }
+            }
+        }
     }
 }
 

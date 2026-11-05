@@ -12,6 +12,24 @@ import audit_aglr_campaign as audit
 
 
 class AuditAglrCampaignTests(unittest.TestCase):
+    def test_assumption_strategy_must_match_locked_manifest(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            rows = [{"name": "origA3", "solves": [{
+                "status": "timeout", "total_time": 30, "timeout_seconds": 30,
+                "process_exit_code": 0, "maxsat_assumptions": "legacy",
+            }]}]
+            for objective in audit.OBJECTIVES:
+                (root / f"{objective}.json").write_text(json.dumps(rows))
+            config = dict(tag="Core-full", kind="exact", policy="legacy",
+                          instances="origA3", assumptions="full",
+                          process_exit_required="true")
+            records = audit.load_json_method(root, config, 30)
+            self.assertTrue(all(any("maxsat_assumptions" in error for error in r["errors"])
+                                for r in records))
+            config["assumptions"] = "legacy"
+            self.assertTrue(all(not r["errors"] for r in audit.load_json_method(root, config, 30)))
+
     def test_cplex_names_are_normalized(self):
         self.assertEqual(audit.canonical_name("addtrackA3"), "trackA3")
         self.assertEqual(audit.canonical_name("addstationB12"), "stationB12")
@@ -149,6 +167,8 @@ class AuditAglrCampaignTests(unittest.TestCase):
         summary[2]["proven_optimal"] = 57
         gate = audit.evaluate_gate(summary, conference)
         self.assertFalse(gate["passed"])
+        self.assertEqual(gate["coverage"], {"finsteps123": 72, "infsteps180": 68, "cont": 57})
+        self.assertEqual(gate["total_coverage"], 197)
         self.assertTrue(any("cont" in reason for reason in gate["reasons"]))
 
     def test_conference_comparison_uses_matching_subset_and_real_pairs(self):

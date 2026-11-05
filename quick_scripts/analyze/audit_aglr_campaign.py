@@ -139,6 +139,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append(f"nonzero process exit {solve['process_exit_code']}")
             if config.get("process_exit_required") == "true" and "process_exit_code" not in solve:
                 errors.append("process exit evidence is missing")
+            if "assumptions" in config and solve.get("maxsat_assumptions") != config["assumptions"]:
+                errors.append("maxsat_assumptions differs from the locked configuration")
             if config.get("process_exit_required") == "true" and config.get("policy") in {"adaptive", "all-scanned"}:
                 for key in ("policy", "min_growth", "fraction", "max_wait", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound", "filter_duplicates"):
                     if key not in config:
@@ -278,6 +280,7 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
                 "heuristic_min_gap": config.get("heuristic_min_gap", "0"),
                 "use_objective_bound": config.get("use_objective_bound", "false"),
                 "filter_duplicates": config.get("filter_duplicates", "false"),
+                "assumptions": config.get("assumptions", "legacy"),
                 "conference_coverage": "",
                 "coverage_delta": "",
                 "conference_par2_seconds": "",
@@ -417,12 +420,12 @@ def evaluate_gate(
         row = lookup.get(("AGLR", objective))
         if row is None or int(row["instances"]) != 72:
             reasons.append(f"AGLR/{objective}: incomplete 72-instance result")
-        elif int(row["proven_optimal"]) < target:
-            reasons.append(
-                f"AGLR/{objective}: {row['proven_optimal']} proven, target {target}"
-            )
         else:
             coverage[objective] = int(row["proven_optimal"])
+            if coverage[objective] < target:
+                reasons.append(
+                    f"AGLR/{objective}: {row['proven_optimal']} proven, target {target}"
+                )
 
     total_coverage = sum(coverage.values()) if len(coverage) == 3 else 0
     total_target = sum(targets.values())

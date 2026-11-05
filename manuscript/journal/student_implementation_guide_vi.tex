@@ -599,6 +599,46 @@ chứng rằng chương trình không crash.
 
 \section{Nếu kết quả chưa đạt}
 
+\subsection{Kết quả mới và hướng đang thử}
+
+Lượt 120 giây đầu tiên trên VM cho AGLR đạt $(72,67,57)$; CSOnet chạy lại
+đạt $(72,68,59)$, còn mốc hội nghị là $(72,68,60)$. Những số này cho thấy
+AGLR chưa đạt yêu cầu. Đặc biệt, bảng hội nghị còn có Big-M Gurobi giải được
+67 instance \code{cont}; vượt CSOnet mới chỉ là mốc trung gian.
+
+Trên các instance khó, hơn 98\% thời gian AGLR nằm trong SAT. Vì vậy, lượt
+tiếp theo giữ cách thêm xung đột của CSOnet và thử cách đưa điều kiện chi phí
+vào SAT. Gọi $m$ là tổng số điều kiện chi phí cần kiểm tra trong một vòng:
+\[
+\begin{array}{ll}
+\texttt{legacy}: & 20,40,60,\ldots,m,\\
+\texttt{geometric}: & 20,40,80,\ldots,m,\\
+\texttt{full}: & m.
+\end{array}
+\]
+Mỗi số là số điều kiện được gửi trong một lời gọi SAT, tối đa bằng $m$.
+Nếu SAT đã phát hiện mâu thuẫn với một phần điều kiện, ta có thể xử lý mâu
+thuẫn đó ngay. Nếu SAT tìm được nghiệm, chỉ được dùng nghiệm sau khi đã gửi
+đủ $m$ điều kiện. Do đó, phép thử này thay đổi cách tìm kiếm nhưng vẫn kiểm
+tra đầy đủ bài toán. Đây là giả thuyết đang thử; chưa có kết luận nhanh hơn.
+
+\begin{verbatim}
+RUN_ID=core-screen-v1 timeout -k 30 21600 \
+  bash run_maxsat_core_experiments.sh screen
+RUN_ID=core-promote-v1 timeout -k 30 21600 \
+  bash run_maxsat_core_experiments.sh promote
+\end{verbatim}
+
+Lệnh đầu dùng 24 instance phát triển ở 30 giây để sàng lọc. Lệnh sau dùng
+cùng tập đó ở 120 giây để kiểm tra hai cách mới. Đọc
+\file{aglr_summary.csv}: ưu tiên coverage rồi PAR-2. Các trường
+\code{maxsat\_sat\_calls} và \code{maxsat\_partial\_sat\_calls} giúp biết
+số lời gọi SAT có giảm hay không. Chỉ khóa một cấu hình để chạy đủ 72
+instance sau khi xem kết quả; không ghép các nghiệm tốt nhất từ nhiều cấu
+hình thành một solver.
+
+\subsection{Cách chọn thay đổi tiếp theo}
+
 Mỗi vòng chỉ thay đổi một thành phần. Đọc telemetry trước khi sửa:
 
 \begin{tabularx}{\textwidth}{@{}p{50mm}X@{}}

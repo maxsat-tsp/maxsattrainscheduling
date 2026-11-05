@@ -56,15 +56,30 @@ Hai thư mục này chứa kết quả mới trên VM:
 ~/projects/experiment-audit/rounds/cycle-20261105-cb839c7-*/
 ```
 
-## Chu kỳ 120 giây đã khởi động
+## Chu kỳ 120 giây đã hoàn tất
 
 Commit `20bd54d` đã chạy lại 25 Rust tests; 60 lần chạy ngắn xen kẽ legacy và
 AGLR đều thoát bình thường. Sửa lỗi khởi tạo môi trường Gurobi thừa đã được áp
 dụng cho cả worker cũ, giữ nguyên phép tính heuristic và cách refinement.
 
-VM đang chạy dịch vụ `aglr-paper120-20bd54d`: baseline 120 giây, sau đó ablation
-từng thành phần, promote, một cấu hình khóa trên toàn bộ tập và xác nhận nếu
-đạt coverage. Toàn dịch vụ giới hạn 6 giờ. Worktree và binary được giữ riêng.
+Dịch vụ `aglr-paper120-20bd54d` đã kết thúc. Mọi lịch tối ưu trong lượt mới
+đã qua auditor; không có lỗi nghiệm hoặc mã thoát. Kết quả full:
+
+| Phương pháp | finsteps123 | infsteps180 | cont | Tổng |
+|---|---:|---:|---:|---:|
+| Mốc hội nghị 120 giây | 72 | 68 | 60 | 200 |
+| CSOnet chạy lại trên VM | 72 | 68 | 59 | 199 |
+| AGLR, rescue theo mô hình | 72 | 67 | 57 | 196 |
+
+AGLR dùng `K_min=16`, `rho=0.25`, `W=5`; không bật giới hạn objective hay lọc
+trùng. PAR-2 của AGLR lần lượt là `0.1200`, `16.9869`, `52.1276` giây; chưa
+đạt tiêu chí. AGLR giải được `trackB12/cont` trong 40.35 giây, nhưng mất các
+instance khác. Không ghép nghiệm từ nhiều cấu hình thành kết quả của một solver.
+
+Trên 24 instance phát triển, sáu ablation đều không tăng coverage. Rescue
+theo mô hình đạt `(24,22,19)` ở cả 30 và 120 giây; các biến thể heuristic,
+lọc trùng và giới hạn objective không tốt hơn. Kết quả này được giữ làm bằng
+chứng để chọn hướng tiếp theo.
 
 ```text
 ~/projects/experiment-audit/rounds/baseline-paper120-20bd54d/
@@ -81,6 +96,23 @@ Objective bound đã qua bảng chân trị, kiểm tra tổng trọng số khi 
 và bài toán nhỏ vét cạn. Bộ kiểm thử Linux có 25 Rust tests; bộ Python sau
 sửa profile 120 giây có 16 tests.
 Chưa điền số AGLR mới vào Abstract, Results hoặc Conclusion.
+
+## Hướng tiếp theo: cách đưa chi phí vào SAT
+
+Ở các instance khó, hơn 98% thời gian của AGLR nằm trong SAT; phần kiểm tra
+nghiệm và chọn xung đột rất nhỏ. Vòng tiếp theo giữ refinement CSOnet và chỉ
+đổi cách gửi các điều kiện chi phí vào SAT:
+
+- `legacy`: thêm 20 điều kiện sau mỗi lời gọi SAT có nghiệm;
+- `full`: gửi toàn bộ điều kiện ngay;
+- `geometric`: thử 20, 40, 80, ... cho đến khi đủ.
+
+Đây là giả thuyết cần đo, chưa phải một cải tiến đã được chứng minh bằng số
+liệu. Mọi cách đều phải kiểm tra toàn bộ điều kiện trước khi dùng nghiệm SAT
+để refinement. Trường `maxsat_sat_calls` đếm số lời gọi SAT, còn
+`maxsat_partial_sat_calls` đếm các lần có nghiệm khi mới gửi một phần điều kiện.
+Script `run_maxsat_core_experiments.sh` ghi cấu hình, commit, hash binary,
+hash dữ liệu và mã thoát; dùng cùng auditor để kiểm tra lịch và chi phí.
 
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 

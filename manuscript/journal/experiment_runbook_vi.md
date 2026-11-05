@@ -346,3 +346,30 @@ Mỗi lệnh có giới hạn 6 giờ. `full` chạy tuần tự mọi solver v�
 vòng 6 giờ; tiếp tục cùng `RUN_ID` để không chạy lại dữ liệu đã xong. Không đổi
 commit hoặc binary khi đang chạy. Trên VM, dùng worktree và bản binary riêng
 cho mỗi vòng để có thể phát triển mã mà không thay đầu vào của vòng đang chạy.
+
+## Thử cách đưa các điều kiện chi phí vào SAT
+
+AGLR full đầu tiên đạt `(72,67,57)`, chưa vượt mốc hội nghị `(72,68,60)`.
+Vòng kế tiếp dùng refinement CSOnet và chỉ thay cách gửi điều kiện chi phí:
+`legacy` thêm 20 điều kiện mỗi lần, `full` gửi hết ngay, `geometric` tăng gấp
+đôi từ 20. Cờ trực tiếp là `--maxsat-ladder-sc-assumptions`.
+
+```bash
+RUN_ID=core-screen-v1 timeout -k 30 21600 \
+  bash run_maxsat_core_experiments.sh screen
+RUN_ID=core-promote-v1 timeout -k 30 21600 \
+  bash run_maxsat_core_experiments.sh promote
+MAXSATDDD_ASSUMPTIONS=full RUN_ID=core-full-v1 timeout -k 30 21600 \
+  bash run_maxsat_core_experiments.sh candidate
+```
+
+Lệnh thứ ba là ví dụ: chỉ chạy `candidate` sau khi đã chọn `full` hoặc
+`geometric` từ bảng 120 giây. `screen` chạy 24 instance phát triển, ba
+objective, timeout 30 giây, tối đa hai worker. `promote` chạy hai cấu hình thử
+ở 120 giây; `candidate` chạy đủ 72 instance. Hai giai đoạn cuối chạy tuần tự.
+Không so trực tiếp coverage 30 giây với mốc hội nghị 120 giây để kết luận thắng.
+
+Kết quả nằm tại `results/aglr/<RUN_ID>/aglr_summary.csv`. Cột `assumptions`
+cho biết phương án đã thử. Các thư mục `Core-*` là lượt phát triển; tag
+`AGLR` trong mode `candidate` giữ tương thích với cổng đánh giá hiện có.
+Manifest ghi rõ policy `legacy`, vì lượt này giữ refinement CSOnet.

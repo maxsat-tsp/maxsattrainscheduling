@@ -110,6 +110,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_prealloc_cost_thresholds: Option<bool>,
 
+    /// Soft-cost assumptions per SAT call: legacy (+20), full, or geometric (doubling).
+    #[structopt(long)]
+    maxsat_ladder_sc_assumptions: Option<String>,
+
     /// AGLR refinement policy: legacy, all-scanned, or adaptive.
     #[structopt(long)]
     aglr_policy: Option<String>,
@@ -550,6 +554,12 @@ fn main() {
     // Empirically best on this benchmark; can be overridden via the
     // matching --maxsat-ladder-sc-* flags.
     let maxsat_ladder_sc_settings = maxsat_ladder_sc::MaxSatDddLadderScSettings {
+        assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
+            "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
+            "full" => maxsat_ladder_sc::AssumptionStrategy::Full,
+            "geometric" => maxsat_ladder_sc::AssumptionStrategy::Geometric,
+            other => panic!("Unknown assumption strategy '{}'; use legacy, full, or geometric", other),
+        },
         use_precedence_graph: opt.maxsat_ladder_sc_use_precedence_graph.unwrap_or(true),
         use_eager_chain_expansion: opt
             .maxsat_ladder_sc_use_eager_chain_expansion

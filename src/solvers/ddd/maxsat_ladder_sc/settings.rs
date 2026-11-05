@@ -17,6 +17,40 @@ pub enum RescueProgressPolicy {
     Model,
 }
 
+/// How many soft-cost assumptions enter each SAT call. Only the final SAT
+/// call containing all assumptions may supply a model to the DDD loop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AssumptionStrategy {
+    Legacy,
+    Full,
+    Geometric,
+}
+
+impl AssumptionStrategy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Legacy => "legacy",
+            Self::Full => "full",
+            Self::Geometric => "geometric",
+        }
+    }
+
+    pub(super) fn initial(self, total: usize) -> usize {
+        match self {
+            Self::Legacy | Self::Geometric => 20,
+            Self::Full => total,
+        }
+    }
+
+    pub(super) fn next(self, current: usize, total: usize) -> usize {
+        match self {
+            Self::Legacy => current.saturating_add(20),
+            Self::Full => total,
+            Self::Geometric => current.saturating_mul(2).max(1).min(total),
+        }
+    }
+}
+
 impl RescueProgressPolicy {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -67,6 +101,7 @@ impl Default for AglrSettings {
 
 #[derive(Clone, Copy, Debug)]
 pub struct MaxSatDddLadderScSettings {
+    pub assumption_strategy: AssumptionStrategy,
     pub use_precedence_graph: bool,
     pub use_sc_amo: bool,
     pub use_touched_clique_amo: bool,
@@ -88,6 +123,7 @@ pub struct MaxSatDddLadderScSettings {
 impl Default for MaxSatDddLadderScSettings {
     fn default() -> Self {
         Self {
+            assumption_strategy: AssumptionStrategy::Legacy,
             use_precedence_graph: true,
             use_eager_chain_expansion: false,
             use_sc_amo: true,
@@ -102,3 +138,32 @@ impl Default for MaxSatDddLadderScSettings {
 // ─── Tunable for SC AMO encoding ─────────────────────────────────────────
 // Benchmark configuration: pairwise for n <= 5, prefix counter for n >= 6.
 pub(super) const PAIRWISE_AMO_MAX_SIZE: usize = 5;
+
+#[cfg(test)]
+mod assumption_tests {
+    use super::AssumptionStrategy;
+
+    #[test]
+    fn assumption_schedules_reach_the_full_set_without_skipping_termination() {
+        for total in [0, 1, 19, 20, 21, 101, 1000] {
+            for strategy in [AssumptionStrategy::Legacy, AssumptionStrategy::Full,
+                             AssumptionStrategy::Geometric] {
+                let mut count = strategy.initial(total);
+                let mut calls = 1;
+                while count < total {
+                    let next = strategy.next(count, total);
+                    assert!(next > count);
+                    count = next;
+                    calls += 1;
+                }
+                assert!(count >= total);
+                if strategy == AssumptionStrategy::Full {
+                    assert_eq!(calls, 1);
+                }
+                if strategy == AssumptionStrategy::Geometric && total == 1000 {
+                    assert_eq!(calls, 7);
+                }
+            }
+        }
+    }
+}

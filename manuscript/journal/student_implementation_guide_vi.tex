@@ -563,8 +563,13 @@ AGLR chỉ đạt yêu cầu khi đồng thời có:
 \end{itemize}
 
 Trường \code{gate.coverage\_passed} chỉ cho biết đã vượt coverage hội nghị.
-Trường \code{gate.passed} còn yêu cầu đủ mọi baseline. Có thể xác nhận ba lần
-sau khi vượt coverage, nhưng chỉ chốt bảng submission khi đủ baseline.
+Trường \file{gate.baseline_comparison_passed} yêu cầu so sánh đủ bốn baseline:
+ưu tiên tổng số instance chứng minh tối ưu, rồi PAR-2 nếu tổng bằng nhau.
+Ví dụ, 201 optimum vượt hội nghị nhưng vẫn thua baseline có 206 optimum.
+Trường \code{gate.passed} chỉ đạt khi cả hai bước đều đạt và không có lỗi
+audit. Có thể xác nhận ba lần sau khi vượt coverage, nhưng chỉ chốt kết luận
+vượt các baseline sau khi hoàn tất bước so sánh này. Các bảng vẫn phải ghi
+riêng từng objective để người đọc thấy nơi nào tăng hoặc giảm.
 
 \subsection{Chạy các cải tiến mới}
 

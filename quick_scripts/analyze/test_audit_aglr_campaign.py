@@ -174,6 +174,36 @@ class AuditAglrCampaignTests(unittest.TestCase):
         self.assertEqual(gate["total_coverage"], 197)
         self.assertTrue(any("cont" in reason for reason in gate["reasons"]))
 
+    def test_beating_conference_alone_does_not_beat_stronger_milp(self):
+        summary = []
+        for tag in ("AGLR", "MaxSAT-Journal", "CSOnet", "BigM-Gurobi", "BigM-CPLEX"):
+            counts = (72, 68, 61) if tag == "AGLR" else (72, 68, 60)
+            if tag == "BigM-Gurobi":
+                counts = (72, 67, 67)
+            for objective, count in zip(audit.OBJECTIVES, counts):
+                summary.append(dict(tag=tag, objective=objective, instances=72,
+                                    proven_optimal=count, par2_seconds=10.0))
+        gate = audit.evaluate_gate(summary)
+        self.assertTrue(gate["coverage_passed"])
+        self.assertFalse(gate["baseline_comparison_passed"])
+        self.assertFalse(gate["passed"])
+        self.assertTrue(any("does not beat BigM-Gurobi" in r for r in gate["reasons"]))
+        for row in summary:
+            if row["tag"] == "AGLR" and row["objective"] == "cont":
+                row["proven_optimal"] = 67  # total 207 > the strongest baseline's 206
+        gate = audit.evaluate_gate(summary)
+        self.assertTrue(gate["passed"])
+        self.assertTrue(gate["baseline_comparison_passed"])
+        # At equal coverage, only a lower PAR-2 is a win.
+        for row in summary:
+            if row["tag"] == "BigM-Gurobi" and row["objective"] == "infsteps180":
+                row["proven_optimal"] = 68
+        self.assertFalse(audit.evaluate_gate(summary)["passed"])
+        for row in summary:
+            if row["tag"] == "AGLR":
+                row["par2_seconds"] = 9.0
+        self.assertTrue(audit.evaluate_gate(summary)["passed"])
+
     def test_conference_comparison_uses_matching_subset_and_real_pairs(self):
         summary = [{"tag": "test", "objective": "cont", "proven_optimal": 1, "par2_seconds": 32.0}]
         reference_summary = [{"objective": "cont", "verified_ok": 58, "par2_seconds": 63.6}]

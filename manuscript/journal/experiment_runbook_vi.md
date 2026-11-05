@@ -410,3 +410,11 @@ instance cần xác nhận. Quyết định chọn cấu hình được ghi tron
 Nếu hết 6 giờ, chạy lại với cùng `CYCLE_ID`, commit và binary để dùng lại các
 lượt đã xong. Vượt cổng hội nghị vẫn cần đối chiếu đủ baseline trước khi tuyên
 bố vượt SOTA.
+
+Auditor phân biệt hai mốc: `gate.coverage_passed` kiểm tra mốc hội nghị;
+`gate.baseline_comparison_passed` kiểm tra kết quả có vượt đủ bốn baseline
+hay không. Phép so sánh cuối ưu tiên tổng coverage, rồi PAR-2 nếu coverage
+bằng nhau, đúng tiêu chí đã chọn. Ví dụ tổng 201 vượt mốc hội nghị 200 nhưng
+vẫn thua Big-M Gurobi nếu baseline đó có 206. `gate.passed` yêu cầu cả hai
+mốc đều đạt và không có lỗi audit. Không dùng việc có đủ file baseline thay
+cho việc vượt kết quả baseline.

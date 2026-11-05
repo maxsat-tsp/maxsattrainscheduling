@@ -121,6 +121,16 @@ trọng số 1. Bộ kiểm thử Linux có 28 tests, gồm mọi tổ hợp c�
 `[7,3,11,5,7]` với cận 0..12 và bài lịch tàu nhỏ với ba objective. Phép thử
 hiệu năng dùng `EXPERIMENT_SET=costs`; chưa có số liệu để kết luận thắng.
 
+Đã khóa mã vòng kế tiếp tại commit `27b6859`. Dịch vụ
+`maxsat-cost-v2-27b6859` đợi `maxsat-core-v1-fb85033` kết thúc rồi mới build
+và chạy. Hai vòng không chạy solver cùng lúc. Vòng mới tự chọn một cấu hình
+đạt mốc phát triển trước khi chạy full; chỉ chạy xác nhận sau khi full vượt
+coverage hội nghị.
+
+Đã sửa cổng cuối: có đủ baseline chưa đủ để báo PASS. Auditor phải so tổng
+coverage với từng baseline, rồi PAR-2 nếu coverage bằng nhau. Bước này tách
+khỏi cổng coverage hội nghị; các kết quả và bảng từng objective vẫn giữ riêng.
+
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 
 Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio

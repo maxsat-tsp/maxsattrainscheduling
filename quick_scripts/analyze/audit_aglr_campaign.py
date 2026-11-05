@@ -440,6 +440,10 @@ def evaluate_gate(
 
     coverage_passed = not reasons
     required = ("MaxSAT-Journal", "CSOnet", "BigM-Gurobi", "BigM-CPLEX")
+    comparisons = []
+    complete_baselines = True
+    candidate_par2 = sum(float(lookup[("AGLR", objective)]["par2_seconds"])
+                         for objective in OBJECTIVES if ("AGLR", objective) in lookup)
     for tag in required:
         incomplete = [
             objective
@@ -448,9 +452,26 @@ def evaluate_gate(
             or int(lookup[(tag, objective)]["instances"]) != 72
         ]
         if incomplete:
+            complete_baselines = False
             reasons.append(
                 f"{tag}: missing or incomplete objectives: {', '.join(incomplete)}"
             )
+        elif len(coverage) == 3:
+            baseline_coverage = {o: int(lookup[(tag, o)]["proven_optimal"]) for o in OBJECTIVES}
+            baseline_total = sum(baseline_coverage.values())
+            baseline_par2 = sum(float(lookup[(tag, o)]["par2_seconds"]) for o in OBJECTIVES)
+            better = total_coverage > baseline_total or (
+                total_coverage == baseline_total and candidate_par2 < baseline_par2
+            )
+            comparisons.append(dict(tag=tag, coverage=baseline_coverage, total=baseline_total,
+                                    par2_sum=baseline_par2, candidate_better=better))
+            if not better:
+                reasons.append(f"AGLR does not beat {tag}: total coverage "
+                               f"{total_coverage} versus {baseline_total}; "
+                               f"PAR-2 sum {candidate_par2:.6f} versus {baseline_par2:.6f}")
+    baseline_comparison_passed = (coverage_passed and complete_baselines
+                                  and len(comparisons) == len(required)
+                                  and all(r["candidate_better"] for r in comparisons))
     par2 = {
         objective: lookup[("AGLR", objective)]["par2_seconds"]
         for objective in OBJECTIVES
@@ -459,6 +480,8 @@ def evaluate_gate(
     return {
         "passed": not reasons,
         "coverage_passed": coverage_passed,
+        "baseline_comparison_passed": baseline_comparison_passed,
+        "baseline_comparisons": comparisons,
         "reasons": reasons,
         "targets": targets,
         "coverage": coverage,
@@ -725,6 +748,7 @@ def main() -> int:
     if gate is not None and errors:
         gate["passed"] = False
         gate["coverage_passed"] = False
+        gate["baseline_comparison_passed"] = False
         gate["reasons"].insert(0, f"Independent audit found {len(errors)} invalid/fatal records")
 
     write_csv(campaign_dir / "aglr_summary.csv", summary)

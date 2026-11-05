@@ -195,3 +195,9 @@ Kết quả từ bộ JSON nhập là `(72,68,57)`, PAR-2 `(0.120001,15.240171,5
 giây. `trackB4/cont` mất 123.462673 giây nên bị chuyển thành timeout. LB/UB
 sau cutoff được bỏ khỏi các ca bị cắt. Các CSV CPLEX cũ vẫn thiếu lịch/`valid`;
 cài xong phần mềm chưa có nghĩa đã hoàn tất bảng thực nghiệm CPLEX mới.
+
+Vòng bộ ba `eaf0316` đã kết thúc; bảng và dữ liệu raw ở
+`results/sat_research/transitivity_v5_20261105/`. Đã kiểm tra
+35 test thư viện Rust và 32 test Python cho phương án giới hạn chi phí;
+mã đã push tại `6ba1b71`. Phương án này được xếp sau vòng bộ ba,
+mỗi vòng có giới hạn 6 giờ và full chạy tuần tự. Chưa kết luận vượt SOTA.

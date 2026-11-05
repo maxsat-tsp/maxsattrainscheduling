@@ -1,0 +1,111 @@
+{
+  "errors": [],
+  "gate": {
+    "passed": false,
+    "coverage_passed": false,
+    "baseline_comparison_passed": false,
+    "baseline_comparisons": [],
+    "reasons": [
+      "AGLR total coverage 200 does not exceed conference coverage 200",
+      "MaxSAT-Journal: missing or incomplete objectives: finsteps123, infsteps180, cont",
+      "CSOnet: missing or incomplete objectives: finsteps123, infsteps180, cont",
+      "BigM-Gurobi: missing or incomplete objectives: finsteps123, infsteps180, cont",
+      "BigM-CPLEX: missing or incomplete objectives: finsteps123, infsteps180, cont"
+    ],
+    "targets": {
+      "finsteps123": 72,
+      "infsteps180": 68,
+      "cont": 60
+    },
+    "coverage": {
+      "finsteps123": 72,
+      "infsteps180": 68,
+      "cont": 60
+    },
+    "total_coverage": 200,
+    "total_target": 200,
+    "conference_par2_seconds": {
+      "finsteps123": 0.023023615722222224,
+      "infsteps180": 13.785423612833334,
+      "cont": 44.06668685684722
+    },
+    "aglr_par2_seconds": {
+      "finsteps123": 0.02997414084722222,
+      "infsteps180": 13.853497016319444,
+      "cont": 45.04203774076389
+    }
+  },
+  "conference_reference": {
+    "source_data_commit": "db0b16f20d97045501e63e4b432a879218a0c180",
+    "source_directory": "results",
+    "runtime_comparable": true,
+    "runtime_comparability_assumed": true,
+    "runtime_provenance_verified": false,
+    "runtime_used_for_gate_or_ranking": true,
+    "runtime_mode": "assumed-equivalent",
+    "profile": "published-csv-120",
+    "verification_scope": "reported costs and bounds; no old schedules supplied",
+    "summary": [
+      {
+        "config": "MaxsatScDefault",
+        "objective": "finsteps123",
+        "n": 72,
+        "ok": 72,
+        "verified_ok": 72,
+        "timeout": 0,
+        "panic": 0,
+        "invalid_solution": 0,
+        "oom": 0,
+        "other_failure": 0,
+        "median_ok_ms": 7.868976999999999,
+        "median_ok_seconds": 0.007868977,
+        "par2_seconds": 0.023023615722222224,
+        "timeout_seconds": 120.0,
+        "runtime_comparable": false
+      },
+      {
+        "config": "MaxsatScDefault",
+        "objective": "infsteps180",
+        "n": 72,
+        "ok": 68,
+        "verified_ok": 68,
+        "timeout": 4,
+        "panic": 0,
+        "invalid_solution": 0,
+        "oom": 0,
+        "other_failure": 0,
+        "median_ok_ms": 10.770781,
+        "median_ok_seconds": 0.010770781,
+        "par2_seconds": 13.785423612833334,
+        "timeout_seconds": 120.0,
+        "runtime_comparable": false
+      },
+      {
+        "config": "MaxsatScDefault",
+        "objective": "cont",
+        "n": 72,
+        "ok": 60,
+        "verified_ok": 60,
+        "timeout": 12,
+        "panic": 0,
+        "invalid_solution": 0,
+        "oom": 0,
+        "other_failure": 0,
+        "median_ok_ms": 8.5956365,
+        "median_ok_seconds": 0.0085956365,
+        "par2_seconds": 44.06668685684722,
+        "timeout_seconds": 120.0,
+        "runtime_comparable": false
+      }
+    ],
+    "verified_optima": {
+      "finsteps123": 72,
+      "infsteps180": 68,
+      "cont": 60
+    },
+    "warnings": [
+      "The accepted manuscript specifies 120 seconds. CSV schedules are unavailable; only reported costs and bounds are checked."
+    ]
+  },
+  "published_baselines": null
+}

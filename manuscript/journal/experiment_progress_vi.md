@@ -162,6 +162,16 @@ Vòng orders `be60148` đã chạy full vì promote đạt `(24,22,20)`. Full đ
 trong `results/sat_research/orders_v3_20261105/`. Vòng kế tiếp thử orders
 ghép với cây chi phí thưa, giữ mọi thành phần khác cố định.
 
+Vòng kết hợp `7a1aa6d` đã xong: promote đạt `(24,22,20)`, nhưng full vẫn
+chỉ đạt `(72,68,59)`. PAR-2 full lần lượt là `0.02984`, `14.36371`,
+`46.92008` giây. Mọi lịch, chi phí, cận và mã thoát đều qua kiểm tra.
+Không chạy xác nhận vì chưa vượt coverage hội nghị. Dữ liệu nằm trong
+`results/sat_research/hybrid_v4_20261105/`.
+
+Đã bổ sung các gói dữ liệu raw và bảng CSV của vòng cost_v2/orders_v3 vào
+đúng thư mục Git; trước đó chúng nằm ở thư mục cha của repository. Hash
+đều khớp báo cáo ban đầu. Không cần chạy lại các thí nghiệm này.
+
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 
 Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio

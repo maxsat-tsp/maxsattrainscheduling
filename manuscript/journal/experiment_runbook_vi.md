@@ -455,10 +455,15 @@ phí cũ và policy refinement `legacy`; không kết hợp thêm thay đổi kh
 Theo dõi `maxsat_resource_order_pairs`, `maxsat_resource_order_rows`, coverage,
 PAR-2 và kích thước mô hình. Tính đúng đắn được kiểm tra bằng bảng chân trị,
 lịch khả thi theo cả hai thứ tự, và so với vét cạn trên bài nhỏ. Bộ kiểm thử
-Linux có 31 tests. Chưa có kết quả hiệu năng để kết luận cải thiện.
+Linux có 31 tests. Kết quả thực nghiệm được ghi ngay dưới đây.
 
 Kết quả orders `be60148` đã được chạy full: `(72,68,59)`, chưa vượt mốc
-`(72,68,60)`. Cấu hình giữ lại một instance `cont` so với CSOnet chạy lại,
+`(72,68,60)`. Cấu hình giữ coverage `cont` của CSOnet chạy lại,
 nhưng vẫn thiếu một instance so với dữ liệu hội nghị; không chạy xác nhận.
 Raw results và danh sách timeout được lưu trong
 `results/sat_research/orders_v3_20261105/`.
+
+Vòng kết hợp orders với sparse costs cũng đã chạy full ở commit `7a1aa6d`.
+Kết quả vẫn là `(72,68,59)`; mọi kết quả qua audit. Dữ liệu ở
+`results/sat_research/hybrid_v4_20261105/`. Chưa chọn cấu hình này làm phương
+pháp cuối và chưa đưa số liệu vào Abstract, Results hoặc Conclusion.

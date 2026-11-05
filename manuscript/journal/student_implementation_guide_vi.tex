@@ -694,10 +694,50 @@ Các trường \code{maxsat\_resource\_order\_pairs} và
 Giữ cách gửi điều kiện và chi phí cũ để đo riêng tác động của quyết định
 thứ tự; không bật cùng AGLR adaptive trong lượt này.
 
-Orders đạt mốc phát triển nhưng full còn thiếu một instance. Có thể thử phép
-kết hợp có chủ đích bằng \code{EXPERIMENT\_SET=orders-sparse}; phép thử này
-giữ orders và cây chi phí thưa, không chọn lời giải theo từng instance. Nếu
-promote không giữ $(24,22,20)$, dừng trước full.
+Orders đạt mốc phát triển nhưng full còn thiếu một instance. Phép kết hợp
+\code{EXPERIMENT\_SET=orders-sparse} đã được chạy và vẫn chỉ đạt
+$(72,68,59)$. Vì vậy chưa chọn hai cấu hình này làm phương pháp cuối.
+
+\subsection{Phép thử mới: loại vòng thứ tự giữa ba lượt}
+
+Giả sử đã có ba biến thứ tự cho các cặp $i,j$, $j,k$ và $i,k$, với
+$i<j<k$. Nếu chọn $i$ trước $j$ và $j$ trước $k$, phải chọn $i$ trước $k$.
+Thứ tự ngược cũng phải nhất quán. Thêm hai mệnh đề:
+\[
+(\neg p_{ij}\lor\neg p_{jk}\lor p_{ik})
+\quad\land\quad
+(p_{ij}\lor p_{jk}\lor\neg p_{ik}).
+\]
+Ví dụ, SAT không được đồng thời chọn A trước B, B trước C và C trước A.
+Nhờ vậy SAT có thể loại sớm một số lựa chọn vô ích mà chưa cần tạo thêm
+mốc thời gian. Mọi lịch hợp lệ đều có cách sắp thứ tự các lượt theo thời
+gian, nên hai mệnh đề vẫn giữ được lịch tối ưu.
+
+Chỉ thêm hai mệnh đề khi cả ba biến cặp đã có. Không tạo thêm cặp hoặc biến
+thứ tự chỉ để hoàn thành một bộ ba. Mỗi bộ ba được thêm đúng một lần, khi
+cặp cuối cùng xuất hiện; xét các lượt thứ ba theo số hiệu tăng dần để kết
+quả có thể tái tạo. Đây chỉ là điều kiện cho bộ ba, chưa phải cơ chế loại
+mọi vòng dài trong đồ thị thứ tự.
+
+\begin{verbatim}
+EXPERIMENT_SET=transitivity CYCLE_ID=orders-transitive-v5 \
+  bash run_maxsat_core_cycle.sh
+\end{verbatim}
+
+Lượt screen so sánh orders cũ với orders có điều kiện bộ ba. Lượt promote
+kiểm tra cách mới ở 120 giây; chỉ chạy full nếu giữ được $(24,22,20)$.
+Giữ biểu diễn chi phí cũ và cách gửi điều kiện \code{legacy} để đo riêng
+tác động của điều kiện bộ ba. Cờ trực tiếp là
+\code{--maxsat-ladder-sc-order-transitivity true}, dùng cùng
+\code{--maxsat-ladder-sc-resource-orders true}; mặc định cả hai đều tắt.
+Trường \code{maxsat\_resource\_order\_triangles} đếm số bộ ba đã thêm;
+số mệnh đề bổ sung bằng hai lần số này.
+
+Trước thực nghiệm, kiểm tra đủ tám cách định hướng một bộ ba: cách mới chỉ
+loại hai cách tạo vòng. Kiểm tra thêm việc không thêm trùng, giữ các lịch
+ba lượt hợp lệ và so với vét cạn trên bài ba tàu ở cả ba objective.
+Sinh viên cần báo coverage, PAR-2, số bộ ba, số biến và thời gian SAT;
+chưa kết luận cải thiện chỉ từ việc số mệnh đề tăng.
 
 Mỗi vòng chỉ thay đổi một thành phần. Đọc telemetry trước khi sửa:
 

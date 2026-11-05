@@ -27,6 +27,20 @@ class SelectionTests(unittest.TestCase):
             row["sparse_costs"] = row["resource_orders"] = "true"
         self.assertEqual(select(source, {"errors": []})["selected"]["variant"], "orders-sparse")
 
+    def test_transitivity_requires_orders_and_preserves_the_tested_variant(self):
+        source = rows("transitive", "legacy", (24, 22, 20))
+        for row in source:
+            row["order_transitivity"] = "true"
+        with self.assertRaises(ValueError):
+            select(source, {"errors": []})
+        for row in source:
+            row["resource_orders"] = "true"
+        self.assertEqual(select(source, {"errors": []})["selected"]["variant"], "orders-transitive")
+        for row in source:
+            row["sparse_costs"] = "true"
+        with self.assertRaises(ValueError):
+            select(source, {"errors": []})
+
     def test_does_not_combine_different_winners_or_promote_regression(self):
         decision = select(rows("full", "full", (24, 21, 21))
                           + rows("geom", "geometric", (24, 22, 19)), {"errors": []})

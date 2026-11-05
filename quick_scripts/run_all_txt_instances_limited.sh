@@ -68,6 +68,7 @@ MAXSATDDD_USE_TOUCHED_CLIQUE_AMO="${MAXSATDDD_USE_TOUCHED_CLIQUE_AMO:-}"
 MAXSATDDD_ASSUMPTIONS="${MAXSATDDD_ASSUMPTIONS:-}"
 MAXSATDDD_SPARSE_COSTS="${MAXSATDDD_SPARSE_COSTS:-}"
 MAXSATDDD_RESOURCE_ORDERS="${MAXSATDDD_RESOURCE_ORDERS:-}"
+MAXSATDDD_ORDER_TRANSITIVITY="${MAXSATDDD_ORDER_TRANSITIVITY:-}"
 
 tmpdir="$(mktemp -d /tmp/ddd-run-all.XXXXXX)"
 order_file="$tmpdir/order.txt"
@@ -278,6 +279,7 @@ run_fingerprint="$(python3 - \
   "${MAXSATDDD_ASSUMPTIONS:-default}" \
   "${MAXSATDDD_SPARSE_COSTS:-default}" \
   "${MAXSATDDD_RESOURCE_ORDERS:-default}" \
+  "${MAXSATDDD_ORDER_TRANSITIVITY:-default}" \
   "${cpu_model:-unavailable}" "$logical_cpus" "$memory_bytes" "$system_description" \
   "$cargo_lock_sha256" "$dataset_file_count" "$dataset_sha256" \
   "$salvers_commit" "$salvers_diff_sha256" "$salvers_state_sha256" "$salvers_dirty_count" \
@@ -356,6 +358,7 @@ else
     printf 'maxsatddd_assumptions=%s\n' "${MAXSATDDD_ASSUMPTIONS:-default}"
     printf 'maxsatddd_sparse_costs=%s\n' "${MAXSATDDD_SPARSE_COSTS:-default}"
     printf 'maxsatddd_resource_orders=%s\n' "${MAXSATDDD_RESOURCE_ORDERS:-default}"
+    printf 'maxsatddd_order_transitivity=%s\n' "${MAXSATDDD_ORDER_TRANSITIVITY:-default}"
     printf 'rustc=%s\n' "$(rustc --version 2>/dev/null || printf unavailable)"
     printf 'gurobi=%s\n' "${gurobi_version:-unavailable}"
     printf 'cpu_model=%s\n' "${cpu_model:-unavailable}"
@@ -427,6 +430,9 @@ run_one() {
   fi
   if [[ -n "$MAXSATDDD_RESOURCE_ORDERS" ]]; then
     extra_args+=(--maxsat-ladder-sc-resource-orders "$MAXSATDDD_RESOURCE_ORDERS")
+  fi
+  if [[ -n "$MAXSATDDD_ORDER_TRANSITIVITY" ]]; then
+    extra_args+=(--maxsat-ladder-sc-order-transitivity "$MAXSATDDD_ORDER_TRANSITIVITY")
   fi
   if [[ -n "$MAXSAT_RC2_BOUND_MODE" ]]; then
     extra_args+=(--maxsat-rc2-bound-mode "$MAXSAT_RC2_BOUND_MODE")

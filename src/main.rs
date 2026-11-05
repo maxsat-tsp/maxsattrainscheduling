@@ -122,6 +122,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_resource_orders: Option<bool>,
 
+    /// Forbid three-way cycles among existing resource-order decisions (default false).
+    #[structopt(long)]
+    maxsat_ladder_sc_order_transitivity: Option<bool>,
+
     /// AGLR refinement policy: legacy, all-scanned, or adaptive.
     #[structopt(long)]
     aglr_policy: Option<String>,
@@ -564,6 +568,7 @@ fn main() {
     let maxsat_ladder_sc_settings = maxsat_ladder_sc::MaxSatDddLadderScSettings {
         sparse_costs: opt.maxsat_ladder_sc_sparse_costs.unwrap_or(false),
         resource_orders: opt.maxsat_ladder_sc_resource_orders.unwrap_or(false),
+        order_transitivity: opt.maxsat_ladder_sc_order_transitivity.unwrap_or(false),
         assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
             "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
             "full" => maxsat_ladder_sc::AssumptionStrategy::Full,

@@ -35,6 +35,9 @@ class AuditAglrCampaignTests(unittest.TestCase):
             config["resource_orders"] = "true"
             self.assertTrue(all(any("maxsat_resource_orders" in error for error in r["errors"])
                                 for r in audit.load_json_method(root, config, 30)))
+            config["order_transitivity"] = "true"
+            self.assertTrue(all(any("maxsat_order_transitivity" in error for error in r["errors"])
+                                for r in audit.load_json_method(root, config, 30)))
 
     def test_cplex_names_are_normalized(self):
         self.assertEqual(audit.canonical_name("addtrackA3"), "trackA3")

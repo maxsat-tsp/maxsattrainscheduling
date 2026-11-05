@@ -82,6 +82,7 @@ pub struct SolveStats {
     pub cost_terms: usize,
     pub resource_order_pairs: usize,
     pub resource_order_rows: usize,
+    pub resource_order_triangles: usize,
     pub n_sat: usize,
     pub n_unsat: usize,
     pub n_travel: usize,
@@ -889,6 +890,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     assert!(settings.aglr.max_wait > 0, "AGLR max_wait must be positive");
     assert!(!settings.resource_orders || settings.aglr.policy == RefinementPolicy::Legacy,
             "resource-order experiments currently require legacy refinement");
+    assert!(!settings.order_transitivity || settings.resource_orders,
+            "order transitivity requires resource-order decisions");
 
     output_stats(
         "aglr_policy".to_string(),
@@ -920,6 +923,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_assumptions".to_string(), settings.assumption_strategy.as_str().into());
     output_stats("maxsat_sparse_costs".to_string(), settings.sparse_costs.into());
     output_stats("maxsat_resource_orders".to_string(), settings.resource_orders.into());
+    output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -1010,7 +1014,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     // Rows already added for fixed-precedence encoding: (visit_id, time).
     let mut fixed_prec_rows: HashSet<(VisitId, i32)> = HashSet::new();
     let mut encoded_refinement_clauses = HashSet::<AglrClauseKey>::new();
-    let mut resource_orders = super::resource_orders::ResourceOrders::new();
+    let mut resource_orders = super::resource_orders::ResourceOrders::new(settings.order_transitivity);
 
     // Optional: seed fixed-precedence (travel-time) constraints from the earliest
     // time points to reduce the number of "travel-time conflict" iterations.
@@ -1446,13 +1450,14 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                                         .unwrap_or(occupations[visit_id].delays[occupations[visit_id].incumbent_idx].0);
                                     let second_guard = other_next_visit.map(|_| t2_out_lit)
                                         .unwrap_or(occupations[other_visit].delays[occupations[other_visit].incumbent_idx].0);
-                                    let (created, rows) = resource_orders.add(
+                                    let (created, rows, triangles) = resource_orders.add(
                                         &mut solver, visit_id.0, other_visit.0, t1_out, t2_out,
                                         first_guard, second_guard, delay_t1, delay_t2,
                                     );
                                     stats.resource_order_pairs += usize::from(created);
                                     stats.resource_order_rows += rows;
-                                    n_conflict_constraints += rows;
+                                    stats.resource_order_triangles += triangles;
+                                    n_conflict_constraints += rows + 2 * triangles;
                                 } else {
                                     n_conflict_constraints += 1;
                                     SatInstance::add_clause(
@@ -2082,6 +2087,7 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_cost_terms".to_string(), stats.cost_terms.into());
     output_stats("maxsat_resource_order_pairs".to_string(), stats.resource_order_pairs.into());
     output_stats("maxsat_resource_order_rows".to_string(), stats.resource_order_rows.into());
+    output_stats("maxsat_resource_order_triangles".to_string(), stats.resource_order_triangles.into());
     output_stats(
         "objective_iters".to_string(),
         (*iteration_types.get(&IterationType::Objective).unwrap_or(&0)).into(),
@@ -2494,6 +2500,48 @@ mod aglr_end_to_end_tests {
         assert_eq!(solve_cost(&problem, RefinementPolicy::Legacy), optimum);
         assert_eq!(solve_cost(&problem, RefinementPolicy::Adaptive), optimum);
         assert_eq!(solve_cost_with_bound(&problem, RefinementPolicy::Adaptive, true), optimum);
+    }
+
+    #[test]
+    fn transitive_resource_orders_match_exhaustive_three_train_optimum() {
+        let problem = Problem {
+            name: "three-train-orders".to_string(),
+            trains: (0..3).map(|_| Train { visits: vec![
+                Visit { resource_id: 0, earliest: 0, aimed: Some(0), travel_time: 2 },
+            ] }).collect(),
+            conflicts: vec![(0, 0)],
+        };
+        for objective in [DelayCostType::Continuous, DelayCostType::FiniteSteps123,
+                          DelayCostType::InfiniteSteps180] {
+            let mut optimum = i32::MAX;
+            // An optimum is contained in [0, 6]: order three length-2 visits
+            // at 0,2,4, and moving any of them later cannot reduce its cost.
+            for a in 0..=6 {
+                for b in 0..=6 {
+                    for c in 0..=6 {
+                        if let Some(cost) = problem.verify_solution(
+                            &vec![vec![a, a + 2], vec![b, b + 2], vec![c, c + 2]], objective,
+                        ) {
+                            optimum = optimum.min(cost);
+                        }
+                    }
+                }
+            }
+            assert_ne!(optimum, i32::MAX);
+            for transitivity in [false, true] {
+                for sparse in [false, true] {
+                    let mut settings = MaxSatDddLadderScSettings::default();
+                    settings.resource_orders = true;
+                    settings.order_transitivity = transitivity;
+                    settings.sparse_costs = sparse;
+                    let (solution, _) = solve_with_settings(
+                        &quiet_env, satcoder::solvers::minisat::Solver::new(),
+                        &problem, 30.0, objective, settings, |_, _| {},
+                    ).unwrap();
+                    assert_eq!(problem.verify_solution(&solution, objective), Some(optimum));
+                }
+            }
+        }
     }
 
     #[test]

@@ -172,6 +172,11 @@ Không chạy xác nhận vì chưa vượt coverage hội nghị. Dữ liệu n
 đúng thư mục Git; trước đó chúng nằm ở thư mục cha của repository. Hash
 đều khớp báo cáo ban đầu. Không cần chạy lại các thí nghiệm này.
 
+Vòng tiếp theo thêm điều kiện bắc cầu cho bộ ba biến thứ tự đã có, không
+tạo hàng loạt cặp mới. Giữ orders, chi phí cũ và giả định `legacy` để đo
+riêng tác động. 35 kiểm thử thư viện Rust và 31 kiểm thử Python đã qua,
+release build thành công. Chưa có số liệu hiệu năng của cơ chế bộ ba.
+
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 
 Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio

@@ -467,3 +467,31 @@ Vòng kết hợp orders với sparse costs cũng đã chạy full ở commit `7
 Kết quả vẫn là `(72,68,59)`; mọi kết quả qua audit. Dữ liệu ở
 `results/sat_research/hybrid_v4_20261105/`. Chưa chọn cấu hình này làm phương
 pháp cuối và chưa đưa số liệu vào Abstract, Results hoặc Conclusion.
+
+## Phép thử loại vòng thứ tự giữa ba lượt
+
+Chỉ thêm tính bắc cầu khi đã có đủ ba biến thứ tự. Với `i < j < k`, thêm
+`(!p_ij OR !p_jk OR p_ik)` và `(p_ij OR p_jk OR !p_ik)`. Hai mệnh đề loại
+hai cách định hướng tạo vòng. Không tạo thêm biến cặp; xét số hiệu lượt thứ
+ba theo thứ tự tăng dần. Đây là điều kiện cho bộ ba, chưa loại mọi vòng dài.
+
+```bash
+EXPERIMENT_SET=transitivity CYCLE_ID=orders-transitive-v5 \
+  bash run_maxsat_core_cycle.sh
+```
+
+Screen đối chứng `orders` với `orders-transitive`; promote chỉ kiểm tra
+cách mới. Giữ cây chi phí cũ, giả định chi phí `legacy` và refinement
+`legacy`. Chỉ chạy full khi promote giữ được `(24,22,20)`. Theo dõi thêm
+`maxsat_resource_order_triangles`: mỗi bộ ba tương ứng hai mệnh đề.
+Mặc định CLI không thay đổi. Cờ mới là
+`--maxsat-ladder-sc-order-transitivity true`, cần bật resource orders.
+
+Đã qua 35 kiểm thử `cargo test --lib -- --test-threads=1` trên Linux,
+31 kiểm thử Python, kiểm tra Bash và build release. Kiểm thử mới gồm đủ
+tám định hướng của bộ ba, không thêm trùng, bảo toàn các lịch ba lượt khả
+thi và optimum vét cạn bài ba tàu ở ba objective. Hướng dẫn LaTeX đã biên
+dịch lại. Kiểm thử CLI cũ `samescore_all_instances` cần
+`instances/Instance3.xml`, `Instance4.xml`, `Instance5.xml`; các file này
+không có trong checkout, nên lượt `cargo test --bin ddd` còn lỗi thiếu
+fixture. Không gọi đây là kết quả toàn bộ test suite đã qua.

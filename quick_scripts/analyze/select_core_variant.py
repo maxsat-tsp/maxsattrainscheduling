@@ -12,6 +12,21 @@ from pathlib import Path
 OBJECTIVES = {"finsteps123", "infsteps180", "cont"}
 
 
+def variant_for(row: dict) -> str:
+    sparse = row.get("sparse_costs") == "true"
+    orders = row.get("resource_orders") == "true"
+    transitive = row.get("order_transitivity") == "true"
+    if transitive and (not orders or sparse):
+        raise ValueError("transitivity requires orders and an explicitly tested cost configuration")
+    if (sparse or orders or transitive) and row["assumptions"] != "legacy":
+        raise ValueError("combined mechanisms require an explicit new variant")
+    if transitive:
+        return "orders-transitive"
+    if orders:
+        return "orders-sparse" if sparse else "orders"
+    return "sparse" if sparse else row["assumptions"]
+
+
 def select(rows: list[dict], audit: dict) -> dict:
     if audit.get("errors") != []:
         raise ValueError("a complete, error-free audit is required")
@@ -24,17 +39,11 @@ def select(rows: list[dict], audit: dict) -> dict:
             raise ValueError(f"{tag}: expected exactly three objective rows")
         if any(int(r["instances"]) != 24 for r in items):
             raise ValueError(f"{tag}: expected the locked 24-instance development set")
-        for row in items:
-            mechanisms = int(row.get("sparse_costs") == "true") + int(row.get("resource_orders") == "true")
-            if mechanisms and row["assumptions"] != "legacy":
-                raise ValueError(f"{tag}: combined mechanisms require an explicit new variant")
-        variants = {"orders-sparse" if r.get("resource_orders") == "true" and r.get("sparse_costs") == "true" else
-                    "orders" if r.get("resource_orders") == "true" else
-                    "sparse" if r.get("sparse_costs") == "true" else r["assumptions"] for r in items}
+        variants = {variant_for(row) for row in items}
         if len(variants) != 1:
             raise ValueError(f"{tag}: objective rows have different variants")
         variant = variants.pop()
-        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse"}:
+        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive"}:
             raise ValueError(f"unsupported variant {variant}")
         par2 = sum(float(r["par2_seconds"]) for r in items)
         if not math.isfinite(par2) or par2 < 0:

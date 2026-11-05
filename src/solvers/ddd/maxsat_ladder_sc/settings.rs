@@ -104,6 +104,8 @@ pub struct MaxSatDddLadderScSettings {
     pub assumption_strategy: AssumptionStrategy,
     pub sparse_costs: bool,
     pub resource_orders: bool,
+    /// Close three-way cycles only among resource-order bits already created.
+    pub order_transitivity: bool,
     pub use_precedence_graph: bool,
     pub use_sc_amo: bool,
     pub use_touched_clique_amo: bool,
@@ -128,6 +130,7 @@ impl Default for MaxSatDddLadderScSettings {
             assumption_strategy: AssumptionStrategy::Legacy,
             sparse_costs: false,
             resource_orders: false,
+            order_transitivity: false,
             use_precedence_graph: true,
             use_eager_chain_expansion: false,
             use_sc_amo: true,

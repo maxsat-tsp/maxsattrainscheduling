@@ -142,6 +142,10 @@ struct Opt {
     #[structopt(long)]
     aglr_use_objective_bound: Option<bool>,
 
+    /// Remove encoded and duplicate refinement actions before budgeting. Default: false.
+    #[structopt(long)]
+    aglr_filter_duplicates: Option<bool>,
+
     /// Objective encoding for `sat_ddd*` solvers: `scpb`, `totalizer`, or `bit_totalizer`.
     #[structopt(long)]
     satddd_objective_encoding: Option<String>,
@@ -595,6 +599,7 @@ fn main() {
         heuristic_period: aglr_heuristic_period,
         heuristic_min_gap: opt.aglr_heuristic_min_gap.unwrap_or(0),
         use_objective_bound: opt.aglr_use_objective_bound.unwrap_or(false),
+        filter_duplicates: opt.aglr_filter_duplicates.unwrap_or(false),
     };
     if solvers
         .iter()

@@ -46,6 +46,7 @@ pub struct AglrSettings {
     pub heuristic_period: usize,
     pub heuristic_min_gap: usize,
     pub use_objective_bound: bool,
+    pub filter_duplicates: bool,
 }
 
 impl Default for AglrSettings {
@@ -59,6 +60,7 @@ impl Default for AglrSettings {
             heuristic_period: 1,
             heuristic_min_gap: 0,
             use_objective_bound: false,
+            filter_duplicates: false,
         }
     }
 }

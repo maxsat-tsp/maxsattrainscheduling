@@ -29,6 +29,7 @@ AGLR_RESCUE_PROGRESS="${AGLR_RESCUE_PROGRESS:-bound-or-heuristic}"
 AGLR_HEURISTIC_PERIOD="${AGLR_HEURISTIC_PERIOD:-1}"
 AGLR_HEURISTIC_MIN_GAP="${AGLR_HEURISTIC_MIN_GAP:-0}"
 AGLR_USE_OBJECTIVE_BOUND="${AGLR_USE_OBJECTIVE_BOUND:-false}"
+AGLR_FILTER_DUPLICATES="${AGLR_FILTER_DUPLICATES:-false}"
 
 case "$MODE" in
   baseline|candidate|screen|promote|full|confirm) ;;
@@ -112,6 +113,7 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'heuristic_period=%s\n' "$AGLR_HEURISTIC_PERIOD"
     printf 'heuristic_min_gap=%s\n' "$AGLR_HEURISTIC_MIN_GAP"
     printf 'use_objective_bound=%s\n' "$AGLR_USE_OBJECTIVE_BOUND"
+    printf 'filter_duplicates=%s\n' "$AGLR_FILTER_DUPLICATES"
     if [[ -n "$conference_reference_sha256" ]]; then
       printf 'conference_reference_dir=%s\n' "$CONFERENCE_RESULTS_DIR"
       printf 'conference_reference_sha256=%s\n' "$conference_reference_sha256"
@@ -126,7 +128,7 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$campaign_file"
 else
-  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" "$CONFERENCE_RUNTIME_MODE" "$SCREEN_PARALLELISM" "$FULL_TIMEOUT_SECS" "$AGLR_RESCUE_PROGRESS" "$AGLR_HEURISTIC_PERIOD" "$AGLR_HEURISTIC_MIN_GAP" "$AGLR_USE_OBJECTIVE_BOUND" <<'PY'
+  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" "$CONFERENCE_RUNTIME_MODE" "$SCREEN_PARALLELISM" "$FULL_TIMEOUT_SECS" "$AGLR_RESCUE_PROGRESS" "$AGLR_HEURISTIC_PERIOD" "$AGLR_HEURISTIC_MIN_GAP" "$AGLR_USE_OBJECTIVE_BOUND" "$AGLR_FILTER_DUPLICATES" <<'PY'
 from pathlib import Path
 import sys
 
@@ -136,7 +138,7 @@ if sys.argv[6]:
     expected["conference_reference_sha256"] = sys.argv[6]
     expected["conference_reference_source_data_commit"] = sys.argv[7]
     expected["conference_runtime_mode"] = sys.argv[8]
-expected.update(zip(("screen_parallelism", "full_timeout_seconds", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound"), sys.argv[9:]))
+expected.update(zip(("screen_parallelism", "full_timeout_seconds", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound", "filter_duplicates"), sys.argv[9:]))
 actual = {}
 for line in path.read_text().splitlines():
     key, separator, value = line.partition("=")
@@ -186,6 +188,7 @@ run_method() {
     "heuristic_period=$AGLR_HEURISTIC_PERIOD" \
     "heuristic_min_gap=$AGLR_HEURISTIC_MIN_GAP" \
     "use_objective_bound=$AGLR_USE_OBJECTIVE_BOUND" \
+    "filter_duplicates=$AGLR_FILTER_DUPLICATES" \
     "timeout_seconds=$timeout" \
     "instances=$(tr ' ' ',' <<<"$instances")"
 
@@ -208,6 +211,7 @@ run_method() {
     AGLR_HEURISTIC_PERIOD="$AGLR_HEURISTIC_PERIOD" \
     AGLR_HEURISTIC_MIN_GAP="$AGLR_HEURISTIC_MIN_GAP" \
     AGLR_USE_OBJECTIVE_BOUND="$AGLR_USE_OBJECTIVE_BOUND" \
+    AGLR_FILTER_DUPLICATES="$AGLR_FILTER_DUPLICATES" \
     INSTANCE_NAMES="$instances" \
     INSTANCE_ORDER_SEED="$(stable_seed "$tag-$objective")" \
     RERUN_NON_OK="${RERUN_NON_OK:-0}" \

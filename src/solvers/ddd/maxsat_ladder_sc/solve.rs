@@ -240,14 +240,22 @@ fn assert_binary_le<L: satcoder::Lit + Copy + 'static>(
 
 struct BinaryObjective<L: satcoder::Lit> {
     reg_bits: Vec<Bool<L>>,
-    remaining: Option<Binary<L>>,
+    remaining: Binary<L>,
+    upper_bound: usize,
 }
 
 impl<L: satcoder::Lit + Copy + 'static> BinaryObjective<L> {
-    fn new() -> Self {
+    /// Reserve an unsigned budget B <= UB. Every original weighted cost term
+    /// is subtracted exactly once, with underflow forbidden. No new soft
+    /// objective is introduced: RC2 keeps minimizing the original costs.
+    fn new(solver: &mut impl SatInstance<L>, upper_bound: usize) -> Self {
+        let reg_bits = (0..bits_needed(upper_bound)).map(|_| solver.new_var()).collect::<Vec<_>>();
+        let remaining = build_binary_register(&reg_bits);
+        assert_binary_le(solver, &remaining, &Binary::constant(upper_bound));
         Self {
-            reg_bits: Vec::new(),
-            remaining: None,
+            reg_bits,
+            remaining,
+            upper_bound,
         }
     }
 
@@ -257,44 +265,18 @@ impl<L: satcoder::Lit + Copy + 'static> BinaryObjective<L> {
         }
 
         let term = build_weighted_binary_term(lit, weight);
-        let current_remaining = self
-            .remaining
-            .clone()
-            .expect("binary objective requires an upper bound before adding terms");
-        let (next_remaining, underflow) = subtract_binary(solver, &current_remaining, &term);
+        let (next_remaining, underflow) = subtract_binary(solver, &self.remaining, &term);
         solver.add_clause(vec![!underflow]);
-        self.remaining = Some(next_remaining);
+        self.remaining = next_remaining;
     }
 
-    fn ensure_capacity(
-        &mut self,
-        solver: &mut impl SatInstance<L>,
-        soft_constraints: &mut HashMap<Bool<L>, (Soft<L>, usize, usize)>,
-        capacity: usize,
-    ) {
-        let need_bits = bits_needed(capacity);
-        let old_len = self.reg_bits.len();
-
-        if need_bits > self.reg_bits.len() {
-            while self.reg_bits.len() < need_bits {
-                let bit = self.reg_bits.len();
-                let reg_bit = solver.new_var();
-                let weight = 1usize << bit;
-                self.reg_bits.push(reg_bit);
-                soft_constraints.insert(!reg_bit, (Soft::Primary, weight, weight));
-            }
-        }
-
-        if old_len == self.reg_bits.len() {
-            if self.remaining.is_none() {
-                self.remaining = Some(build_binary_register(&self.reg_bits));
-            }
-        } else if let Some(remaining) = self.remaining.take() {
-            let mut bits = remaining.into_list();
-            bits.extend(self.reg_bits[old_len..].iter().copied());
-            self.remaining = Some(Binary::from_list(bits));
+    fn tighten(&mut self, solver: &mut impl SatInstance<L>, upper_bound: usize) -> bool {
+        if upper_bound < self.upper_bound {
+            assert_binary_le(solver, &build_binary_register(&self.reg_bits), &Binary::constant(upper_bound));
+            self.upper_bound = upper_bound;
+            true
         } else {
-            self.remaining = Some(build_binary_register(&self.reg_bits));
+            false
         }
     }
 }
@@ -314,6 +296,13 @@ struct AglrTelemetry {
     duplicate_clauses_skipped: usize,
     model_progress_iterations: usize,
     heuristic_submissions: usize,
+    objective_bound_terms: usize,
+    objective_bound_updates: usize,
+    objective_bound_time: Duration,
+    duplicate_candidates_filtered: usize,
+    refinement_clauses_added: usize,
+    refinement_points_added: usize,
+    rescue_candidates_selected: usize,
     final_validation_time: Duration,
 }
 
@@ -357,6 +346,23 @@ enum RefinementAction<L: satcoder::Lit> {
 struct DetectedRefinement<L: satcoder::Lit> {
     candidate: AglrCandidate,
     action: RefinementAction<L>,
+}
+
+impl<L: satcoder::Lit> DetectedRefinement<L> {
+    fn clause_key(&self) -> AglrClauseKey {
+        match &self.action {
+            RefinementAction::Travel { visit_id, next_visit, in_t, required_t, .. } => AglrClauseKey::Travel {
+                from: *visit_id, from_time: *in_t, to: *next_visit, required_time: *required_t,
+            },
+            RefinementAction::Resource { visit_id, other_visit, t1_out, t2_out, .. } => {
+                if visit_id.0 <= other_visit.0 {
+                    AglrClauseKey::Resource { first: *visit_id, first_exit: *t1_out, second: *other_visit, second_exit: *t2_out }
+                } else {
+                    AglrClauseKey::Resource { first: *other_visit, first_exit: *t2_out, second: *visit_id, second_exit: *t1_out }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -521,6 +527,13 @@ fn detect_and_apply_aglr<L: satcoder::Lit + Copy + 'static>(
         model_progress: false,
     };
     telemetry.candidates_detected += detected.len();
+    if settings.aglr.filter_duplicates {
+        let keys = detected.iter().map(DetectedRefinement::clause_key).collect::<Vec<_>>();
+        let keep = super::aglr::unique_action_indices(&keys, encoded_refinement_clauses).into_iter().collect::<HashSet<_>>();
+        let before = detected.len();
+        detected = detected.into_iter().enumerate().filter_map(|(index, action)| keep.contains(&index).then_some(action)).collect();
+        telemetry.duplicate_candidates_filtered += before - detected.len();
+    }
 
     let existing = occupations
         .iter_enumerated()
@@ -553,9 +566,11 @@ fn detect_and_apply_aglr<L: satcoder::Lit + Copy + 'static>(
     telemetry.max_age = telemetry.max_age.max(selection.max_age);
     if selection.rescued {
         telemetry.rescue_iterations += 1;
+        telemetry.rescue_candidates_selected += selection.indices.len();
     }
 
-    let before_constraints = *n_conflict_constraints;
+    let before_clauses = encoded_refinement_clauses.len();
+    let before_sat_clauses = crate::solvers::util::counting_solver::get_counts().1;
     let before_time_points = new_time_points.len();
     let apply_start = Instant::now();
     let mut touched_pair_cliques: HashMap<(usize, i32), HashSet<VisitId>> = HashMap::new();
@@ -721,8 +736,11 @@ fn detect_and_apply_aglr<L: satcoder::Lit + Copy + 'static>(
         }
     }
     telemetry.application_time += apply_start.elapsed();
-    outcome.model_progress = *n_conflict_constraints > before_constraints
-        || new_time_points.len() > before_time_points;
+    let added_clauses = encoded_refinement_clauses.len() - before_clauses;
+    let added_points = new_time_points.len() - before_time_points;
+    telemetry.refinement_clauses_added += crate::solvers::util::counting_solver::get_counts().1 - before_sat_clauses;
+    telemetry.refinement_points_added += added_points;
+    outcome.model_progress = added_clauses > 0 || added_points > 0;
     outcome
 }
 
@@ -891,6 +909,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         "aglr_use_objective_bound".to_string(),
         settings.aglr.use_objective_bound.into(),
     );
+    output_stats("aglr_filter_duplicates".to_string(), settings.aglr.filter_duplicates.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -1076,6 +1095,18 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
     let mut aglr_history = CandidateHistory::default();
     let mut aglr_telemetry = AglrTelemetry::default();
+    let mut binary_objective = if settings.aglr.use_objective_bound
+        && settings.aglr.policy != RefinementPolicy::Legacy
+    {
+        let upper = best_heur.as_ref().ok_or_else(|| SolverError::InvalidSolution(
+            "objective bound requires a verified initial feasible schedule".to_string()
+        ))?.0;
+        Some(BinaryObjective::new(&mut solver, upper.try_into().map_err(|_| {
+            SolverError::InvalidSolution("negative objective upper bound".to_string())
+        })?))
+    } else {
+        None
+    };
     let mut last_progress_iteration = 0usize;
     let mut last_heuristic_submission_iteration = None;
 
@@ -1597,6 +1628,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             }
         }
 
+        // Only original CostTree terms enter the hard objective bound; RC2
+        // relaxation totalizers are not costs and must never be counted twice.
+        let mut new_objective_terms = Vec::new();
         // Add new time points and their costs to the solver.
         for (visit, new_timepoint_var, new_t) in new_time_points.drain(..) {
             n_timepoints += 1;
@@ -1636,12 +1670,29 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                         new_timepoint_cost,
                         &mut |weight, cost_var| {
                             soft_constraints.insert(!cost_var, (Soft::Primary, weight, weight));
+                            if binary_objective.is_some() {
+                                new_objective_terms.push((cost_var, weight));
+                            }
                         },
                     );
                 }
             }
 
             // set the cost for this new time point.
+        }
+
+        if let Some(objective) = binary_objective.as_mut() {
+            let encoding_start = Instant::now();
+            if let Some((upper, _)) = best_heur.as_ref() {
+                if objective.tighten(&mut solver, *upper as usize) {
+                    aglr_telemetry.objective_bound_updates += 1;
+                }
+            }
+            for (literal, weight) in new_objective_terms {
+                objective.add_term(&mut solver, literal, weight);
+                aglr_telemetry.objective_bound_terms += 1;
+            }
+            aglr_telemetry.objective_bound_time += encoding_start.elapsed();
         }
 
         //Solve
@@ -1885,6 +1936,11 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                         }
                     }
                 }
+                if binary_objective.is_some() {
+                    return Err(SolverError::InvalidSolution(
+                        "bounded model is UNSAT despite a verified feasible upper bound".to_string()
+                    ));
+                }
                 return Err(SolverError::NoSolution); // UNSAT
             }
 
@@ -2109,6 +2165,14 @@ fn do_output_stats<L: satcoder::Lit>(
         "aglr_heuristic_submissions".to_string(),
         aglr.heuristic_submissions.into(),
     );
+    output_stats("aglr_objective_bound_terms".to_string(), aglr.objective_bound_terms.into());
+    output_stats("aglr_objective_bound_updates".to_string(), aglr.objective_bound_updates.into());
+    output_stats("aglr_objective_bound_time".to_string(), aglr.objective_bound_time.as_secs_f64().into());
+    output_stats("aglr_duplicate_candidates_filtered".to_string(), aglr.duplicate_candidates_filtered.into());
+    output_stats("aglr_refinement_clauses_added".to_string(), aglr.refinement_clauses_added.into());
+    output_stats("aglr_refinement_points_added".to_string(), aglr.refinement_points_added.into());
+    output_stats("aglr_rescue_candidates_selected".to_string(), aglr.rescue_candidates_selected.into());
+    output_stats("aglr_growth_ratio".to_string(), if aglr.all_growth == 0 { 0.0 } else { aglr.selected_growth as f64 / aglr.all_growth as f64 }.into());
     let heuristic = heuristic_filter.snapshot();
     output_stats(
         "heuristic_candidates_received".to_string(),
@@ -2198,6 +2262,63 @@ fn inject_solution_timepoints_maxsat<L: satcoder::Lit>(
 }
 
 #[cfg(test)]
+mod binary_objective_tests {
+    use super::*;
+    use satcoder::{SatResult, SatSolver};
+
+    #[test]
+    fn comparator_and_subtraction_match_exhaustive_truth_tables() {
+        for a in 0..16 {
+            for b in 0..16 {
+                let mut solver = satcoder::solvers::minisat::Solver::new();
+                let (diff, borrow) = subtract_binary(&mut solver, &Binary::constant(a), &Binary::constant(b));
+                let bits = diff.into_list();
+                let width = bits.len();
+                match SatSolver::solve(&mut solver) {
+                    SatResult::Sat(model) => {
+                        assert_eq!(model.value(&borrow), a < b);
+                        let value = bits.iter().enumerate().fold(0, |acc, (i, bit)| acc | ((model.value(bit) as usize) << i));
+                        assert_eq!(value, a.wrapping_sub(b) & ((1 << width) - 1));
+                    }
+                    _ => panic!("arithmetic encoding must be satisfiable"),
+                };
+                let mut solver = satcoder::solvers::minisat::Solver::new();
+                assert_binary_le(&mut solver, &Binary::constant(a), &Binary::constant(b));
+                assert_eq!(matches!(SatSolver::solve(&mut solver), SatResult::Sat(_)), a <= b);
+            }
+        }
+    }
+
+    #[test]
+    fn incremental_weighted_bound_handles_zero_large_terms_and_tightening() {
+        for initial_upper in [0, 1, 3, 7, 10, 16] {
+            let mut solver = satcoder::solvers::minisat::Solver::new();
+            let literals = (0..3).map(|_| SatInstance::new_var(&mut solver)).collect::<Vec<_>>();
+            let weights = [1, 3, 17];
+            let mut objective = BinaryObjective::new(&mut solver, initial_upper);
+            for i in 0..3 {
+                objective.add_term(&mut solver, literals[i], weights[i]);
+                for mask in 0..8 {
+                    let cost = (0..=i).filter(|j| mask & (1 << j) != 0).map(|j| weights[j]).sum::<usize>();
+                    let result = SatSolverWithCore::solve_with_assumptions(&mut solver,
+                        literals.iter().enumerate().map(|(j, lit)| if mask & (1 << j) != 0 { *lit } else { !*lit }));
+                    assert_eq!(matches!(result, satcoder::SatResultWithCore::Sat(_)), cost <= initial_upper);
+                }
+            }
+            for upper in (0..initial_upper).rev() {
+                assert!(objective.tighten(&mut solver, upper));
+                for mask in 0..8 {
+                    let cost = (0..3).filter(|j| mask & (1 << j) != 0).map(|j| weights[j]).sum::<usize>();
+                    let result = SatSolverWithCore::solve_with_assumptions(&mut solver,
+                        literals.iter().enumerate().map(|(j, lit)| if mask & (1 << j) != 0 { *lit } else { !*lit }));
+                    assert_eq!(matches!(result, satcoder::SatResultWithCore::Sat(_)), cost <= upper);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod aglr_end_to_end_tests {
     use super::*;
     use crate::problem::{Problem, Train, Visit};
@@ -2243,12 +2364,17 @@ mod aglr_end_to_end_tests {
     }
 
     fn solve_cost(problem: &Problem, policy: RefinementPolicy) -> i32 {
+        solve_cost_with_bound(problem, policy, false)
+    }
+
+    fn solve_cost_with_bound(problem: &Problem, policy: RefinementPolicy, use_bound: bool) -> i32 {
         let mut settings = MaxSatDddLadderScSettings::default();
         settings.aglr = AglrSettings {
             policy,
             min_growth: 1,
             fraction: 0.5,
             max_wait: 2,
+            use_objective_bound: use_bound,
             ..AglrSettings::default()
         };
         let solution = solve_with_settings(
@@ -2273,6 +2399,7 @@ mod aglr_end_to_end_tests {
         let optimum = exhaustive_optimum(&problem);
         assert_eq!(solve_cost(&problem, RefinementPolicy::Legacy), optimum);
         assert_eq!(solve_cost(&problem, RefinementPolicy::Adaptive), optimum);
+        assert_eq!(solve_cost_with_bound(&problem, RefinementPolicy::Adaptive, true), optimum);
     }
 }
 

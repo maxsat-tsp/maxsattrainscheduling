@@ -8,6 +8,16 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::settings::{AglrSettings, RefinementPolicy};
 
+/// Return the first occurrence of each not-yet-encoded action, preserving order.
+pub(super) fn unique_action_indices<K: Eq + std::hash::Hash + Copy>(
+    keys: &[K], encoded: &HashSet<K>,
+) -> Vec<usize> {
+    let mut seen = HashSet::new();
+    keys.iter().enumerate().filter_map(|(index, key)| {
+        (!encoded.contains(key) && seen.insert(*key)).then_some(index)
+    }).collect()
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(super) struct VisitTime {
     pub visit: u32,
@@ -253,6 +263,18 @@ pub(super) fn select(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn filter_actions_before_budget_but_keep_different_times() {
+        let keys = [(1, 2, 10), (1, 2, 10), (1, 2, 20), (3, 4, 30)];
+        let encoded = HashSet::from([(3, 4, 30)]);
+        assert_eq!(unique_action_indices(&keys, &encoded), vec![0, 2]);
+        assert_eq!(unique_action_indices(&keys, &encoded), unique_action_indices(&keys, &encoded));
+        let candidates = keys.iter().map(|&(from, to, time)| candidate(ConflictKey::Travel { from, to }, &[(to, time)])).collect::<Vec<_>>();
+        let filtered = unique_action_indices(&keys, &encoded).into_iter().map(|i| candidates[i].clone()).collect::<Vec<_>>();
+        assert_eq!(all_growth(&filtered, &HashSet::new()), 4);
+        assert_eq!(all_growth(&candidates, &HashSet::new()), 7);
+    }
 
     fn point(visit: u32, time: i32) -> VisitTime {
         VisitTime { visit, time }

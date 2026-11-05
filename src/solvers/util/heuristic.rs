@@ -185,14 +185,15 @@ pub fn spawn_filtered_heuristic_thread(
 }
 
 pub fn spawn_heuristic_thread(
-    mk_env: impl Fn() -> grb::prelude::Env + Send + 'static,
+    _mk_env: impl Fn() -> grb::prelude::Env + Send + 'static,
     sol_in_rx: std::sync::mpsc::Receiver<Vec<Vec<i32>>>,
     problem: Problem,
     delay_cost_type: DelayCostType,
     sol_out_tx: std::sync::mpsc::Sender<(i32, Vec<Vec<i32>>)>,
 ) {
     std::thread::spawn(move || {
-        let env = mk_env();
+        // Preserve the legacy graph heuristic, but avoid the same unused
+        // native-environment startup race fixed in the filtered AGLR worker.
         while let Ok(mut sol) = sol_in_rx.recv() {
             loop {
                 while let Ok(more_recent_sol) = sol_in_rx.try_recv() {
@@ -200,8 +201,7 @@ pub fn spawn_heuristic_thread(
                 }
                 // let ub_sol =
                 //     crate::solvers::util::heuristic::solve_heuristic(&env, &problem, &sol).unwrap();
-                let ub_sol = crate::solvers::util::heuristic::solve_heuristic_better(
-                    &env,
+                let ub_sol = solve_graph_heuristic(
                     &problem,
                     delay_cost_type,
                     false,
@@ -227,8 +227,7 @@ pub fn spawn_heuristic_thread(
                     _ => {}
                 }
 
-                let ub_sol = crate::solvers::util::heuristic::solve_heuristic_better(
-                    &env,
+                let ub_sol = solve_graph_heuristic(
                     &problem,
                     delay_cost_type,
                     true,

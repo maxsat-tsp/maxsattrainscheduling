@@ -150,6 +150,12 @@ kiện và cây chi phí cũ được giữ làm đối chứng. 31 Rust tests �
 bảng chân trị tương đương mệnh đề cũ ở một mốc, tính đúng khi dùng nhiều
 mốc và bài lịch tàu nhỏ vét cạn. Chỉ chạy sau khi xem kết quả vòng chi phí.
 
+Vòng chi phí `27b6859` đã kết thúc. Cách mã hóa thưa đạt `(24,22,19)` ở
+120 giây trên tập phát triển, dưới mốc `(24,22,20)`; không chạy full. Bản
+đối chứng legacy ở 30 giây là `(24,22,17)`, sparse cũng `(24,22,17)`. Mọi
+JSON đã qua audit. Dữ liệu nằm trong `results/sat_research/cost_v2_20261105/`
+và `core_selection.json` ghi quyết định không chọn cấu hình.
+
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 
 Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio

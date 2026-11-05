@@ -419,6 +419,11 @@ vẫn thua Big-M Gurobi nếu baseline đó có 206. `gate.passed` yêu cầu c�
 mốc đều đạt và không có lỗi audit. Không dùng việc có đủ file baseline thay
 cho việc vượt kết quả baseline.
 
+Vòng `cost_v2` đã cho kết quả promote `(24,22,19)` với cách sparse, nên
+script đã dừng trước full. Đây là hành vi bắt buộc: không chạy 72 instance
+khi cấu hình đã mất coverage phát triển. Kết quả giữ trong
+`results/sat_research/cost_v2_20261105/`.
+
 Theo yêu cầu tái sử dụng kết quả hội nghị, auditor có cờ
 `--reuse-published-baselines results`, dùng kèm cutoff 120 và
 `--conference-runtime-mode assumed-equivalent`. Cờ này giữ metadata rằng

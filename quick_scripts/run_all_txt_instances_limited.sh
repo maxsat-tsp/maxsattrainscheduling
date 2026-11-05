@@ -500,46 +500,8 @@ PY
   elapsed_ms=$((end_ms - start_ms))
   elapsed_seconds="$(awk "BEGIN { printf \"%.3f\", $elapsed_ms / 1000 }")"
 
-  if [[ -s "$out_json" ]]; then
-    return 0
-  fi
-
-  local external_status="failed"
-  if [[ "$status" -eq 124 ]]; then
-    external_status="external_timeout"
-  elif [[ "$status" -eq 137 ]]; then
-    external_status="killed"
-  elif [[ "$status" -eq 134 ]]; then
-    external_status="aborted"
-  elif [[ "$status" -eq 139 ]]; then
-    external_status="segfault"
-  elif [[ "$status" -eq 101 ]]; then
-    external_status="panic"
-  fi
-
-  cat >"$out_json" <<EOF
-[
-  {
-    "index": null,
-    "name": "$instance_name",
-    "trains": null,
-    "conflicts": null,
-    "avg_tracks": null,
-    "conflicting_visit_pairs": null,
-    "delay_cost_type": "$OBJECTIVE",
-    "solves": [
-      {
-        "solver_name": "$effective_solver",
-        "status": "$external_status",
-        "external_status": "$external_status",
-        "exit_code": $status,
-        "sol_time": $elapsed_ms,
-        "total_time": $elapsed_seconds
-      }
-    ]
-  }
-]
-EOF
+  python3 quick_scripts/analyze/record_process_exit.py \
+    "$out_json" "$status" "$elapsed_seconds" "$instance_name" "$effective_solver" "$INSTANCE_TIMEOUT_SECS"
 }
 
 while IFS= read -r instance_name; do

@@ -125,7 +125,7 @@ fn send_if_improving_and_valid(
 /// AGLR-only heuristic worker that avoids validating candidates which cannot
 /// improve the current incumbent and does not validate the same schedule twice.
 pub fn spawn_filtered_heuristic_thread(
-    mk_env: impl Fn() -> grb::prelude::Env + Send + 'static,
+    _mk_env: impl Fn() -> grb::prelude::Env + Send + 'static,
     sol_in_rx: std::sync::mpsc::Receiver<Vec<Vec<i32>>>,
     problem: Problem,
     delay_cost_type: DelayCostType,
@@ -133,7 +133,9 @@ pub fn spawn_filtered_heuristic_thread(
     filter: Arc<HeuristicFilter>,
 ) {
     std::thread::spawn(move || {
-        let env = mk_env();
+        // This heuristic only propagates graph edges; it never calls Gurobi.
+        // Do not initialize a native environment in a detached worker that may
+        // still be starting when a short solver process exits.
         let mut seen = HashSet::<Vec<Vec<i32>>>::new();
         while let Ok(mut sol) = sol_in_rx.recv() {
             loop {
@@ -141,7 +143,7 @@ pub fn spawn_filtered_heuristic_thread(
                     sol = more_recent_sol;
                 }
                 let candidate =
-                    solve_heuristic_better(&env, &problem, delay_cost_type, false, Some(&sol))
+                    solve_graph_heuristic(&problem, delay_cost_type, false, Some(&sol))
                         .unwrap();
                 if let Some(candidate) = candidate {
                     send_if_improving_and_valid(
@@ -164,7 +166,7 @@ pub fn spawn_filtered_heuristic_thread(
                 }
 
                 let candidate =
-                    solve_heuristic_better(&env, &problem, delay_cost_type, true, Some(&sol))
+                    solve_graph_heuristic(&problem, delay_cost_type, true, Some(&sol))
                         .unwrap();
                 if let Some(candidate) = candidate {
                     send_if_improving_and_valid(
@@ -247,7 +249,16 @@ pub fn spawn_heuristic_thread(
 }
 
 pub fn solve_heuristic_better(
-    env: &grb::Env,
+    _env: &grb::Env,
+    problem: &Problem,
+    delay_cost_type: crate::problem::DelayCostType,
+    use_strong_branching: bool,
+    solution: Option<&Vec<Vec<i32>>>,
+) -> Result<Option<Vec<Vec<i32>>>, SolverError> {
+    solve_graph_heuristic(problem, delay_cost_type, use_strong_branching, solution)
+}
+
+fn solve_graph_heuristic(
     problem: &Problem,
     delay_cost_type: crate::problem::DelayCostType,
     use_strong_branching: bool,

@@ -31,8 +31,8 @@ AGLR_HEURISTIC_MIN_GAP="${AGLR_HEURISTIC_MIN_GAP:-0}"
 AGLR_USE_OBJECTIVE_BOUND="${AGLR_USE_OBJECTIVE_BOUND:-false}"
 
 case "$MODE" in
-  screen|promote|full|confirm) ;;
-  *) echo "ERROR: mode phải là screen, promote, full hoặc confirm." >&2; exit 2 ;;
+  baseline|candidate|screen|promote|full|confirm) ;;
+  *) echo "ERROR: mode phải là baseline, candidate, screen, promote, full hoặc confirm." >&2; exit 2 ;;
 esac
 [[ "$SCREEN_PARALLELISM" =~ ^[1-9][0-9]*$ ]] || {
   echo "ERROR: SCREEN_PARALLELISM phải là số nguyên dương." >&2
@@ -62,7 +62,7 @@ command -v gurobi_cl >/dev/null || {
 }
 
 conference_reference_sha256=""
-if [[ "$MODE" == "full" ]]; then
+if [[ -d "$CONFERENCE_RESULTS_DIR" ]]; then
   for objective in finsteps123 infsteps180 cont; do
     [[ -f "$CONFERENCE_RESULTS_DIR/MaxsatScDefault_${objective}.json" ]] || {
       echo "ERROR: thiếu dữ liệu hội nghị cho $objective trong $CONFERENCE_RESULTS_DIR" >&2
@@ -106,7 +106,13 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'git_commit=%s\n' "$git_commit"
     printf 'binary_sha256=%s\n' "$binary_sha256"
     printf 'repetitions=1\n'
-    if [[ "$MODE" == "full" ]]; then
+    printf 'screen_parallelism=%s\n' "$SCREEN_PARALLELISM"
+    printf 'full_timeout_seconds=%s\n' "$FULL_TIMEOUT_SECS"
+    printf 'rescue_progress=%s\n' "$AGLR_RESCUE_PROGRESS"
+    printf 'heuristic_period=%s\n' "$AGLR_HEURISTIC_PERIOD"
+    printf 'heuristic_min_gap=%s\n' "$AGLR_HEURISTIC_MIN_GAP"
+    printf 'use_objective_bound=%s\n' "$AGLR_USE_OBJECTIVE_BOUND"
+    if [[ -n "$conference_reference_sha256" ]]; then
       printf 'conference_reference_dir=%s\n' "$CONFERENCE_RESULTS_DIR"
       printf 'conference_reference_sha256=%s\n' "$conference_reference_sha256"
       printf 'conference_reference_source_data_commit=%s\n' "$CONFERENCE_SOURCE_DATA_COMMIT"
@@ -120,15 +126,17 @@ if [[ ! -s "$campaign_file" ]]; then
     printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$campaign_file"
 else
-  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" <<'PY'
+  python3 - "$campaign_file" "$MODE" "$RUN_ID" "$git_commit" "$binary_sha256" "$conference_reference_sha256" "$CONFERENCE_SOURCE_DATA_COMMIT" "$CONFERENCE_RUNTIME_MODE" "$SCREEN_PARALLELISM" "$FULL_TIMEOUT_SECS" "$AGLR_RESCUE_PROGRESS" "$AGLR_HEURISTIC_PERIOD" "$AGLR_HEURISTIC_MIN_GAP" "$AGLR_USE_OBJECTIVE_BOUND" <<'PY'
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
 expected = dict(zip(("mode", "run_id", "git_commit", "binary_sha256"), sys.argv[2:]))
-if sys.argv[2] == "full":
+if sys.argv[6]:
     expected["conference_reference_sha256"] = sys.argv[6]
     expected["conference_reference_source_data_commit"] = sys.argv[7]
+    expected["conference_runtime_mode"] = sys.argv[8]
+expected.update(zip(("screen_parallelism", "full_timeout_seconds", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound"), sys.argv[9:]))
 actual = {}
 for line in path.read_text().splitlines():
     key, separator, value = line.partition("=")
@@ -225,7 +233,20 @@ print(row["min_growth"], row["fraction"], row["max_wait"])
 PY
 }
 
-if [[ "$MODE" == "screen" ]]; then
+audit_campaign() {
+  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout "$1" \
+    --conference-reference "$CONFERENCE_RESULTS_DIR" \
+    --conference-runtime-mode "$CONFERENCE_RUNTIME_MODE"
+}
+
+if [[ "$MODE" == "baseline" ]]; then
+  run_method CSOnet maxsat_ddd_ladder_sc exact legacy 32 0.5 5 "$FULL_TIMEOUT_SECS" ""
+  audit_campaign "$FULL_TIMEOUT_SECS"
+elif [[ "$MODE" == "candidate" ]]; then
+  run_method AGLR maxsat_ddd_ladder_aglr exact adaptive \
+    "${AGLR_MIN_GROWTH:-16}" "${AGLR_FRACTION:-0.25}" "${AGLR_MAX_WAIT:-5}" "$FULL_TIMEOUT_SECS" ""
+  audit_campaign "$FULL_TIMEOUT_SECS"
+elif [[ "$MODE" == "screen" ]]; then
   configs=()
   while IFS= read -r config; do
     configs+=("$config")
@@ -242,21 +263,24 @@ for row in rows:
     print(*row)
 PY
   )
-  running=0
+  worker_pids=()
+  trap 'for worker in "${worker_pids[@]}"; do kill "$worker" 2>/dev/null || true; done' EXIT
   for config in "${configs[@]}"; do
     read -r tag min_growth fraction max_wait <<< "$config"
     (
       run_method "$tag" maxsat_ddd_ladder_aglr exact adaptive \
         "$min_growth" "$fraction" "$max_wait" 30 "$DEVELOPMENT_INSTANCES"
     ) &
-    ((++running))
-    if (( running >= SCREEN_PARALLELISM )); then
-      wait -n
-      running=$((running - 1))
+    worker_pids+=("$!")
+    if (( ${#worker_pids[@]} >= SCREEN_PARALLELISM )); then
+      for worker in "${worker_pids[@]}"; do wait "$worker"; done
+      worker_pids=()
     fi
   done
-  wait
-  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout 30
+  for worker in "${worker_pids[@]}"; do wait "$worker"; done
+  worker_pids=()
+  trap - EXIT
+  audit_campaign 30
   printf '%s\n' "$CAMPAIGN_DIR" > "$RESULTS_ROOT/latest_screen.txt"
 
 elif [[ "$MODE" == "promote" ]]; then
@@ -280,14 +304,14 @@ PY
     run_method "$tag" maxsat_ddd_ladder_aglr exact adaptive \
       "$min_growth" "$fraction" "$max_wait" 120 "$DEVELOPMENT_INSTANCES"
   done
-  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout 120
+  audit_campaign 120
   printf '%s\n' "$CAMPAIGN_DIR" > "$RESULTS_ROOT/latest_promote.txt"
 
 elif [[ "$MODE" == "full" ]]; then
-  promote_dir="${PROMOTE_DIR:-$(latest_path promote)}"
   if [[ -n "${AGLR_MIN_GROWTH:-}" && -n "${AGLR_FRACTION:-}" && -n "${AGLR_MAX_WAIT:-}" ]]; then
     min_growth="$AGLR_MIN_GROWTH"; fraction="$AGLR_FRACTION"; max_wait="$AGLR_MAX_WAIT"
   else
+    promote_dir="${PROMOTE_DIR:-$(latest_path promote)}"
     read -r min_growth fraction max_wait <<< "$(read_winner "$promote_dir")"
   fi
 
@@ -320,7 +344,7 @@ PY
 from pathlib import Path
 import shutil, sys
 
-source, target = map(Path, sys.argv[1:])
+source, target = map(Path, sys.argv[1:3])
 for objective in ("finsteps123", "infsteps180", "cont"):
     matches = sorted(source.glob(f"results_bigm_{objective}_*s.csv"))
     matches += sorted(source.glob(f"MILP_BigM_CPLEX_{objective}_*s.csv"))
@@ -342,8 +366,8 @@ else
   python3 - "$full_dir/aglr_audit.json" <<'PY'
 import json, sys
 audit = json.load(open(sys.argv[1]))
-if not (audit.get("gate") or {}).get("passed"):
-    raise SystemExit("ERROR: lượt full chưa qua cổng submission; chưa chạy confirm.")
+if not (audit.get("gate") or {}).get("coverage_passed"):
+    raise SystemExit("ERROR: chưa đạt cổng coverage; chưa chạy confirm.")
 PY
   instances="$(tr '\n' ' ' < "$full_dir/confirm_instances.txt")"
   [[ -n "$instances" ]] || { echo "Không có instance cần chạy xác nhận."; exit 0; }
@@ -355,9 +379,9 @@ PY
   )"
   for repetition in 1 2 3; do
     run_method "AGLR-confirm-$repetition" maxsat_ddd_ladder_aglr exact adaptive \
-      "$min_growth" "$fraction" "$max_wait" 120 "$instances"
+      "$min_growth" "$fraction" "$max_wait" "$FULL_TIMEOUT_SECS" "$instances"
   done
-  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout 120 --reference-full "$full_dir"
+  python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout "$FULL_TIMEOUT_SECS" --reference-full "$full_dir"
 fi
 
 printf 'completed_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$campaign_file"

@@ -134,6 +134,10 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append(f"duplicate instance name {name!r}")
             if status not in journal_audit.ALLOWED_STATUSES:
                 errors.append(f"unsupported status {status!r}")
+            if solve.get("process_exit_code", 0) != 0:
+                errors.append(f"nonzero process exit {solve['process_exit_code']}")
+            if not journal_audit.same_number(solve.get("timeout_seconds"), timeout):
+                errors.append(f"timeout_seconds does not match campaign cutoff {timeout}")
             if status == "ok":
                 errors.extend(
                     journal_audit.independently_verify_solution(name, objective, solve)
@@ -142,6 +146,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                     errors.append(
                         f"{kind} returned status=ok without matching lower/upper bounds"
                     )
+                if not journal_audit.same_number(solve.get("cost"), solve.get("ub")):
+                    errors.append("status=ok requires cost=ub")
             proven = (
                 status == "ok"
                 and not errors
@@ -263,7 +269,9 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
 
 
 def add_conference_metrics(
-    summary: list[dict], conference_summary: list[dict] | None
+    summary: list[dict], conference_summary: list[dict] | None,
+    records: list[dict] = (), references: list[dict] = (),
+    runtime_mode: str = "diagnostic", timeout: float = 150.0,
 ) -> None:
     if not conference_summary:
         return
@@ -272,14 +280,26 @@ def add_conference_metrics(
         ref = reference.get(row["objective"])
         if ref is None:
             continue
-        coverage = int(ref["verified_ok"])
+        selected = [r for r in records if r["tag"] == row["tag"] and r["objective"] == row["objective"]]
+        names = {r["name"] for r in selected}
+        subset = [r for r in references if r["objective"] == row["objective"] and r["name"] in names]
+        coverage = sum(r["verified"] for r in subset) if subset else int(ref["verified_ok"])
         row["conference_coverage"] = coverage
         row["coverage_delta"] = int(row["proven_optimal"]) - coverage
-        row["conference_par2_seconds"] = float(ref["par2_seconds"])
-        row["par2_delta_seconds"] = float(row["par2_seconds"]) - float(
-            ref["par2_seconds"]
+        if runtime_mode != "assumed-equivalent":
+            continue
+        reference_par2 = (
+            statistics.fmean(r["total_time"] if r["verified"] and r["total_time"] <= timeout else 2 * timeout for r in subset)
+            if subset else float(ref["par2_seconds"])
         )
-        row["paired_runtime_seconds"] = ""
+        row["conference_par2_seconds"] = reference_par2
+        row["par2_delta_seconds"] = float(row["par2_seconds"]) - float(
+            reference_par2
+        )
+        by_name = {r["name"]: r for r in subset if r["verified"]}
+        pairs = [(r["time"], by_name[r["name"]]["total_time"]) for r in selected if r["proven"] and r["name"] in by_name]
+        if pairs:
+            row["paired_runtime_seconds"] = statistics.fmean(a - b for a, b in pairs)
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
@@ -322,7 +342,7 @@ def ranking(
                 "infsteps180_proven": coverage["infsteps180"],
                 "cont_proven": coverage["cont"],
                 "coverage_non_regression": all(
-                    coverage[objective] >= targets[objective]
+                    coverage[objective] >= int(by_objective[objective].get("conference_coverage") or targets[objective])
                     for objective in OBJECTIVES
                 ),
                 "par2_sum": sum(float(row["par2_seconds"]) for row in rows),
@@ -377,6 +397,7 @@ def evaluate_gate(
             f"coverage {total_target}"
         )
 
+    coverage_passed = not reasons
     required = ("MaxSAT-Journal", "CSOnet", "BigM-Gurobi", "BigM-CPLEX")
     for tag in required:
         incomplete = [
@@ -396,6 +417,7 @@ def evaluate_gate(
     }
     return {
         "passed": not reasons,
+        "coverage_passed": coverage_passed,
         "reasons": reasons,
         "targets": targets,
         "coverage": coverage,
@@ -406,9 +428,12 @@ def evaluate_gate(
     }
 
 
-def confirmation_instances(records: list[dict]) -> list[str]:
+def confirmation_instances(records: list[dict], conference_comparisons: list[dict] = ()) -> list[str]:
     by_method = {(r["tag"], r["objective"], r["name"]): r for r in records}
     names = set()
+    for comparison in conference_comparisons:
+        if comparison["tag"] == "AGLR" and comparison["reference_verified"] != comparison["campaign_proven"]:
+            names.add(comparison["name"])
     for objective in OBJECTIVES:
         objective_names = {
             name for tag, obj, name in by_method if tag == "AGLR" and obj == objective
@@ -512,6 +537,7 @@ def compare_conference_reference(
         "runtime_used_for_gate_or_ranking": runtime_mode == "assumed-equivalent",
         "runtime_mode": runtime_mode,
         "summary": reference_summary,
+        "records": reference_records,
         "verified_optima": reference_audit["verified_optima"],
         "warnings": reference_audit["warnings"],
     }
@@ -612,7 +638,9 @@ def main() -> int:
             records, args.conference_reference, args.conference_runtime_mode
         )
         conference_summary = conference_metadata.get("summary", [])
-        add_conference_metrics(summary, conference_summary)
+        add_conference_metrics(summary, conference_summary, records,
+                               conference_metadata.pop("records"),
+                               args.conference_runtime_mode, args.timeout)
     ranked = ranking(
         summary,
         {
@@ -646,6 +674,7 @@ def main() -> int:
     )
     if gate is not None and errors:
         gate["passed"] = False
+        gate["coverage_passed"] = False
         gate["reasons"].insert(0, f"Independent audit found {len(errors)} invalid/fatal records")
 
     write_csv(campaign_dir / "aglr_summary.csv", summary)
@@ -661,7 +690,7 @@ def main() -> int:
         )
         + "\n"
     )
-    confirm = confirmation_instances(records)
+    confirm = confirmation_instances(records, comparisons)
     (campaign_dir / "confirm_instances.txt").write_text("\n".join(confirm) + ("\n" if confirm else ""))
 
     print(f"Wrote {campaign_dir / 'aglr_summary.csv'}")

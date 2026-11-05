@@ -13,7 +13,7 @@ RESULTS_ROOT="${RESULTS_ROOT:-results/aglr}"
 BIN="${BIN:-./target/release/ddd}"
 SCREEN_PARALLELISM="${SCREEN_PARALLELISM:-2}"
 EXPERIMENT_SET="${EXPERIMENT_SET:-assumptions}"
-[[ "$EXPERIMENT_SET" =~ ^(assumptions|costs|orders)$ ]] || exit 2
+[[ "$EXPERIMENT_SET" =~ ^(assumptions|costs|orders|orders-sparse)$ ]] || exit 2
 [[ "$SCREEN_PARALLELISM" =~ ^[1-9][0-9]*$ ]] || exit 2
 development="origA3 trackA3 stationA3 origA6 trackA6 stationA6 origA9 trackA9 stationA9 origA12 trackA12 stationA12 origB3 trackB3 stationB3 origB6 trackB6 stationB6 origB9 trackB9 stationB9 origB12 trackB12 stationB12"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
@@ -27,6 +27,7 @@ if [[ "$mode" == screen ]]; then
     strategies=(legacy full geometric)
     [[ "$EXPERIMENT_SET" != costs ]] || strategies=(legacy sparse)
     [[ "$EXPERIMENT_SET" != orders ]] || strategies=(legacy orders)
+    [[ "$EXPERIMENT_SET" != orders-sparse ]] || strategies=(orders-sparse)
     cutoff=30
     instances="$development"
     parallelism="$SCREEN_PARALLELISM"
@@ -34,6 +35,7 @@ elif [[ "$mode" == promote ]]; then
     strategies=(full geometric)
     [[ "$EXPERIMENT_SET" != costs ]] || strategies=(sparse)
     [[ "$EXPERIMENT_SET" != orders ]] || strategies=(orders)
+    [[ "$EXPERIMENT_SET" != orders-sparse ]] || strategies=(orders-sparse)
     cutoff=120
     instances="$development"
     parallelism=1
@@ -56,7 +58,8 @@ current_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True
 binary_hash = hashlib.sha256(pathlib.Path(sys.argv[2]).read_bytes()).hexdigest()
 if values["git_commit"] != current_commit or values["binary_sha256"] != binary_hash:
     raise SystemExit("ERROR: repeats must use the original full-candidate source and binary")
-print("orders" if values.get("resource_orders") == "true" else
+print("orders-sparse" if values.get("resource_orders") == "true" and values.get("sparse_costs") == "true" else
+      "orders" if values.get("resource_orders") == "true" else
       "sparse" if values.get("sparse_costs") == "true" else values["assumptions"])
 PY
 )"
@@ -69,7 +72,7 @@ fi
 
 run_strategy() {
     local strategy="$1" tag="${2:-Core-$1}"
-    [[ "$strategy" =~ ^(legacy|full|geometric|sparse|orders)$ ]] || exit 2
+    [[ "$strategy" =~ ^(legacy|full|geometric|sparse|orders|orders-sparse)$ ]] || exit 2
     local assumptions="$strategy" sparse_costs=false resource_orders=false
     if [[ "$strategy" == sparse ]]; then
         assumptions=legacy
@@ -77,6 +80,11 @@ run_strategy() {
     fi
     if [[ "$strategy" == orders ]]; then
         assumptions=legacy
+        resource_orders=true
+    fi
+    if [[ "$strategy" == orders-sparse ]]; then
+        assumptions=legacy
+        sparse_costs=true
         resource_orders=true
     fi
     [[ "$mode" != candidate ]] || tag=AGLR

@@ -694,6 +694,11 @@ Các trường \code{maxsat\_resource\_order\_pairs} và
 Giữ cách gửi điều kiện và chi phí cũ để đo riêng tác động của quyết định
 thứ tự; không bật cùng AGLR adaptive trong lượt này.
 
+Orders đạt mốc phát triển nhưng full còn thiếu một instance. Có thể thử phép
+kết hợp có chủ đích bằng \code{EXPERIMENT\_SET=orders-sparse}; phép thử này
+giữ orders và cây chi phí thưa, không chọn lời giải theo từng instance. Nếu
+promote không giữ $(24,22,20)$, dừng trước full.
+
 Mỗi vòng chỉ thay đổi một thành phần. Đọc telemetry trước khi sửa:
 
 \begin{tabularx}{\textwidth}{@{}p{50mm}X@{}}

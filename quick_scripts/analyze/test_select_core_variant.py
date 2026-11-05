@@ -19,8 +19,13 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(select(source, {"errors": []})["selected"]["variant"], variant)
             for row in source:
                 row["sparse_costs"] = row["resource_orders"] = "true"
-            with self.assertRaises(ValueError):
-                select(source, {"errors": []})
+            self.assertEqual(select(source, {"errors": []})["selected"]["variant"], "orders-sparse")
+
+    def test_hybrid_variant_is_explicit(self):
+        source = rows("hybrid", "legacy", (24, 22, 20))
+        for row in source:
+            row["sparse_costs"] = row["resource_orders"] = "true"
+        self.assertEqual(select(source, {"errors": []})["selected"]["variant"], "orders-sparse")
 
     def test_does_not_combine_different_winners_or_promote_regression(self):
         decision = select(rows("full", "full", (24, 21, 21))

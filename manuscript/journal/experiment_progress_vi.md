@@ -156,6 +156,12 @@ Vòng chi phí `27b6859` đã kết thúc. Cách mã hóa thưa đạt `(24,22,1
 JSON đã qua audit. Dữ liệu nằm trong `results/sat_research/cost_v2_20261105/`
 và `core_selection.json` ghi quyết định không chọn cấu hình.
 
+Vòng orders `be60148` đã chạy full vì promote đạt `(24,22,20)`. Full đạt
+`(72,68,59)`, tổng 199; mốc hội nghị là tổng 200. Vì thiếu một instance
+`cont`, chưa chạy ba lượt xác nhận và chưa đưa số vào bài. Dữ liệu raw nằm
+trong `results/sat_research/orders_v3_20261105/`. Vòng kế tiếp thử orders
+ghép với cây chi phí thưa, giữ mọi thành phần khác cố định.
+
 ## CPLEX và tái sử dụng dữ liệu đã hoàn tất
 
 Đã dùng ticket IBM Academic để tải qua HTTP bộ cài CPLEX Optimization Studio

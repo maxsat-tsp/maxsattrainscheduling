@@ -456,3 +456,9 @@ Theo dõi `maxsat_resource_order_pairs`, `maxsat_resource_order_rows`, coverage,
 PAR-2 và kích thước mô hình. Tính đúng đắn được kiểm tra bằng bảng chân trị,
 lịch khả thi theo cả hai thứ tự, và so với vét cạn trên bài nhỏ. Bộ kiểm thử
 Linux có 31 tests. Chưa có kết quả hiệu năng để kết luận cải thiện.
+
+Kết quả orders `be60148` đã được chạy full: `(72,68,59)`, chưa vượt mốc
+`(72,68,60)`. Cấu hình giữ lại một instance `cont` so với CSOnet chạy lại,
+nhưng vẫn thiếu một instance so với dữ liệu hội nghị; không chạy xác nhận.
+Raw results và danh sách timeout được lưu trong
+`results/sat_research/orders_v3_20261105/`.

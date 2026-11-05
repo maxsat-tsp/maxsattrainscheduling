@@ -7,6 +7,17 @@ from record_process_exit import record_exit
 
 
 class ProcessExitTests(unittest.TestCase):
+    def test_detached_worker_panic_is_not_ignored_after_main_returns_ok(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "origA1.json"
+            stderr = Path(raw) / "stderr.log"
+            path.write_text(json.dumps([{"name": "origA1", "solves": [{"status": "ok"}]}]))
+            stderr.write_text("thread '<unnamed>' panicked at src/worker.rs:123\n")
+            record_exit(path, 0, 0.1, "origA1", "test", stderr=stderr)
+            solve = json.loads(path.read_text())[0]["solves"][0]
+            self.assertEqual(solve["status"], "panic")
+            self.assertEqual(solve["process_exit_code"], 0)
+
     def test_crash_after_ok_json_cannot_count_as_success(self):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "origA1.json"

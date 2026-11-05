@@ -8,11 +8,14 @@ import sys
 from pathlib import Path
 
 
-def record_exit(path: Path, exit_code: int, elapsed: float, name: str, solver: str, timeout: float = 0) -> None:
+def record_exit(path: Path, exit_code: int, elapsed: float, name: str, solver: str, timeout: float = 0, stderr: Path | None = None) -> None:
     status = {
         124: "external_timeout", 137: "killed", 134: "aborted",
         139: "segfault", 101: "panic",
     }.get(exit_code, "failed")
+    worker_panic = bool(stderr and stderr.is_file() and b"panicked at" in stderr.read_bytes())
+    if worker_panic:
+        status = "panic"
     if path.is_file() and path.stat().st_size:
         raw = path.read_bytes()
         try:
@@ -28,7 +31,7 @@ def record_exit(path: Path, exit_code: int, elapsed: float, name: str, solver: s
         else:
             solve["process_exit_code"] = exit_code
             solve["process_wall_time_seconds"] = elapsed
-            if exit_code:
+            if exit_code or worker_panic:
                 path.with_suffix(".raw.json").write_bytes(raw)
                 solve["solver_reported_status"] = solve.get("status")
                 solve["status"] = status
@@ -47,4 +50,4 @@ def record_exit(path: Path, exit_code: int, elapsed: float, name: str, solver: s
 
 
 if __name__ == "__main__":
-    record_exit(Path(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), *sys.argv[4:6], float(sys.argv[6]))
+    record_exit(Path(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), *sys.argv[4:6], float(sys.argv[6]), Path(sys.argv[7]))

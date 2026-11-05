@@ -195,6 +195,10 @@ run_method() {
 
   for objective in finsteps123 infsteps180 cont; do
     local json_out="$method_dir/$objective.json"
+    local worker_ram="$RAM_LIMIT_KB"
+    if [[ "$MODE" == "screen" ]]; then
+      worker_ram=$((RAM_LIMIT_KB / SCREEN_PARALLELISM))
+    fi
     echo "[$tag] $objective | timeout=${timeout}s | instances=$([[ -n "$instances" ]] && wc -w <<<"$instances" || echo 72)"
     BIN="$BIN" \
     SOLVER="$solver" \
@@ -203,7 +207,7 @@ run_method() {
     RUN_LOG_DIR="$method_dir/$objective.logs" \
     INSTANCE_TIMEOUT_SECS="$timeout" \
     EXTERNAL_TIMEOUT_GRACE_SECS="$EXTERNAL_TIMEOUT_GRACE_SECS" \
-    RAM_LIMIT_KB="$RAM_LIMIT_KB" \
+    RAM_LIMIT_KB="$worker_ram" \
     AGLR_POLICY="$policy" \
     AGLR_MIN_GROWTH="$min_growth" \
     AGLR_FRACTION="$fraction" \

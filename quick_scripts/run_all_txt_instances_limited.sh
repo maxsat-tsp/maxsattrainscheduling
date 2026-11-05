@@ -464,7 +464,9 @@ try:
     data = json.load(open(path))
     item = data[0] if isinstance(data, list) and len(data) == 1 else data
     solve = item["solves"][0]
-    valid = item.get("name") == expected_name and isinstance(solve.get("status"), str)
+    valid = (item.get("name") == expected_name
+             and isinstance(solve.get("status"), str)
+             and isinstance(solve.get("process_exit_code"), int))
     if rerun_non_ok == "1" and solve.get("status") != "ok":
         valid = False
 except (OSError, ValueError, KeyError, IndexError, TypeError):
@@ -474,6 +476,10 @@ PY
   then
     echo "Reusing $instance_name"
     return 0
+  fi
+
+  if [[ -e "$out_json" ]]; then
+    mv "$out_json" "$out_json.previous-$(date -u +%Y%m%dT%H%M%S)"
   fi
 
   echo "Running $instance_name"
@@ -507,7 +513,7 @@ PY
   elapsed_seconds="$(awk "BEGIN { printf \"%.3f\", $elapsed_ms / 1000 }")"
 
   python3 quick_scripts/analyze/record_process_exit.py \
-    "$out_json" "$status" "$elapsed_seconds" "$instance_name" "$effective_solver" "$INSTANCE_TIMEOUT_SECS"
+    "$out_json" "$status" "$elapsed_seconds" "$instance_name" "$effective_solver" "$INSTANCE_TIMEOUT_SECS" "$stderr_log"
 }
 
 while IFS= read -r instance_name; do

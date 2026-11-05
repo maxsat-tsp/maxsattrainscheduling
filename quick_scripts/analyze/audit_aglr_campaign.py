@@ -136,6 +136,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append(f"unsupported status {status!r}")
             if solve.get("process_exit_code", 0) != 0:
                 errors.append(f"nonzero process exit {solve['process_exit_code']}")
+            if config.get("process_exit_required") == "true" and "process_exit_code" not in solve:
+                errors.append("process exit evidence is missing")
             if not journal_audit.same_number(solve.get("timeout_seconds"), timeout):
                 errors.append(f"timeout_seconds does not match campaign cutoff {timeout}")
             if status == "ok":
@@ -173,7 +175,7 @@ def load_cplex(campaign_dir: Path, timeout: float) -> list[dict]:
     records: list[dict] = []
     cplex_dir = campaign_dir / "CPLEX"
     for objective in OBJECTIVES:
-        matches = sorted(cplex_dir.glob(f"results_bigm_{objective}_*s.csv"))
+        matches = sorted(cplex_dir.glob(f"results_bigm_{objective}_{timeout:g}s.csv"))
         if not matches:
             continue
         path = matches[-1]
@@ -194,6 +196,8 @@ def load_cplex(campaign_dir: Path, timeout: float) -> list[dict]:
             solve["lb"] = finite_number(row.get("lb"))
             solve["ub"] = finite_number(row.get("ub"))
             errors = []
+            if row.get("timeout_seconds") and not journal_audit.same_number(row["timeout_seconds"], timeout):
+                errors.append("CPLEX timeout differs from campaign cutoff")
             if name not in journal_audit.EXPECTED_NAMES:
                 errors.append(f"unexpected CPLEX instance name {row.get('name')!r}")
             if counts[name] > 1:
@@ -258,6 +262,11 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
                 "min_growth": config.get("min_growth", ""),
                 "fraction": config.get("fraction", ""),
                 "max_wait": config.get("max_wait", ""),
+                "rescue_progress": config.get("rescue_progress", "bound-or-heuristic"),
+                "heuristic_period": config.get("heuristic_period", "1"),
+                "heuristic_min_gap": config.get("heuristic_min_gap", "0"),
+                "use_objective_bound": config.get("use_objective_bound", "false"),
+                "filter_duplicates": config.get("filter_duplicates", "false"),
                 "conference_coverage": "",
                 "coverage_delta": "",
                 "conference_par2_seconds": "",
@@ -337,6 +346,11 @@ def ranking(
                 "min_growth": sample["min_growth"],
                 "fraction": sample["fraction"],
                 "max_wait": sample["max_wait"],
+                "rescue_progress": sample.get("rescue_progress", "bound-or-heuristic"),
+                "heuristic_period": sample.get("heuristic_period", "1"),
+                "heuristic_min_gap": sample.get("heuristic_min_gap", "0"),
+                "use_objective_bound": sample.get("use_objective_bound", "false"),
+                "filter_duplicates": sample.get("filter_duplicates", "false"),
                 "proven_total": sum(int(row["proven_optimal"]) for row in rows),
                 "finsteps123_proven": coverage["finsteps123"],
                 "infsteps180_proven": coverage["infsteps180"],
@@ -569,8 +583,10 @@ def audit_confirmations(records: list[dict], reference_full: Path, timeout: floa
             repeats[(record["objective"], record["name"])].append(record)
 
     errors = []
+    names_file = reference_full / "confirm_instances.txt"
+    selected_names = set(names_file.read_text().split()) if names_file.is_file() else {name for _, name in repeats}
     for key, reference_record in expected.items():
-        if key not in repeats:
+        if key[1] not in selected_names:
             continue
         objective, name = key
         items = repeats[key]

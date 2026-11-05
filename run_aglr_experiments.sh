@@ -32,8 +32,8 @@ AGLR_USE_OBJECTIVE_BOUND="${AGLR_USE_OBJECTIVE_BOUND:-false}"
 AGLR_FILTER_DUPLICATES="${AGLR_FILTER_DUPLICATES:-false}"
 
 case "$MODE" in
-  baseline|candidate|screen|promote|full|confirm) ;;
-  *) echo "ERROR: mode phải là baseline, candidate, screen, promote, full hoặc confirm." >&2; exit 2 ;;
+  baseline|candidate|ablate|screen|promote|full|confirm) ;;
+  *) echo "ERROR: mode phải là baseline, candidate, ablate, screen, promote, full hoặc confirm." >&2; exit 2 ;;
 esac
 [[ "$SCREEN_PARALLELISM" =~ ^[1-9][0-9]*$ ]] || {
   echo "ERROR: SCREEN_PARALLELISM phải là số nguyên dương." >&2
@@ -189,6 +189,7 @@ run_method() {
     "heuristic_min_gap=$AGLR_HEURISTIC_MIN_GAP" \
     "use_objective_bound=$AGLR_USE_OBJECTIVE_BOUND" \
     "filter_duplicates=$AGLR_FILTER_DUPLICATES" \
+    "process_exit_required=true" \
     "timeout_seconds=$timeout" \
     "instances=$(tr ' ' ',' <<<"$instances")"
 
@@ -237,6 +238,18 @@ print(row["min_growth"], row["fraction"], row["max_wait"])
 PY
 }
 
+load_variant() {
+  read -r AGLR_RESCUE_PROGRESS AGLR_HEURISTIC_PERIOD AGLR_HEURISTIC_MIN_GAP AGLR_USE_OBJECTIVE_BOUND AGLR_FILTER_DUPLICATES < <(python3 - "$1" <<'PY'
+import sys
+from pathlib import Path
+values = dict(line.split("=", 1) for line in Path(sys.argv[1]).read_text().splitlines() if "=" in line)
+print(*(values.get(k, default) for k, default in (
+    ("rescue_progress", "bound-or-heuristic"), ("heuristic_period", "1"),
+    ("heuristic_min_gap", "0"), ("use_objective_bound", "false"), ("filter_duplicates", "false"))))
+PY
+  )
+}
+
 audit_campaign() {
   python3 "$AUDITOR" "$CAMPAIGN_DIR" --timeout "$1" \
     --conference-reference "$CONFERENCE_RESULTS_DIR" \
@@ -250,6 +263,22 @@ elif [[ "$MODE" == "candidate" ]]; then
   run_method AGLR maxsat_ddd_ladder_aglr exact adaptive \
     "${AGLR_MIN_GROWTH:-16}" "${AGLR_FRACTION:-0.25}" "${AGLR_MAX_WAIT:-5}" "$FULL_TIMEOUT_SECS" ""
   audit_campaign "$FULL_TIMEOUT_SECS"
+elif [[ "$MODE" == "ablate" ]]; then
+  # Every variant changes exactly one component relative to Control.
+  variants=(
+    "Control bound-or-heuristic 1 0 false false"
+    "Rescue-model model 1 0 false false"
+    "Heuristic-period bound-or-heuristic 2 0 false false"
+    "Heuristic-gap bound-or-heuristic 1 1 false false"
+    "Filter-duplicates bound-or-heuristic 1 0 false true"
+    "Objective-bound bound-or-heuristic 1 0 true false"
+  )
+  for variant in "${variants[@]}"; do
+    read -r tag AGLR_RESCUE_PROGRESS AGLR_HEURISTIC_PERIOD AGLR_HEURISTIC_MIN_GAP AGLR_USE_OBJECTIVE_BOUND AGLR_FILTER_DUPLICATES <<< "$variant"
+    run_method "$tag" maxsat_ddd_ladder_aglr exact adaptive \
+      "${AGLR_MIN_GROWTH:-16}" "${AGLR_FRACTION:-0.25}" "${AGLR_MAX_WAIT:-5}" 30 "$DEVELOPMENT_INSTANCES"
+  done
+  audit_campaign 30
 elif [[ "$MODE" == "screen" ]]; then
   configs=()
   while IFS= read -r config; do
@@ -304,6 +333,7 @@ PY
   [[ "${#finalists[@]}" -eq 3 ]] || { echo "ERROR: cần đúng ba cấu hình từ screen." >&2; exit 2; }
   for finalist in "${finalists[@]}"; do
     read -r old_tag min_growth fraction max_wait <<< "$finalist"
+    load_variant "$source_dir/$old_tag/config.txt"
     tag="Promote-${old_tag}"
     run_method "$tag" maxsat_ddd_ladder_aglr exact adaptive \
       "$min_growth" "$fraction" "$max_wait" 120 "$DEVELOPMENT_INSTANCES"
@@ -317,6 +347,8 @@ elif [[ "$MODE" == "full" ]]; then
   else
     promote_dir="${PROMOTE_DIR:-$(latest_path promote)}"
     read -r min_growth fraction max_wait <<< "$(read_winner "$promote_dir")"
+    winner_tag="$(python3 -c 'import csv,sys; print(next(csv.DictReader(open(sys.argv[1])))["tag"])' "$promote_dir/aglr_ranking.csv")"
+    load_variant "$promote_dir/$winner_tag/config.txt"
   fi
 
   methods=()
@@ -350,11 +382,11 @@ import shutil, sys
 
 source, target = map(Path, sys.argv[1:3])
 for objective in ("finsteps123", "infsteps180", "cont"):
-    matches = sorted(source.glob(f"results_bigm_{objective}_*s.csv"))
-    matches += sorted(source.glob(f"MILP_BigM_CPLEX_{objective}_*s.csv"))
-    if not matches:
-        raise SystemExit(f"ERROR: thiếu CSV CPLEX cho {objective} trong {source}")
     timeout = sys.argv[3]
+    matches = sorted(source.glob(f"results_bigm_{objective}_{timeout}s.csv"))
+    matches += sorted(source.glob(f"MILP_BigM_CPLEX_{objective}_{timeout}s.csv"))
+    if not matches:
+        raise SystemExit(f"ERROR: thiếu CSV CPLEX {timeout}s cho {objective} trong {source}")
     shutil.copy2(matches[-1], target / f"results_bigm_{objective}_{timeout}s.csv")
 PY
   else
@@ -381,6 +413,7 @@ values = dict(line.strip().split("=", 1) for line in open(sys.argv[1]) if "=" in
 print(values["min_growth"], values["fraction"], values["max_wait"])
 PY
   )"
+  load_variant "$full_dir/AGLR/config.txt"
   for repetition in 1 2 3; do
     run_method "AGLR-confirm-$repetition" maxsat_ddd_ladder_aglr exact adaptive \
       "$min_growth" "$fraction" "$max_wait" "$FULL_TIMEOUT_SECS" "$instances"

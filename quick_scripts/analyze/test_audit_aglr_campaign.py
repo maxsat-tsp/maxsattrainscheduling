@@ -151,6 +151,37 @@ class AuditAglrCampaignTests(unittest.TestCase):
         self.assertFalse(gate["passed"])
         self.assertTrue(any("cont" in reason for reason in gate["reasons"]))
 
+    def test_conference_comparison_uses_matching_subset_and_real_pairs(self):
+        summary = [{"tag": "test", "objective": "cont", "proven_optimal": 1, "par2_seconds": 32.0}]
+        reference_summary = [{"objective": "cont", "verified_ok": 58, "par2_seconds": 63.6}]
+        records = [
+            {"tag": "test", "objective": "cont", "name": "origA1", "proven": True, "time": 4.0},
+            {"tag": "test", "objective": "cont", "name": "origA2", "proven": False, "time": 30.0},
+        ]
+        references = [
+            {"objective": "cont", "name": "origA1", "verified": True, "total_time": 2.0},
+            {"objective": "cont", "name": "origA2", "verified": False, "total_time": 150.0},
+            {"objective": "cont", "name": "origA3", "verified": True, "total_time": 1.0},
+        ]
+        audit.add_conference_metrics(summary, reference_summary, records, references, "assumed-equivalent", 30.0)
+        self.assertEqual(summary[0]["conference_coverage"], 1)
+        self.assertEqual(summary[0]["conference_par2_seconds"], 31.0)
+        self.assertEqual(summary[0]["coverage_delta"], 0)
+        self.assertEqual(summary[0]["paired_runtime_seconds"], 2.0)
+
+    def test_real_schedule_with_matching_but_wrong_bounds_is_rejected(self):
+        reference_dir = Path(__file__).resolve().parents[2] / "results" / "conferences"
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            for objective in audit.OBJECTIVES:
+                item = json.loads((reference_dir / f"MaxsatScDefault_{objective}.json").read_text())[0]
+                solve = item["solves"][0]
+                solve["lb"] = solve["ub"] = solve["cost"] + 1
+                (root / f"{objective}.json").write_text(json.dumps([item]))
+            records = audit.load_json_method(root, {"tag": "test", "instances": "origA1"}, 150)
+        self.assertTrue(all(not r["proven"] for r in records))
+        self.assertTrue(all(any("cost=ub" in e for e in r["errors"]) for r in records))
+
 
 if __name__ == "__main__":
     unittest.main()

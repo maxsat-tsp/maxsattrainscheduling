@@ -21,6 +21,8 @@ mod sc_amo;
 mod settings;
 mod hardening;
 mod core_minimize;
+#[cfg(test)]
+mod backend_tests;
 mod solve;
 
 pub use settings::{

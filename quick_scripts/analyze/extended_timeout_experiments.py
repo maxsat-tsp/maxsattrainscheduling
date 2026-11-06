@@ -38,15 +38,21 @@ METHODS = {
 
 
 def methods_for(plan: dict) -> dict:
+    backend = plan.get("sat_backend", "minisat")
+    if backend not in {"minisat", "cadical"}:
+        raise ValueError("unsupported common MaxSAT backend")
+    base = {tag: (dict(cfg, backend="cadical") if backend == "cadical"
+                  and tag in {"Orders-Transitive", "CSOnet", "MaxSAT-Journal"} else cfg)
+            for tag,cfg in METHODS.items()}
     variant = plan.get("candidate_variant")
     if variant is None:
-        return METHODS
+        return base
     if variant != "mincore4" or plan.get("candidate_tag") != "Orders-Transitive-Mincore":
         raise ValueError("unsupported extended-timeout candidate variant")
     return {("Orders-Transitive-Mincore" if tag == "Orders-Transitive" else tag):
             (dict(cfg, core_minimize_checks="4") if tag == "Orders-Transitive"
              else dict(cfg, result_source="reused-audited-same-timeout"))
-            for tag, cfg in METHODS.items()}
+            for tag, cfg in base.items()}
 
 
 def save(path: Path, value) -> None:
@@ -55,7 +61,7 @@ def save(path: Path, value) -> None:
     temporary.replace(path)
 
 
-def build_plan(manifest: Path, reference: Path, cutoff: int) -> dict:
+def build_plan(manifest: Path, reference: Path, cutoff: int, sat_backend: str = "cadical") -> dict:
     if cutoff <= 120:
         raise ValueError("extended-timeout experiments require a cutoff above 120 seconds")
     frozen = json.loads(manifest.read_text())
@@ -75,6 +81,7 @@ def build_plan(manifest: Path, reference: Path, cutoff: int) -> dict:
             reference_coverage[tag][objective] = [r["name"] for r in proven]
             selected[objective].update(r["name"] for r in items if r not in proven)
     return dict(schema="extended-timeout-v1", timeout_seconds=cutoff, selection_cutoff_seconds=120,
+                sat_backend=sat_backend, conference_sat_backend="not-verified-from-binary-provenance",
                 instances_by_objective={o: [n for n in common.EXPECTED_NAMES if n in selected[o]]
                                         for o in audit.OBJECTIVES},
                 dataset_sha256=focus.dataset_hash(), focus_manifest_sha256=focus.sha(manifest),
@@ -125,6 +132,12 @@ def assess_case(root: Path, method: str, objective: str, name: str, cutoff: int,
     solve = record["solve"]
     if solve.get("solution") is not None and record["status"] != "ok":
         record["errors"].extend(common.independently_verify_solution(name, objective, solve))
+    evidence_path = root/"reused_from.json"
+    if evidence_path.exists():
+        evidence = json.loads(evidence_path.read_text())
+        if focus.sha(root/f"{objective}.json") != evidence.get("sha256") or evidence.get("measured_again") is not False:
+            raise ValueError("reused case bytes or provenance changed")
+        record["config"]["result_source"] = "reused-audited-same-timeout"
     return record
 
 
@@ -185,6 +198,12 @@ def summarize(plan: dict, records: list[dict]) -> dict:
     if plan.get("candidate_variant") is not None:
         report.update(measured_runs=sum(r["tag"] == candidate_tag for r in records),
                       reused_baseline_runs=sum(r["tag"] != candidate_tag for r in records))
+    else:
+        reused_milp = sum(r["tag"] in {"BigM-Gurobi", "BigM-CPLEX"}
+                         and r.get("config",{}).get("result_source") == "reused-audited-same-timeout"
+                         for r in records)
+        if reused_milp:
+            report.update(reused_milp_runs=reused_milp, measured_runs=len(records)-reused_milp)
     return report
 
 
@@ -343,6 +362,11 @@ def audit_saved(root: Path) -> dict:
     definitions = methods_for(plan)
     if locked.get("methods") != definitions:
         raise ValueError("saved method settings differ from this auditor")
+    if locked.get("milp_reuse"):
+        for file,key in (("milp_reuse_manifest.json","manifest_sha256"),
+                         ("milp_reuse_audit.json","report_sha256")):
+            if focus.sha(root/file) != locked["milp_reuse"][key]:
+                raise ValueError("reused MILP provenance changed")
     if plan.get("candidate_variant") is not None:
         for file, key in (("reference_manifest.json", "reference_manifest_sha256"),
                           ("reference_audit.json", "reference_audit_sha256")):
@@ -367,6 +391,13 @@ def audit_saved(root: Path) -> dict:
                 or evidence.get("measured_again") is not False
             ):
                 raise ValueError("reused baseline bytes or provenance changed")
+        if locked.get("milp_reuse") and (root/"cases"/method/objective/name/"reused_from.json").exists():
+            evidence = json.loads((root/"cases"/method/objective/name/"reused_from.json").read_text())
+            if method not in {"BigM-Gurobi", "BigM-CPLEX"} or any(
+                evidence[key] != locked["milp_reuse"][ref]
+                for key,ref in (("manifest_sha256","manifest_sha256"),("report_sha256","report_sha256"))
+            ):
+                raise ValueError("only matching MILP cases may cross the SAT-backend correction")
     rebuilt = summarize(plan, records)
     if not reports_match(rebuilt, original):
         raise ValueError("saved report differs from the independently regenerated result")
@@ -406,6 +437,21 @@ def reuse_case(source: Path, destination: Path, plan: dict) -> None:
         save(evidence_path, evidence)
 
 
+def reusable_milp_cases(reference: Path, plan: dict, definitions: dict) -> tuple[set, dict]:
+    report = audit_saved(reference)
+    manifest = json.loads((reference/"manifest.json").read_text())
+    source_plan = json.loads((reference/"plan.json").read_text())
+    if source_plan["timeout_seconds"] != plan["timeout_seconds"] or source_plan["dataset_sha256"] != plan["dataset_sha256"]:
+        raise ValueError("MILP reuse requires the identical cutoff and dataset")
+    for method in ("BigM-Gurobi", "BigM-CPLEX"):
+        if manifest["methods"][method] != definitions[method]:
+            raise ValueError("MILP settings changed across the backend correction")
+    selected = set(tasks_for(plan))
+    return ({(r["method"],r["objective"],r["name"]) for r in report["case_bounds"]
+             if r["method"] in {"BigM-Gurobi", "BigM-CPLEX"}
+             and (r["method"],r["objective"],r["name"]) in selected}, manifest)
+
+
 def run(args) -> None:
     plan = json.loads(args.plan.read_text())
     selected = validate_plan(plan)
@@ -414,6 +460,12 @@ def run(args) -> None:
     definitions = methods_for(plan)
     args.method_definitions = definitions
     reference = getattr(args, "reference_results", None)
+    milp_reference = getattr(args, "reuse_milp_from", None)
+    if reference is not None and milp_reference is not None:
+        raise ValueError("choose either a complete baseline reference or selective MILP reuse")
+    reusable = set()
+    if milp_reference is not None:
+        reusable, source_manifest = reusable_milp_cases(milp_reference,plan,definitions)
     if (plan.get("candidate_variant") is not None) != (reference is not None):
         raise ValueError("a new candidate requires its locked baseline reference")
     if reference is not None:
@@ -434,11 +486,22 @@ def run(args) -> None:
             if Path("/proc/cpuinfo").exists() else platform.processor(),
         memory=Path("/proc/meminfo").read_text().splitlines()[0] if Path("/proc/meminfo").exists() else None,
         salvers=dependency_state(REPO.parent/"salvers"), ipamir=dependency_state(REPO.parent/"ipamir-rs"))
+    if milp_reference is not None:
+        for field in ("ram_kb", "platform", "machine", "memory", "threads_milp"):
+            if source_manifest[field] != locked[field]:
+                raise ValueError(f"MILP reuse environment changed: {field}")
+        locked["milp_reuse"] = dict(source=str(milp_reference.resolve()),
+            manifest_sha256=focus.sha(milp_reference/"manifest.json"),
+            report_sha256=focus.sha(milp_reference/"extended_audit.json"))
     manifest = root/"manifest.json"
     if manifest.exists() and json.loads(manifest.read_text()) != locked:
         raise ValueError("resume would change source, dependencies, binaries, environment or parameters")
     save(manifest, locked)
     save(root/"plan.json", plan)
+    if milp_reference is not None:
+        for source,target in (("manifest.json","milp_reuse_manifest.json"),
+                              ("extended_audit.json","milp_reuse_audit.json")):
+            shutil.copy2(milp_reference/source,root/target)
     if reference is not None:
         for source, target in (("manifest.json", "reference_manifest.json"),
                                ("extended_audit.json", "reference_audit.json")):
@@ -448,7 +511,11 @@ def run(args) -> None:
     for method, objective, name in tasks_for(plan):
         case = root/"cases"/method/objective/name
         result = case/f"{objective}.json"
-        if reference is not None and method != plan["candidate_tag"]:
+        if (method,objective,name) in reusable:
+            reuse_case(milp_reference/"cases"/method/objective/name/f"{objective}.json", result,
+                       dict(reference_manifest_sha256=locked["milp_reuse"]["manifest_sha256"],
+                            reference_audit_sha256=locked["milp_reuse"]["report_sha256"]))
+        elif reference is not None and method != plan["candidate_tag"]:
             reuse_case(reference/"cases"/method/objective/name/f"{objective}.json", result, plan)
         elif not result.exists():
             # Leave enough room to finish one instance and write the audit.
@@ -476,6 +543,7 @@ def main():
     builder.add_argument("--focus-manifest", type=Path, required=True)
     builder.add_argument("--reference", type=Path, default=Path("results"))
     builder.add_argument("--timeout", type=int, default=300)
+    builder.add_argument("--sat-backend", choices=["minisat", "cadical"], default="cadical")
     builder.add_argument("--output", type=Path, required=True)
     runner = sub.add_parser("run")
     runner.add_argument("--plan", type=Path, required=True)
@@ -487,6 +555,7 @@ def main():
     runner.add_argument("--round-seconds", type=int, default=21600)
     runner.add_argument("--ram-kb", type=int, default=15000000)
     runner.add_argument("--reference-results", type=Path)
+    runner.add_argument("--reuse-milp-from", type=Path)
     trial = sub.add_parser("candidate-plan")
     trial.add_argument("--reference-results", type=Path, required=True)
     trial.add_argument("--output", type=Path, required=True)
@@ -496,7 +565,7 @@ def main():
     if args.action == "plan":
         if args.output.exists():
             raise ValueError("keep the old selection immutable")
-        plan = build_plan(args.focus_manifest, args.reference, args.timeout)
+        plan = build_plan(args.focus_manifest, args.reference, args.timeout, args.sat_backend)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         save(args.output, plan)
         print(json.dumps(plan["instances_by_objective"], indent=2))

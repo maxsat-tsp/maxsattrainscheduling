@@ -138,8 +138,8 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_core_minimize_checks: Option<usize>,
 
-    /// SAT backend for SC/AGLR: minisat (default) or genuine native glucose.
-    #[structopt(long, default_value = "minisat", possible_values = &["minisat", "glucose"])]
+    /// SAT backend for SC/AGLR and journal MaxSAT-DDD: minisat, cadical, or native glucose.
+    #[structopt(long, default_value = "minisat", possible_values = &["minisat", "cadical", "glucose"])]
     maxsat_ladder_sc_backend: String,
 
     /// AGLR refinement policy: legacy, all-scanned, or adaptive.
@@ -509,7 +509,41 @@ fn solve_sc_with_backend(
             counting_solver::CountingSolver::new(ddd_solvers::incremental_sat::new_maxsat_glucose_solver()),
             problem, timeout, objective, settings, output,
         ).map(|(solution, _)| solution),
+        "cadical" => {
+            let solver = satcoder::solvers::cadical::Solver::new();
+            output("maxsat_backend_signature".to_string(), solver.cadical.signature().to_string().into());
+            maxsat_ladder_sc::solve_with_settings(
+                &mk_env, counting_solver::CountingSolver::new(solver),
+                problem, timeout, objective, settings, output,
+            ).map(|(solution, _)| solution)
+        }
         _ => unreachable!("CLI validates the SC backend"),
+    }
+}
+
+fn solve_journal_with_backend(
+    backend: &str,
+    problem: &problem::Problem,
+    timeout: f64,
+    objective: DelayCostType,
+    mut output: impl FnMut(String, serde_json::Value),
+) -> Result<Vec<Vec<i32>>, SolverError> {
+    counting_solver::reset_counts();
+    output("maxsat_backend".to_string(), backend.into());
+    match backend {
+        "minisat" => maxsat_ladder::solve(&mk_env,
+            counting_solver::CountingSolver::new(satcoder::solvers::minisat::Solver::new()),
+            problem, timeout, objective, output).map(|(solution, _)| solution),
+        "glucose" => maxsat_ladder::solve(&mk_env,
+            counting_solver::CountingSolver::new(ddd_solvers::incremental_sat::new_maxsat_glucose_solver()),
+            problem, timeout, objective, output).map(|(solution, _)| solution),
+        "cadical" => {
+            let solver = satcoder::solvers::cadical::Solver::new();
+            output("maxsat_backend_signature".to_string(), solver.cadical.signature().to_string().into());
+            maxsat_ladder::solve(&mk_env, counting_solver::CountingSolver::new(solver),
+                problem, timeout, objective, output).map(|(solution, _)| solution)
+        }
+        _ => unreachable!("CLI validates the MaxSAT backend"),
     }
 }
 
@@ -980,20 +1014,12 @@ fn main() {
                         )
                     }
                     SolverType::MaxSatDddLadderRC2 => {
-                        counting_solver::reset_counts();
-                        maxsat_ladder::solve(
-                            &mk_env,
-                            counting_solver::CountingSolver::new(
-                                satcoder::solvers::minisat::Solver::new(),
-                            ),
-                            &p.problem,
-                            timeout,
-                            delay_cost_type,
+                        solve_journal_with_backend(
+                            &opt.maxsat_ladder_sc_backend, &p.problem, timeout, delay_cost_type,
                             |k, v| {
                                 solve_data.insert(k, v);
                             },
                         )
-                        .map(|(v, _)| v)
                     }
                     SolverType::MaxsatRc2 => {
                         counting_solver::reset_counts();
@@ -1044,17 +1070,12 @@ fn main() {
                         },
                     )
                     .map(|(v, _)| v),
-                    SolverType::MaxSatDddCadical => maxsat_ladder::solve(
-                        &mk_env,
-                        satcoder::solvers::rustsat_glucose::Solver::new(),
-                        &p.problem,
-                        timeout,
-                        delay_cost_type,
+                    SolverType::MaxSatDddCadical => solve_journal_with_backend(
+                        "cadical", &p.problem, timeout, delay_cost_type,
                         |k, v| {
                             solve_data.insert(k, v);
                         },
-                    )
-                    .map(|(v, _)| v),
+                    ),
                     SolverType::SatDdd => ddd_solvers::incremental_sat::solve_with_encoding_and_settings(
                         &mk_env,
                         satcoder::solvers::minisat::Solver::new(),

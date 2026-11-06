@@ -17,6 +17,56 @@ def plan():
 
 
 class ExtendedTests(unittest.TestCase):
+    def test_backend_correction_reuses_only_completed_milp_cases(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            original=plan()
+            extended.save(root/"plan.json",original)
+            extended.save(root/"manifest.json",dict(methods=extended.METHODS,
+                plan_sha256=extended.focus.sha(root/"plan.json")))
+            records=[]
+            for method in ("BigM-Gurobi","BigM-CPLEX","MaxSAT-Journal"):
+                case=root/"cases"/method/"cont"/"origA2"
+                case.mkdir(parents=True)
+                extended.save(case/"cont.json",[dict(name="origA2",solves=[dict(
+                    status="timeout",timeout_seconds=300,total_time=300,process_exit_code=0)])])
+                records.append(extended.assess_case(case,method,"cont","origA2",300))
+            extended.save(root/"extended_audit.json",extended.summarize(original,records))
+            target=dict(original,sat_backend="cadical")
+            cases,_=extended.reusable_milp_cases(root,target,extended.methods_for(target))
+            self.assertEqual(cases,{("BigM-Gurobi","cont","origA2"),("BigM-CPLEX","cont","origA2")})
+            with self.assertRaises(ValueError):
+                extended.reusable_milp_cases(root,dict(target,timeout_seconds=600),extended.methods_for(target))
+            definitions=extended.methods_for(target)
+            definitions["BigM-Gurobi"]=dict(definitions["BigM-Gurobi"],solver="other")
+            with self.assertRaises(ValueError):
+                extended.reusable_milp_cases(root,target,definitions)
+
+    def test_cadical_is_explicit_for_all_three_maxsat_roles(self):
+        frozen=plan()
+        frozen["sat_backend"]="cadical"
+        definitions=extended.methods_for(frozen)
+        for method in ("Orders-Transitive","CSOnet","MaxSAT-Journal"):
+            self.assertEqual(definitions[method]["backend"],"cadical")
+        for method in ("BigM-Gurobi","BigM-CPLEX"):
+            self.assertEqual(definitions[method],extended.METHODS[method])
+        self.assertEqual(extended.methods_for(plan()),extended.METHODS)
+        with self.assertRaises(ValueError):
+            extended.methods_for(dict(frozen,sat_backend="fake"))
+
+    def test_backend_label_without_native_signature_fails_audit(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            solve=dict(status="timeout",timeout_seconds=300,total_time=300,
+                       process_exit_code=0,maxsat_backend="cadical")
+            extended.save(root/"cont.json",[dict(name="origA1",solves=[solve])])
+            definition=dict(extended.METHODS["MaxSAT-Journal"],backend="cadical")
+            result=extended.assess_case(root,"MaxSAT-Journal","cont","origA1",300,definition)
+            self.assertIn("genuine CaDiCaL runtime signature is missing",result["errors"])
+            solve["maxsat_backend_signature"]="cadical native test signature"
+            extended.save(root/"cont.json",[dict(name="origA1",solves=[solve])])
+            self.assertFalse(extended.assess_case(root,"MaxSAT-Journal","cont","origA1",300,definition)["errors"])
+
     def test_complete_reference_can_be_reused_without_running_baselines_again(self):
         with tempfile.TemporaryDirectory() as raw:
             reference=Path(raw)/"reference"

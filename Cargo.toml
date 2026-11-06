@@ -9,7 +9,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-satcoder = { path = "../salvers/satcoder", default-features = false, features = ["solver_minisat", "solver_rustsat_glucose"] }
+satcoder = { path = "../salvers/satcoder", default-features = false, features = ["solver_minisat", "solver_cadical", "solver_rustsat_glucose"] }
 rustsat = { version = "0.7.5", optional = true }
 rustsat-glucose = { version = "0.7.5", optional = true }
 

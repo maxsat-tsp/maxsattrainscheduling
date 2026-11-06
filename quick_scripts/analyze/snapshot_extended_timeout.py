@@ -22,6 +22,9 @@ def snapshot(root: Path, output: Path) -> dict:
     if plan.get("candidate_variant") is not None:
         for name in ("reference_manifest.json", "reference_audit.json"):
             files[name] = (root/name).read_bytes()
+    if json.loads(files["manifest.json"]).get("milp_reuse"):
+        for name in ("milp_reuse_manifest.json", "milp_reuse_audit.json"):
+            files[name] = (root/name).read_bytes()
     allowed = {(method, objective, name)
                for method in json.loads(files["manifest.json"])["methods"]
                for objective, names in plan["instances_by_objective"].items() for name in names}

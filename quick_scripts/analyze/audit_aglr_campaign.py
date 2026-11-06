@@ -170,6 +170,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append("maxsat_assumptions differs from the locked configuration")
             if "backend" in config and solve.get("maxsat_backend") != config["backend"]:
                 errors.append("maxsat_backend differs from the locked configuration")
+            if config.get("backend") == "cadical" and "cadical" not in str(solve.get("maxsat_backend_signature", "")).lower():
+                errors.append("genuine CaDiCaL runtime signature is missing")
             if "sparse_costs" in config and str(solve.get("maxsat_sparse_costs")).lower() != config["sparse_costs"].lower():
                 errors.append("maxsat_sparse_costs differs from the locked configuration")
             if "resource_orders" in config and str(solve.get("maxsat_resource_orders")).lower() != config["resource_orders"].lower():

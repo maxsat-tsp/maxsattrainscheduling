@@ -2726,6 +2726,17 @@ mod aglr_end_to_end_tests {
                 if checks == 0 { assert_eq!(stats.core_minimize_calls,0); }
                 observed_checks += stats.core_minimize_calls;
             }
+            for checks in [0,4] {
+                let mut settings = MaxSatDddLadderScSettings::default();
+                settings.resource_orders = true;
+                settings.order_transitivity = true;
+                settings.core_minimize_checks = checks;
+                let (solution, _) = solve_with_settings(
+                    &quiet_env, satcoder::solvers::cadical::Solver::new(),
+                    &problem, 30.0, objective, settings, |_,_| {},
+                ).unwrap();
+                assert_eq!(problem.verify_solution(&solution, objective), Some(optimum));
+            }
         }
         assert!(observed_checks > 0, "test must exercise the extra SAT queries");
     }

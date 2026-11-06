@@ -144,12 +144,13 @@ def run_trial(args) -> None:
     repo = Path(__file__).resolve().parents[2]
     if subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=all"], cwd=repo).strip():
         raise ValueError("commit source changes before running a focused trial")
-    if args.variant not in {"orders", "orders-transitive", "orders-transitive-glucose", "orders-transitive-harden", "orders-bound", "orders-sparse", "legacy"}:
+    if args.variant not in {"orders", "orders-transitive", "orders-transitive-full", "orders-transitive-geometric", "orders-transitive-glucose", "orders-transitive-harden", "orders-bound", "orders-sparse", "legacy"}:
         raise ValueError("unsupported focused variant")
     config = dict(tag="Focus-" + args.variant, kind="exact", solver="maxsat_ddd_ladder_sc", policy="legacy",
-                  assumptions="legacy", sparse_costs=str(args.variant == "orders-sparse").lower(),
+                  assumptions=("full" if args.variant.endswith("-full") else "geometric" if args.variant.endswith("-geometric") else "legacy"),
+                  sparse_costs=str(args.variant == "orders-sparse").lower(),
                   resource_orders=str(args.variant != "legacy").lower(),
-                  order_transitivity=str(args.variant in {"orders-transitive", "orders-transitive-glucose", "orders-transitive-harden"}).lower(),
+                  order_transitivity=str(args.variant in {"orders-transitive", "orders-transitive-full", "orders-transitive-geometric", "orders-transitive-glucose", "orders-transitive-harden"}).lower(),
                   objective_bound=str(args.variant == "orders-bound").lower(),
                   residual_hardening=str(args.variant == "orders-transitive-harden").lower(),
                   backend="glucose" if args.variant.endswith("-glucose") else "minisat",

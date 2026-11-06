@@ -43,6 +43,15 @@ Theo dõi bằng `journalctl -u maxsat-extended300-b6a4370.service`.
 Không đổi mã hoặc binary trong worktree `~/projects/core-v9/maxsattrainscheduling`
 khi dịch vụ này đang chạy.
 
+Có thể lấy bản chụp các ca đã hoàn tất mà không dừng chiến dịch:
+`python3 quick_scripts/analyze/snapshot_extended_timeout.py <RUN_DIR> <archive.tar.gz>`.
+Chạy script từ một bản mã riêng nếu worktree thí nghiệm đã khóa commit cũ.
+Sau khi giải nén trên máy local, kiểm tra lại bằng
+`python3 quick_scripts/analyze/extended_timeout_experiments.py audit-saved <snapshot_dir>`.
+Auditor xác minh hash từng file, kiểm tra lịch độc lập và dựng lại báo cáo.
+Chỉ các thống kê thời gian tính lại được chấp nhận sai khác làm tròn cỡ máy;
+chi phí, số ca tối ưu và dữ liệu đầu vào vẫn phải khớp.
+
 ## Quy trình nhóm 120 giây đã chạy
 
 Từ 06/11/2026, mỗi ý tưởng mới chạy trên danh sách đã lọc theo objective.

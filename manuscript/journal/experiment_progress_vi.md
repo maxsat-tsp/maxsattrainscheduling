@@ -2,6 +2,15 @@
 
 ## Trạng thái mới nhất
 
+Bản chụp **82/155 lượt ở 300 giây** đã được lấy về và kiểm toán độc lập:
+không có lỗi lịch hoặc chi phí mâu thuẫn. Trên cùng 16 cặp cont đã hoàn tất
+đủ năm phương pháp, bộ ba V5 đạt 10/16, CSOnet 10/16, MaxSAT-Journal 10/16,
+Gurobi 13/16, CPLEX 13/16. Bộ ba cần 216,23 giây cho stationA9 và 132,12
+giây cho trackB12; các baseline SAT cũng giải thêm được ca khi tăng timeout.
+Vì vậy chưa vượt SOTA. Dữ liệu nguyên bản và bảng cùng mẫu ở
+`results/sat_research/extended_300_20261106/progress_82/`.
+Đây là bản chụp giữa chiến dịch, không phải kết quả cuối hoặc coverage full.
+
 Theo yêu cầu ngày 06/11, vòng kế tiếp tăng timeout chung lên **300 giây**
 cho phương án bộ ba V5 và bốn đối chứng: CSOnet, MaxSAT-Journal, Big-M Gurobi,
 Big-M CPLEX. Danh sách mở rộng là hợp những ca các phương pháp chưa giải ở

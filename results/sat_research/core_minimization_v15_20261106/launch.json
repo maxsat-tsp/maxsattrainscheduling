@@ -1,0 +1,31 @@
+{
+  "service": "maxsat-core-v15-unresolved300.service",
+  "run_id": "core-v15-unresolved300",
+  "started_utc": "2026-11-06T14:52:06Z",
+  "started_vietnam": "2026-11-06 21:52:06 +07:00",
+  "runner_commit": "a417f3d3da50f48a8c489955868e6cf0071b0072",
+  "solver_source_commit": "1908b2204be627ce0048b442282827a8915797b1",
+  "binary_sha256": "b04b50af81ef57d6f670eacc9d2d4cf7f5a2786cbaf1d14f68d82369e934ef20",
+  "manifest_sha256": "47a52c7e709c05fafaba333e099cf8aef25a8c9b0ec32e2aef496b8e42057591",
+  "backend": "minisat",
+  "candidate": "Orders-Transitive-Mincore",
+  "changed_component": "up to four additional deletion checks per UNSAT core",
+  "core_minimize_checks": 4,
+  "timeout_seconds": 300,
+  "ram_limit_kb": 6000000,
+  "cpu_affinity": [0, 1, 4, 5],
+  "maximum_seconds_per_round": 21600,
+  "planned_new_cases": 15,
+  "new_baseline_runs": 0,
+  "instances_by_objective": {
+    "finsteps123": [],
+    "infsteps180": ["trackA11", "trackA12", "stationA11", "stationA12"],
+    "cont": ["origA8", "origB11", "trackA8", "trackA11", "trackA12", "stationA1", "stationA2", "stationA8", "stationA11", "stationA12", "stationB12"]
+  },
+  "python_tests_passed_on_vm": 68,
+  "native_smoke_optimal_cost": 5526,
+  "native_smoke_actual_extra_queries": 111,
+  "vm_result_directory": "/home/tuyenkv/projects/core-v15/maxsattrainscheduling/results/aglr/core-v15-unresolved300",
+  "status": "launch_receipt_only",
+  "submission_passed": false
+}

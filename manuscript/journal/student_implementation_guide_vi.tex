@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.5}
+\fancyhead[R]{\small Phiên bản 5.6}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.5, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.6, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -82,6 +82,12 @@ cải tiến solver CSOnet. Phương án dùng biến thứ tự và điều ki�
 đạt full $(72,68,60)$; phương án giới hạn chi phí đạt $(72,68,59)$.
 Chưa có phương án vượt baseline tốt nhất. Tiến độ và vị trí dữ liệu được ghi tại
 \file{manuscript/journal/experiment_progress_vi.md}.
+
+\textbf{Việc làm hiện tại:} thử thời gian dài hơn cho cả phương pháp mới và
+các đối chứng. Lượt 300 giây dùng 31 cặp bài toán--hàm mục tiêu đã chọn:
+5 cặp \code{infsteps180}, 26 cặp \code{cont}. Danh sách gồm cả những ca SOTA
+chưa giải được. Xem phần ``Thử timeout dài hơn'' ở cuối tài liệu để chạy.
+Các lệnh 120 giây bên dưới giúp tái tạo các lượt đã hoàn tất.
 
 Khi tiếp tục công việc, thực hiện các bước sau:
 
@@ -879,6 +885,55 @@ Sinh viên điền trực tiếp mẫu
 \file{manuscript/journal/student_experiment_report_template_vi.md} để không bỏ
 sót thông tin.
 
+\section{Thử timeout dài hơn}
+
+Các vòng 120 giây gần đây chưa giải thêm ca mới. Bây giờ thử giới hạn
+$T=300$ giây cho cả năm phương pháp: bộ ba V5, CSOnet, MaxSAT của bài tạp
+chí trước, Big-M Gurobi và Big-M CPLEX. Cả năm chạy cùng 31 cặp đã khóa tại
+\file{results/sat_research/extended_300_20261106/plan.json}. Không chạy lại
+\code{finsteps123} trong vòng này vì các đối chứng đã giải hết ở 120 giây.
+
+Sau khi kích hoạt môi trường Gurobi trên VM, chạy:
+\begin{verbatim}
+BIN=./target/release/ddd \
+EXPORT_BIN=./target/release/export_lp \
+CPLEX_BIN=/duong/dan/toi/cplex \
+RUN_ID=extended-300-20261106 \
+  bash run_extended_timeout_experiments.sh
+\end{verbatim}
+Đường dẫn CPLEX thực tế trên VM có trong runbook. Mỗi vòng tối đa 6 giờ;
+script chỉ bắt đầu một ca khi còn đủ thời gian để hoàn tất. Chạy lại cùng
+lệnh để tiếp tục phần còn thiếu. Giữ nguyên mã nguồn, binary, danh sách và
+tham số. Các ca chạy tuần tự; thứ tự phương pháp được trộn với seed cố định.
+CPLEX dùng Big-M eager, 4 luồng, gap tương đối và tuyệt đối bằng 0.
+
+Với ca $i$, gọi $t_i$ là thời gian hoàn tất và $q_i(T)=1$ khi lịch đã được
+kiểm tra, chi phí bằng cận dưới và cận trên, và $t_i\le T$; còn lại
+$q_i(T)=0$. Trên cùng tập $N$ ca đã chạy đủ, báo cáo:
+\[
+ n(T)=\sum_{i=1}^N q_i(T),\qquad
+ \operatorname{PAR\!\text{-}2}(T)
+ =\frac{1}{N}\sum_{i=1}^N
+ \begin{cases}
+ t_i,&q_i(T)=1,\\
+ 2T,&q_i(T)=0.
+ \end{cases}
+\]
+Chẳng hạn, một lịch được chứng minh tối ưu ở giây 240 được tính thành công
+ở mốc 300 giây. Nếu đến giây 300 vẫn chưa chứng minh tối ưu thì bị phạt
+600 giây khi tính PAR-2. So sánh số ca tối ưu trước, rồi mới so PAR-2.
+
+Đọc \file{extended_audit.json}: \code{complete=false} nghĩa là còn ca chưa
+chạy; \code{missing} liệt kê các ca đó. Bảng \file{extended_summary.csv}
+cho kết quả đang có. \code{gained}/\code{lost} chỉ so sánh những cặp đã chạy
+đủ cả hai phương pháp ở 300 giây. Lịch không hợp lệ hoặc chi phí mâu thuẫn
+làm dừng vòng chạy; giữ nguyên dữ liệu lỗi để tìm nguyên nhân.
+
+Giữ nguyên bảng 120 giây làm mốc lịch sử. Các timeout cũ không trở thành
+kết quả 300 giây bằng cách đổi nhãn. Kết quả 31 cặp chỉ mô tả nhóm khó;
+chưa phải coverage toàn bộ dataset. Sau khi có cấu hình tốt hơn, kiểm tra
+lại toàn bộ dữ liệu trước khi đưa vào bảng chính của bài báo.
+
 \section{Nội dung được phép đưa vào bài báo}
 
 Methods có thể mô tả AGLR ngay vì công thức đã khớp với mã. Các số RC2+B+R cũ
@@ -901,4 +956,3 @@ tên biến nội bộ. Không viết rằng AGLR nhanh hơn hoặc mạnh hơn 
 đã qua cổng trên.
 
 \end{document}
-của các ca dễ với kết quả mới của các ca khó thành một lượt full.

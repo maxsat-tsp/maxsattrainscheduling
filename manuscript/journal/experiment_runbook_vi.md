@@ -7,7 +7,36 @@ Mốc chính đã được sửa theo camera-ready: **120 giây**, MaxSAT-Defaul
 Có thể dùng lại lượt 150 giây bằng cách tạo bảng dẫn xuất ở cutoff 120 giây.
 Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt chạy lại.
 
-## Quy trình hiện tại: chỉ thử các instance chưa giải được
+## Vòng hiện tại: 300 giây cho cả phương pháp mới và SOTA
+
+Chưa có ca mới được giải ở 120 giây. Theo yêu cầu của thầy/cô, thử 300 giây
+cho cả phương án bộ ba V5 và CSOnet, MaxSAT-Journal, Big-M Gurobi, Big-M CPLEX.
+Danh sách mới có 31 cặp: 5 infsteps180, 26 cont, không có finsteps123. Đây là
+hợp những ca chưa giải trong danh sách cũ hoặc trong bốn bảng baseline.
+Mỗi phương pháp chạy đúng danh sách này. Không đổi timeout của kết quả cũ.
+
+```bash
+BIN=./target/release/ddd EXPORT_BIN=./target/release/export_lp \
+CPLEX_BIN=/home/tuyenkv/opt/ibm/ILOG/CPLEX_Studio2220/cplex/bin/x86-64_linux/cplex \
+RUN_ID=extended-300-20261106 bash run_extended_timeout_experiments.sh
+```
+
+Kích hoạt môi trường Gurobi đã cài trước khi chạy. Lệnh giới hạn một vòng
+6 giờ, chạy tuần tự, xen kẽ thứ tự phương pháp có seed cố định. Chạy lại cùng
+lệnh để tiếp tục; nguồn, binary, dependency, máy và danh sách phải khớp.
+Mỗi ca hoàn tất được kiểm tra lịch độc lập và lưu trước khi chuyển sang ca
+tiếp. Nếu có lỗi, giữ dữ liệu và sửa nguyên nhân, không chạy lặp để chọn kết
+quả đẹp hơn. CPLEX dùng Big-M eager, 4 luồng và gap bằng 0; chỉ tính tối ưu
+khi có lịch hợp lệ và cận khớp.
+
+Đọc `extended_audit.json` và `extended_summary.csv` trong thư mục RUN_ID.
+`complete=false` nghĩa là còn ca chưa chạy; dùng `missing` để biết phần còn
+lại. `gained` và `lost` so sánh các cặp đã chạy đủ cả hai phương pháp ở
+**cùng 300 giây**. Chỉ kết luận về nhóm khó; cần kiểm tra toàn bộ dataset
+sau khi chọn được cấu hình. Nếu 300 giây chưa giúp phân biệt, xem cận và
+thời gian trước khi quyết định vòng 600 giây cho cả năm phương pháp.
+
+## Quy trình nhóm 120 giây đã chạy
 
 Từ 06/11/2026, mỗi ý tưởng mới chạy trên danh sách đã lọc theo objective.
 Không chạy lại toàn bộ dataset ở mỗi vòng. Hai lượt full mới nhất đã xong:

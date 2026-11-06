@@ -2,6 +2,20 @@
 
 ## Trạng thái mới nhất
 
+Theo yêu cầu ngày 06/11, vòng kế tiếp tăng timeout chung lên **300 giây**
+cho phương án bộ ba V5 và bốn đối chứng: CSOnet, MaxSAT-Journal, Big-M Gurobi,
+Big-M CPLEX. Danh sách mở rộng là hợp những ca các phương pháp chưa giải ở
+120 giây: **5 cặp infsteps180, 26 cặp cont**, không chạy finsteps123.
+Cả năm phương pháp đều chạy lại cùng 31 cặp, tuần tự, mỗi vòng tối đa 6 giờ.
+Kết quả cũ không được đổi nhãn thành kết quả 300 giây. Lựa chọn đã khóa tại
+`results/sat_research/extended_300_20261106/plan.json`.
+
+V10 đã được kiểm toán lại độc lập: giả định `full` đạt 0/4 infsteps180 và
+0/14 cont; `geometric` đạt 0/4 và 1/14. Không giải thêm ca mới. V9 có một
+nghiệm không hợp lệ ở stationB1/cont, đã bị loại và revert; nguyên nhân
+chính xác chưa được cô lập. Lưu cả dữ liệu lỗi để truy vết tại
+`results/sat_research/rejected_v9_and_assumptions_v10_20261106/`.
+
 Vòng focus `270d1ce` đã hoàn tất và được kiểm toán lại độc lập: infsteps180 giải 0/4, cont giải 2/14 trong nhóm khó; không chạy finsteps123. Dữ liệu ở `results/sat_research/hardening_v8_20261106/`. Đây là kết quả nhóm đã lọc, chưa phải một lượt full của mã mới.
 
 Vòng focus `b7160db` đã hoàn tất và được kiểm toán lại độc lập: infsteps180 giải 0/4, cont giải 2/14 trong nhóm khó; không chạy finsteps123. Dữ liệu ở `results/sat_research/focus_v7_20261106/`. Đây là kết quả nhóm đã lọc, chưa phải một lượt full của mã mới.
@@ -18,8 +32,8 @@ giải được trong ít nhất một trong hai lượt này hoặc ở mốc h
 ca mới giải được và ca bị mất. Dữ liệu cũ làm đối chứng, không chạy lại.
 
 Danh sách và hash nguồn ở `results/sat_research/focus_20261106/selection.json`.
-Sau Glucose, vòng tiếp theo giữ MiniSAT và phương án bộ ba, chỉ thêm quy
-tắc loại lựa chọn có trọng số còn lại lớn hơn `UB-LB`. Dùng
+Sau Glucose, vòng V8 đã giữ MiniSAT và phương án bộ ba, chỉ thêm quy
+tắc loại lựa chọn có trọng số còn lại lớn hơn `UB-LB`. Đã dùng
 `CORE_VARIANT=orders-transitive-harden` với
 `run_maxsat_focused_experiments.sh`, không tự chạy full. Kết quả nhóm khó
 không được ghép với các ca dễ cũ để công bố coverage full của mã mới.
@@ -37,14 +51,13 @@ mọi phép gán trong ngân sách, điểm biên bằng ngân sách, phần tr�
 lại sau xử lý core, và các bài lịch nhỏ vét cạn trên ba objective với cả
 MiniSAT/Glucose. Bài hai tàu xác nhận thực tế có điều kiện chi phí được cố
 định và optimum vẫn đúng. 41 kiểm thử Python và build release đã đạt.
-Chưa có kết quả hiệu năng của quy tắc này; dùng lại nhóm 18 cặp và các đối
-chứng đã có để thử một lần ở 120 giây.
+V8 đã chạy trên nhóm 18 cặp ở 120 giây và chưa tăng coverage.
 
 Vòng `maxsat-harden-v8-270d1ce` đã bắt đầu trên VM sáng 06/11/2026, từ
 mã `270d1ce`. Config xác nhận MiniSAT, bộ ba và residual hardening bật,
 objective bound nhị phân tắt; vẫn chỉ có 4 ca infsteps180 và 14 ca cont.
 Thư mục: `~/projects/experiment-audit/rounds/maxsat-harden-v8-270d1ce/`.
-Mã, kiểm thử và hướng dẫn đã push; chưa có kết quả cuối của vòng này.
+Mã, kiểm thử, hướng dẫn và kết quả cuối đã push; xem phần cập nhật đầu tài liệu.
 
 Đối chiếu lại camera-ready theo ý kiến của thầy/cô: mốc đúng là **120 giây**,
 `(72,68,60)`, tổng 200 optimum. Bộ JSON 150 giây `(72,68,58)` là lượt khác;

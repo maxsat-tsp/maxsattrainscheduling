@@ -298,7 +298,8 @@ def run_case(method: str, objective: str, name: str, args, root: Path) -> None:
                             ("order_transitivity", "ORDER_TRANSITIVITY"),
                             ("objective_bound", "OBJECTIVE_BOUND"), ("residual_hardening", "RESIDUAL_HARDENING"),
                             ("core_minimize_checks", "CORE_MINIMIZE_CHECKS"),
-                            ("core_minimize_conflicts", "CORE_MINIMIZE_CONFLICTS")):
+                            ("core_minimize_conflicts", "CORE_MINIMIZE_CONFLICTS"),
+                            ("core_exhaust_checks", "CORE_EXHAUST_CHECKS")):
             if key in cfg:
                 env["MAXSATDDD_" + suffix] = cfg[key]
         execute(["bash", "quick_scripts/run_all_txt_instances_limited.sh"], REPO, root/"runner.log",

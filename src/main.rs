@@ -142,6 +142,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_core_minimize_conflicts: Option<usize>,
 
+    /// Extra cardinality-floor checks per new core (default 0; MiniSAT experiment).
+    #[structopt(long)]
+    maxsat_ladder_sc_core_exhaust_checks: Option<usize>,
+
     /// SAT backend for SC/AGLR and journal MaxSAT-DDD: minisat, cadical, or native glucose.
     #[structopt(long, default_value = "minisat", possible_values = &["minisat", "cadical", "glucose"])]
     maxsat_ladder_sc_backend: String,
@@ -498,6 +502,10 @@ fn emit_native_minisat_stats(mut output:impl FnMut(String,serde_json::Value)) {
     output("maxsat_native_budgeted_calls".to_string(),stats.budgeted_calls.into());
     output("maxsat_native_inconclusive_calls".to_string(),stats.inconclusive_calls.into());
     output("maxsat_native_sat_time".to_string(),stats.sat_time.as_secs_f64().into());
+    output("maxsat_native_exhaust_checks".to_string(),stats.exhaust_checks.into());
+    output("maxsat_native_exhaust_proved_steps".to_string(),stats.exhaust_proved_steps.into());
+    output("maxsat_native_exhaust_inconclusive".to_string(),stats.exhaust_inconclusive.into());
+    output("maxsat_native_exhaust_time".to_string(),stats.exhaust_time.as_secs_f64().into());
     let (variables,clauses)=counting_solver::get_counts();
     output("num_vars_total".to_string(),variables.into());
     output("num_clauses_total".to_string(),clauses.into());
@@ -674,6 +682,7 @@ fn main() {
         residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),
         core_minimize_checks: opt.maxsat_ladder_sc_core_minimize_checks.unwrap_or(0),
         core_minimize_conflicts: opt.maxsat_ladder_sc_core_minimize_conflicts.unwrap_or(0),
+        core_exhaust_checks: opt.maxsat_ladder_sc_core_exhaust_checks.unwrap_or(0),
         assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
             "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
             "full" => maxsat_ladder_sc::AssumptionStrategy::Full,
@@ -697,6 +706,12 @@ fn main() {
         assert!(opt.maxsat_ladder_sc_backend=="minisat" && maxsat_ladder_sc_settings.core_minimize_checks>0
                 && maxsat_ladder_sc_settings.core_minimize_conflicts<=i32::MAX as usize,
                 "a core conflict budget requires MiniSAT, positive core checks and an i32-sized budget");
+    }
+    if maxsat_ladder_sc_settings.core_exhaust_checks>0 {
+        assert!(opt.maxsat_ladder_sc_backend=="minisat"
+                && maxsat_ladder_sc_settings.core_minimize_checks>0
+                && maxsat_ladder_sc_settings.core_minimize_conflicts>0,
+                "experimental core exhaustion requires MiniSAT and positive core-check and conflict budgets");
     }
 
     let aglr_fraction = opt.aglr_fraction.unwrap_or(0.5);

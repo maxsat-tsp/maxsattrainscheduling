@@ -114,6 +114,8 @@ pub struct MaxSatDddLadderScSettings {
     pub core_minimize_checks: usize,
     /// Native MiniSAT conflicts per extra core check; zero is unlimited.
     pub core_minimize_conflicts: usize,
+    /// Extra cardinality-floor checks per new core; zero preserves legacy RC2.
+    pub core_exhaust_checks: usize,
     pub use_precedence_graph: bool,
     pub use_sc_amo: bool,
     pub use_touched_clique_amo: bool,
@@ -143,6 +145,7 @@ impl Default for MaxSatDddLadderScSettings {
             residual_hardening: false,
             core_minimize_checks: 0,
             core_minimize_conflicts: 0,
+            core_exhaust_checks: 0,
             use_precedence_graph: true,
             use_eager_chain_expansion: false,
             use_sc_amo: true,

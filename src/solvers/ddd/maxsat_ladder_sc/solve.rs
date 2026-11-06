@@ -91,6 +91,10 @@ pub struct SolveStats {
     pub core_minimize_weight_increases: usize,
     pub core_minimize_inconclusive: usize,
     pub core_minimize_time: Duration,
+    pub core_exhaust_calls: usize,
+    pub core_exhaust_steps: usize,
+    pub core_exhaust_inconclusive: usize,
+    pub core_exhaust_time: Duration,
     pub hardening_scans: usize,
     pub hardened_primary: usize,
     pub hardened_totalizer: usize,
@@ -966,6 +970,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
     output_stats("maxsat_core_minimize_checks".to_string(), settings.core_minimize_checks.into());
     output_stats("maxsat_core_minimize_conflicts".to_string(), settings.core_minimize_conflicts.into());
+    output_stats("maxsat_core_exhaust_checks".to_string(), settings.core_exhaust_checks.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -2140,14 +2145,74 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             }
 
             if core.len() > 1 {
-                let bound = 1;
-                let tot = Totalizer::count(&mut solver, core.iter().map(|c| !*c), bound as u32);
-                assert!(bound < tot.rhs().len());
-
-                soft_constraints.insert(
-                    !tot.rhs()[bound], // tot <= 1
-                    (Soft::Totalizer(tot, bound), min_weight, min_weight),
-                );
+                let mut bound = 1;
+                let mut tot = Totalizer::count(&mut solver, core.iter().map(|c| !*c), bound as u32);
+                if settings.core_exhaust_checks > 0 {
+                    let exhaust_start = Instant::now();
+                    let outcome = super::core_exhaust::exhaust(core.len(), settings.core_exhaust_checks,
+                        |tested_bound| {
+                            tot.increase_bound(&mut solver, tested_bound as u32);
+                            let assumption = !tot.rhs()[tested_bound];
+                            let call_start = Instant::now();
+                            stats.sat_calls += 1;
+                            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                crate::solvers::util::minisat_deadline::with_core_check_limit(settings.core_minimize_conflicts, || {
+                                    match solver.solve_with_assumptions([assumption]) {
+                                        satcoder::SatResultWithCore::Sat(_) => Ok(Some(false)),
+                                        satcoder::SatResultWithCore::Unsat(proof) => {
+                                            if proof.len()!=1 || Bool::Lit(proof[0])!=assumption {
+                                                Err("core-exhaustion proof is empty or contains an unqueried literal".to_string())
+                                            } else { Ok(Some(true)) }
+                                        },
+                                    }
+                                })
+                            })) {
+                                Ok(answer) => answer,
+                                Err(payload) if payload.is::<crate::solvers::util::minisat_deadline::CoreCheckInconclusive>() => Ok(None),
+                                Err(payload) => std::panic::resume_unwind(payload),
+                            };
+                            let elapsed = call_start.elapsed();
+                            solver_time += elapsed;
+                            crate::solvers::util::minisat_deadline::record_exhaust_check(
+                                elapsed, matches!(result, Ok(Some(true))), matches!(result, Ok(None)));
+                            if matches!(result, Ok(Some(true))) {
+                                // F AND assumption was proved UNSAT: its negation
+                                // is entailed by F and may be made permanent.
+                                SatInstance::add_clause(&mut solver, [!assumption]);
+                            }
+                            result
+                        }, || start_time.elapsed().as_secs_f64() >= timeout,
+                    ).map_err(SolverError::InvalidSolution)?;
+                    stats.core_exhaust_calls += outcome.checks;
+                    stats.core_exhaust_steps += outcome.bound-1;
+                    stats.core_exhaust_inconclusive += outcome.inconclusive;
+                    stats.core_exhaust_time += exhaust_start.elapsed();
+                    bound = outcome.bound;
+                    let extra_cost = min_weight.checked_mul(bound-1).and_then(|n| i32::try_from(n).ok())
+                        .ok_or_else(|| SolverError::InvalidSolution("core-exhaustion cost overflow".to_string()))?;
+                    total_cost = total_cost.checked_add(extra_cost)
+                        .ok_or_else(|| SolverError::InvalidSolution("core-exhaustion lower-bound overflow".to_string()))?;
+                    if best_heur.as_ref().is_some_and(|(upper,_)| *upper < total_cost) {
+                        return Err(SolverError::InvalidSolution("core exhaustion exceeded a verified feasible cost".to_string()));
+                    }
+                    if extra_cost > 0 { println!("    EXHAUST LB={} STEPS={}",total_cost,bound-1); }
+                    if best_heur.as_ref().is_some_and(|(upper,_)| *upper == total_cost) {
+                        do_output_stats(&mut output_stats, iteration, &iteration_types, &stats,
+                            &occupations, start_time, solver_time, total_cost, total_cost,
+                            &aglr_telemetry, &heuristic_filter);
+                        return Ok((best_heur.unwrap().1, stats));
+                    }
+                }
+                if bound < core.len() {
+                    // The floor has already been charged to LB. Further
+                    // violations retain their original minimum core weight.
+                    tot.increase_bound(&mut solver, bound as u32);
+                    assert!(bound < tot.rhs().len());
+                    soft_constraints.insert(
+                        !tot.rhs()[bound],
+                        (Soft::Totalizer(tot, bound), min_weight, min_weight),
+                    );
+                }
             } else {
                 SatInstance::add_clause(&mut solver, vec![!core[0]]);
             }
@@ -2185,6 +2250,10 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_core_minimize_weight_increases".to_string(), stats.core_minimize_weight_increases.into());
     output_stats("maxsat_core_minimize_inconclusive".to_string(), stats.core_minimize_inconclusive.into());
     output_stats("maxsat_core_minimize_time".to_string(), stats.core_minimize_time.as_secs_f64().into());
+    output_stats("maxsat_core_exhaust_calls".to_string(), stats.core_exhaust_calls.into());
+    output_stats("maxsat_core_exhaust_steps".to_string(), stats.core_exhaust_steps.into());
+    output_stats("maxsat_core_exhaust_inconclusive".to_string(), stats.core_exhaust_inconclusive.into());
+    output_stats("maxsat_core_exhaust_time".to_string(), stats.core_exhaust_time.as_secs_f64().into());
     output_stats("maxsat_hardening_scans".to_string(), stats.hardening_scans.into());
     output_stats("maxsat_hardened_primary".to_string(), stats.hardened_primary.into());
     output_stats("maxsat_hardened_totalizer".to_string(), stats.hardened_totalizer.into());
@@ -2718,6 +2787,7 @@ mod aglr_end_to_end_tests {
             conflicts: vec![(0,0)],
         };
         let mut observed_checks = 0;
+        let mut observed_exhaust_checks = 0;
         for objective in [DelayCostType::Continuous, DelayCostType::FiniteSteps123,
                           DelayCostType::InfiniteSteps180] {
             let mut optimum = i32::MAX;
@@ -2741,16 +2811,22 @@ mod aglr_end_to_end_tests {
                 observed_checks += stats.core_minimize_calls;
             }
             for conflicts in [1,1000] {
+              for exhaust_checks in [0,4] {
                 let mut settings=MaxSatDddLadderScSettings::default();
                 settings.resource_orders=true;
                 settings.order_transitivity=true;
                 settings.core_minimize_checks=4;
                 settings.core_minimize_conflicts=conflicts;
-                let (solution,_)=solve_with_settings(
+                settings.core_exhaust_checks=exhaust_checks;
+                let (solution,stats)=solve_with_settings(
                     &quiet_env,crate::solvers::util::minisat_deadline::Solver::new(30.0),
                     &problem,30.0,objective,settings,|_,_| {},
                 ).unwrap();
                 assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+                if exhaust_checks==0 { assert_eq!(stats.core_exhaust_calls,0); }
+                assert!(stats.core_exhaust_steps<=stats.core_exhaust_calls);
+                observed_exhaust_checks += stats.core_exhaust_calls;
+              }
             }
             for checks in [0,4] {
                 let mut settings = MaxSatDddLadderScSettings::default();
@@ -2765,6 +2841,7 @@ mod aglr_end_to_end_tests {
             }
         }
         assert!(observed_checks > 0, "test must exercise the extra SAT queries");
+        assert!(observed_exhaust_checks > 0, "test must exercise native cardinality-floor queries");
     }
 
     #[test]

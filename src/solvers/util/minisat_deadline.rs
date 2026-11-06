@@ -15,10 +15,28 @@ pub struct NativeStats {
     pub budgeted_calls: usize,
     pub inconclusive_calls: usize,
     pub sat_time: Duration,
+    pub exhaust_checks: usize,
+    pub exhaust_proved_steps: usize,
+    pub exhaust_inconclusive: usize,
+    pub exhaust_time: Duration,
 }
 thread_local! {static NATIVE_STATS: Cell<NativeStats> = Cell::new(NativeStats::default());}
 pub fn native_stats() -> NativeStats {
     NATIVE_STATS.with(Cell::get)
+}
+
+/// Preserve additional-check telemetry even when the instance later expires
+/// inside a different native SAT query. These counts describe proved steps,
+/// not a claimed final optimum or an incumbent schedule.
+pub fn record_exhaust_check(elapsed: Duration, proved: bool, inconclusive: bool) {
+    NATIVE_STATS.with(|cell| {
+        let mut stats = cell.get();
+        stats.exhaust_checks += 1;
+        stats.exhaust_proved_steps += usize::from(proved);
+        stats.exhaust_inconclusive += usize::from(inconclusive);
+        stats.exhaust_time += elapsed;
+        cell.set(stats);
+    });
 }
 
 /// Apply a native conflict limit only within an additional core check.

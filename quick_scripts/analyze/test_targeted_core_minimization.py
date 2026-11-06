@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import compare_sat_backends as dual
 import targeted_core_minimization as targeted
@@ -10,6 +11,42 @@ import extended_timeout_experiments as extended
 
 
 class TargetedCoreTests(unittest.TestCase):
+    def test_exhaustion_requires_matching_runtime_telemetry_and_forwards_the_flag(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            cfg=dict(extended.METHODS["Orders-Transitive"],core_minimize_checks="4",
+                     core_minimize_conflicts="100",core_exhaust_checks="4")
+            solve=dict(status="timeout",total_time=300,timeout_seconds=300,process_exit_code=0)
+            solve.update({"maxsat_"+k:v for k,v in cfg.items() if k not in {"solver","kind"}})
+            for value in (None,0,4):
+                solve["maxsat_core_exhaust_checks"]=value
+                extended.save(root/"cont.json",[dict(name="origA1",solves=[solve])])
+                errors=extended.assess_case(root,"Exhaust","cont","origA1",300,cfg)["errors"]
+                self.assertEqual(bool(errors),value!=4)
+            args=SimpleNamespace(timeout=300,binary=root/"ddd",ram_kb=6000000,method_definitions={"Exhaust":cfg})
+            with patch.object(extended,"execute") as execute:
+                extended.run_case("Exhaust","cont","origA1",args,root/"run")
+            env=execute.call_args.args[4]
+            self.assertEqual(env["MAXSATDDD_CORE_EXHAUST_CHECKS"],"4")
+            self.assertEqual(env["MAXSATDDD_CORE_MINIMIZE_CONFLICTS"],"100")
+
+    def test_next_trial_reuses_the_winner_and_only_keeps_its_unresolved_cases(self):
+        selection=dict(finsteps123=[],infsteps180=[],cont=["origA1","origA2"])
+        config=dict(extended.METHODS["Orders-Transitive"],core_minimize_checks="4",core_minimize_conflicts="100")
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            extended.save(root/"manifest.json",dict(definition=config))
+            extended.save(root/"core_minimization_audit.json",{})
+            with patch("confirm_targeted_core_minimization.choose",return_value=(root,dict(newly_solved=[dict(objective="cont",name="origA1")]))), \
+                 patch.object(targeted,"select",return_value=selection):
+                chosen,cfg,evidence=targeted.unresolved_after_trials(root,[root])
+            self.assertEqual(chosen["cont"],["origA2"])
+            self.assertEqual(cfg,config)
+            self.assertEqual(evidence["selected_manifest_sha256"],extended.focus.sha(root/"manifest.json"))
+            extended.save(root/"manifest.json",dict(definition=dict(config,core_exhaust_checks="4")))
+            with self.assertRaisesRegex(ValueError,"original V16"):
+                targeted.unresolved_after_trials(root,[root])
+
     def test_conflict_limited_trial_requires_matching_solver_telemetry(self):
         with tempfile.TemporaryDirectory() as raw:
             root=Path(raw)

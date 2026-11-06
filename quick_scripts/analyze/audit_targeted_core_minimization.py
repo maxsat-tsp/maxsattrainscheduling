@@ -100,7 +100,7 @@ def verify_snapshot(root):
         raise ValueError("snapshot contains a symlink")
 
 
-def audit_saved(root: Path, reference: Path):
+def audit_saved(root: Path, reference: Path, previous_trials=None):
     verify_snapshot(root)
     manifest = json.loads((root/"manifest.json").read_text())
     saved = json.loads((root/"core_minimization_audit.json").read_text())
@@ -111,7 +111,18 @@ def audit_saved(root: Path, reference: Path):
             raise ValueError("reference differs from the source locked for this trial")
     if manifest["dataset_sha256"] != extended.focus.dataset_hash():
         raise ValueError("dataset differs from the locked trial")
-    if manifest["instances_by_objective"] != targeted.select(reference):
+    selection=targeted.select(reference)
+    if manifest.get("previous_trials"):
+        if not previous_trials:
+            raise ValueError("provide the prior V16 trials to audit the new selection")
+        selection,previous_config,evidence=targeted.unresolved_after_trials(reference,previous_trials)
+        if evidence!=manifest["previous_trials"]:
+            raise ValueError("prior trial hashes differ from the frozen selection")
+        if manifest["definition"].get("core_minimize_conflicts")!=previous_config.get("core_minimize_conflicts"):
+            raise ValueError("exhaustion changed the selected native conflict budget")
+    elif previous_trials:
+        raise ValueError("this historical trial does not declare any prior V16 trials")
+    if manifest["instances_by_objective"] != selection:
         raise ValueError("selection differs from unresolved reference cases")
     source = json.loads((reference/"manifest.json").read_text())
     config = dict(dual.definition(source["plan"], "minisat", "Orders-Transitive"),
@@ -121,9 +132,13 @@ def audit_saved(root: Path, reference: Path):
         raise ValueError("invalid native conflict budget")
     if conflicts:
         config["core_minimize_conflicts"] = str(conflicts)
+    exhaust=int(manifest["definition"].get("core_exhaust_checks",0))
+    if exhaust<0 or bool(exhaust)!=bool(manifest.get("previous_trials")):
+        raise ValueError("exhaustion must declare its audited predecessor trials")
+    if exhaust: config["core_exhaust_checks"]=str(exhaust)
     if manifest["definition"] != config or manifest["timeout_seconds"] != source["plan"]["timeout_seconds"]:
         raise ValueError("method or cutoff differs from the frozen comparison")
-    tag = targeted.TAG if not conflicts else f"{targeted.TAG}-C{conflicts}"
+    tag = targeted.tag_for(config)
     oracle = {}
     for task in dual.tasks(source["plan"]):
         if (dual.case_root(reference, task)/"measurement.json").exists():
@@ -175,11 +190,12 @@ def main():
     checker = commands.add_parser("audit")
     checker.add_argument("results", type=Path)
     checker.add_argument("--reference", type=Path, required=True)
+    checker.add_argument("--previous-trials", type=Path, nargs="+")
     args = parser.parse_args()
     if args.command == "snapshot":
         result = snapshot(args.results, args.output)
     else:
-        result = audit_saved(args.results, args.reference)
+        result = audit_saved(args.results, args.reference, args.previous_trials)
     print(json.dumps(result, indent=2))
     if result.get("audit_passed") is False:
         raise SystemExit(1)

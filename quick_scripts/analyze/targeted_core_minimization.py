@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test four core-reduction checks only on unresolved MiniSAT candidate cases."""
+"""Test bounded RC2 core improvements only on unresolved MiniSAT cases."""
 import argparse
 import json
 import os
@@ -12,6 +12,31 @@ import compare_sat_backends as dual
 import extended_timeout_experiments as extended
 
 TAG="Orders-Transitive-Mincore"
+
+
+def tag_for(config):
+    conflicts=int(config.get("core_minimize_conflicts",0))
+    tag=TAG if not conflicts else f"{TAG}-C{conflicts}"
+    exhaust=int(config.get("core_exhaust_checks",0))
+    return tag if not exhaust else f"{tag}-E{exhaust}"
+
+
+def unresolved_after_trials(reference, trials):
+    # Import lazily: the independent auditor also imports this module.
+    from confirm_targeted_core_minimization import choose
+    for path in trials:
+        previous=json.loads((path/"manifest.json").read_text())
+        if int(previous["definition"].get("core_exhaust_checks",0)):
+            raise ValueError("this trial must extend the original V16 configurations")
+    best, report=choose(trials,reference)
+    prior=json.loads((best/"manifest.json").read_text())
+    gains={(item["objective"],item["name"]) for item in report["newly_solved"]}
+    selected={o:[n for n in names if (o,n) not in gains] for o,names in select(reference).items()}
+    evidence=dict(trials=sorted([dict(manifest_sha256=extended.focus.sha(path/"manifest.json"),
+                              report_sha256=extended.focus.sha(path/"core_minimization_audit.json")) for path in trials],
+                              key=lambda item:item["manifest_sha256"]),
+                  selected_manifest_sha256=extended.focus.sha(best/"manifest.json"))
+    return selected,prior["definition"],evidence
 
 
 def select(reference):
@@ -33,6 +58,13 @@ def run(args):
         raise ValueError("one round must be at most six hours")
     source=json.loads((args.reference/"manifest.json").read_text())
     selection=select(args.reference)
+    exhaust=getattr(args,"core_exhaust_checks",0)
+    previous_trials=getattr(args,"previous_trials",None)
+    prior_config=None
+    if exhaust<0 or bool(exhaust)!=bool(previous_trials):
+        raise ValueError("core exhaustion requires completed prior trials, and vice versa")
+    if previous_trials:
+        selection,prior_config,previous=unresolved_after_trials(args.reference,previous_trials)
     if not any(selection.values()):
         raise ValueError("there are no unresolved MiniSAT candidate cases")
     build=json.loads(args.build_manifest.read_text())
@@ -41,11 +73,14 @@ def run(args):
     if subprocess.check_output(["git","status","--porcelain","--untracked-files=all"],cwd=extended.REPO).strip():
         raise ValueError("commit the experiment code first")
     conflicts=getattr(args,"core_conflicts",0)
+    if prior_config is not None:
+        conflicts=int(prior_config["core_minimize_conflicts"])
     if not 0<=conflicts<=2147483647:
         raise ValueError("core conflict budget must fit a nonnegative i32")
     config=dict(dual.definition(source["plan"],"minisat","Orders-Transitive"),core_minimize_checks="4")
     if conflicts: config["core_minimize_conflicts"]=str(conflicts)
-    tag=TAG if not conflicts else f"{TAG}-C{conflicts}"
+    if exhaust: config["core_exhaust_checks"]=str(exhaust)
+    tag=tag_for(config)
     root=args.results.resolve()
     root.mkdir(parents=True,exist_ok=True)
     manifest=dict(schema="targeted-core-minimization-v1",timeout_seconds=source["plan"]["timeout_seconds"],
@@ -56,6 +91,7 @@ def run(args):
         reference_report_sha256=extended.focus.sha(args.reference/"backend_comparison.json"),
         dataset_sha256=extended.focus.dataset_hash(),ram_kb=args.ram_kb,
         cpu_affinity=sorted(os.sched_getaffinity(0)),submission_passed=False)
+    if previous_trials: manifest["previous_trials"]=previous
     if (root/"manifest.json").exists() and json.loads((root/"manifest.json").read_text())!=manifest:
         raise ValueError("resume would change the selected cases, binary or experiment settings")
     extended.save(root/"manifest.json",manifest)
@@ -99,6 +135,8 @@ def main():
     parser.add_argument("--results",type=Path,required=True)
     parser.add_argument("--ram-kb",type=int,default=6000000)
     parser.add_argument("--core-conflicts",type=int,default=0)
+    parser.add_argument("--core-exhaust-checks",type=int,default=0)
+    parser.add_argument("--previous-trials",type=Path,nargs="+")
     parser.add_argument("--round-seconds",type=int,default=21600)
     args=parser.parse_args()
     try:

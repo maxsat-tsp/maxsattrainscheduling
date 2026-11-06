@@ -138,6 +138,28 @@ class SavedCoreAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "saved report differs"):
             checker.audit_saved(self.root, self.reference)
 
+    def test_exhaustion_selection_and_predecessor_hashes_are_checked_independently(self):
+        prior_config=dict(self.config)
+        evidence=dict(trials=[dict(manifest_sha256="prior",report_sha256="report")],selected_manifest_sha256="prior")
+        self.config["core_exhaust_checks"]="4"
+        self.manifest["previous_trials"]=evidence
+        extended.save(self.root/"manifest.json",self.manifest)
+        path=self.case/"cont.json"
+        rows=json.loads(path.read_text());rows[0]["solves"][0]["maxsat_core_exhaust_checks"]=4
+        extended.save(path,rows)
+        path=self.case/"logs/manifest.txt"
+        path.write_text(path.read_text()+"maxsatddd_core_exhaust_checks=4\n")
+        self.report["summary"][0]["tag"]+="-E4"
+        extended.save(self.root/"core_minimization_audit.json",self.report)
+        with self.assertRaisesRegex(ValueError,"provide the prior"):
+            checker.audit_saved(self.root,self.reference)
+        previous=[self.base/"prior"]
+        with patch.object(checker.targeted,"unresolved_after_trials",return_value=(self.selection,prior_config,evidence)):
+            self.assertTrue(checker.audit_saved(self.root,self.reference,previous)["audit_passed"])
+        with patch.object(checker.targeted,"unresolved_after_trials",return_value=(self.selection,prior_config,{})):
+            with self.assertRaisesRegex(ValueError,"prior trial hashes"):
+                checker.audit_saved(self.root,self.reference,previous)
+
     def test_selection_and_completeness_are_strict(self):
         for names in (["origA1", "origA1"], ["../outside"], "origA1"):
             manifest = dict(self.manifest, instances_by_objective=dict(self.selection, cont=names))

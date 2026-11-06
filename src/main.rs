@@ -134,6 +134,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_residual_hardening: Option<bool>,
 
+    /// Extra SAT checks to reduce each UNSAT core, lowest weight first (default 0).
+    #[structopt(long)]
+    maxsat_ladder_sc_core_minimize_checks: Option<usize>,
+
     /// SAT backend for SC/AGLR: minisat (default) or genuine native glucose.
     #[structopt(long, default_value = "minisat", possible_values = &["minisat", "glucose"])]
     maxsat_ladder_sc_backend: String,
@@ -608,6 +612,7 @@ fn main() {
         order_transitivity: opt.maxsat_ladder_sc_order_transitivity.unwrap_or(false),
         use_objective_bound: opt.maxsat_ladder_sc_use_objective_bound.unwrap_or(false),
         residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),
+        core_minimize_checks: opt.maxsat_ladder_sc_core_minimize_checks.unwrap_or(0),
         assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
             "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
             "full" => maxsat_ladder_sc::AssumptionStrategy::Full,

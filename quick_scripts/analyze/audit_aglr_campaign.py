@@ -180,6 +180,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append("maxsat_objective_bound differs from the locked configuration")
             if "residual_hardening" in config and str(solve.get("maxsat_residual_hardening")).lower() != config["residual_hardening"].lower():
                 errors.append("maxsat_residual_hardening differs from the locked configuration")
+            if "core_minimize_checks" in config and not journal_audit.same_number(solve.get("maxsat_core_minimize_checks"), config["core_minimize_checks"]):
+                errors.append("maxsat_core_minimize_checks differs from the locked configuration")
             if config.get("process_exit_required") == "true" and config.get("policy") in {"adaptive", "all-scanned"}:
                 for key in ("policy", "min_growth", "fraction", "max_wait", "rescue_progress", "heuristic_period", "heuristic_min_gap", "use_objective_bound", "filter_duplicates"):
                     if key not in config:

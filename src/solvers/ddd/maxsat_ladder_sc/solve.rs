@@ -86,6 +86,10 @@ pub struct SolveStats {
     pub core_literals: usize,
     pub max_core_size: usize,
     pub unit_weight_cores: usize,
+    pub core_minimize_calls: usize,
+    pub core_minimize_removed: usize,
+    pub core_minimize_weight_increases: usize,
+    pub core_minimize_time: Duration,
     pub hardening_scans: usize,
     pub hardened_primary: usize,
     pub hardened_totalizer: usize,
@@ -959,6 +963,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
+    output_stats("maxsat_core_minimize_checks".to_string(), settings.core_minimize_checks.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -1210,7 +1215,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
                 while let Ok((ub_cost, ub_sol)) = sol_rx.try_recv() {
                     if ub_cost < total_cost as i32 {
-                        if settings.aglr.policy != RefinementPolicy::Legacy || use_objective_bound || settings.residual_hardening {
+                        if settings.aglr.policy != RefinementPolicy::Legacy || use_objective_bound || settings.residual_hardening || settings.core_minimize_checks > 0 {
                             return Err(SolverError::InvalidSolution(format!(
                                 "verified AGLR heuristic upper bound {} is below lower bound {}",
                                 ub_cost, total_cost
@@ -1620,7 +1625,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     panic!()
                 };
 
-                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders || use_objective_bound || settings.residual_hardening {
+                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders || use_objective_bound || settings.residual_hardening || settings.core_minimize_checks > 0 {
                     let validation_start = Instant::now();
                     let verified_cost = problem.verify_solution(&trains, delay_cost_type);
                     aglr_telemetry.final_validation_time += validation_start.elapsed();
@@ -2018,7 +2023,31 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 return Err(SolverError::NoSolution); // UNSAT
             }
 
-            let core = core.iter().map(|c| Bool::Lit(*c)).collect::<Vec<_>>();
+            let mut core = core.iter().map(|c| Bool::Lit(*c)).collect::<Vec<_>>();
+            if settings.core_minimize_checks > 0 && core.len() > 1 {
+                let minimize_start = Instant::now();
+                let outcome = super::core_minimize::minimize(
+                    core, settings.core_minimize_checks,
+                    |literal| soft_constraints[&literal].1,
+                    |assumptions| {
+                        let call_start = Instant::now();
+                        stats.sat_calls += 1;
+                        let result = match solver.solve_with_assumptions(assumptions.iter().copied()) {
+                            satcoder::SatResultWithCore::Sat(_) => None,
+                            satcoder::SatResultWithCore::Unsat(proved) => Some(
+                                proved.iter().map(|&literal| Bool::Lit(literal)).collect()),
+                        };
+                        solver_time += call_start.elapsed();
+                        result
+                    },
+                    || start_time.elapsed().as_secs_f64() >= timeout,
+                ).map_err(SolverError::InvalidSolution)?;
+                stats.core_minimize_calls += outcome.checks;
+                stats.core_minimize_removed += outcome.removed;
+                stats.core_minimize_weight_increases += usize::from(outcome.minimum_weight_increased);
+                stats.core_minimize_time += minimize_start.elapsed();
+                core = outcome.core;
+            }
 
             *iteration_types.entry(IterationType::Objective).or_default() += 1;
             debug_actions.push(SolverAction::Core(core.len()));
@@ -2066,7 +2095,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             }
 
             total_cost += min_weight as i32;
-            if settings.residual_hardening && best_heur.as_ref().is_some_and(|(upper, _)| *upper < total_cost) {
+            if (settings.residual_hardening || settings.core_minimize_checks > 0) && best_heur.as_ref().is_some_and(|(upper, _)| *upper < total_cost) {
                 return Err(SolverError::InvalidSolution(
                     "lower bound exceeds a verified feasible cost during residual hardening".to_string()
                 ));
@@ -2138,6 +2167,10 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_core_literals".to_string(), stats.core_literals.into());
     output_stats("maxsat_core_max_size".to_string(), stats.max_core_size.into());
     output_stats("maxsat_unit_weight_cores".to_string(), stats.unit_weight_cores.into());
+    output_stats("maxsat_core_minimize_calls".to_string(), stats.core_minimize_calls.into());
+    output_stats("maxsat_core_minimize_removed".to_string(), stats.core_minimize_removed.into());
+    output_stats("maxsat_core_minimize_weight_increases".to_string(), stats.core_minimize_weight_increases.into());
+    output_stats("maxsat_core_minimize_time".to_string(), stats.core_minimize_time.as_secs_f64().into());
     output_stats("maxsat_hardening_scans".to_string(), stats.hardening_scans.into());
     output_stats("maxsat_hardened_primary".to_string(), stats.hardened_primary.into());
     output_stats("maxsat_hardened_totalizer".to_string(), stats.hardened_totalizer.into());
@@ -2659,6 +2692,42 @@ mod aglr_end_to_end_tests {
             assert_eq!(problem.verify_solution(&solution, DelayCostType::Continuous), Some(optimum));
             if hardening { assert!(stats.hardened_primary > 0); }
         }
+    }
+
+    #[test]
+    fn bounded_core_minimization_matches_exhaustive_three_train_optimum() {
+        let problem = Problem {
+            name: "core-minimization-three-train".to_string(),
+            trains: (0..3).map(|_| Train { visits: vec![
+                Visit { resource_id: 0, earliest: 0, aimed: Some(0), travel_time: 2 },
+            ] }).collect(),
+            conflicts: vec![(0,0)],
+        };
+        let mut observed_checks = 0;
+        for objective in [DelayCostType::Continuous, DelayCostType::FiniteSteps123,
+                          DelayCostType::InfiniteSteps180] {
+            let mut optimum = i32::MAX;
+            for a in 0..=6 { for b in 0..=6 { for c in 0..=6 {
+                if let Some(cost) = problem.verify_solution(
+                    &vec![vec![a,a+2],vec![b,b+2],vec![c,c+2]], objective,
+                ) { optimum = optimum.min(cost); }
+            } } }
+            for checks in [0,4] {
+                let mut settings = MaxSatDddLadderScSettings::default();
+                settings.resource_orders = true;
+                settings.order_transitivity = true;
+                settings.core_minimize_checks = checks;
+                let (solution, stats) = solve_with_settings(
+                    &quiet_env, satcoder::solvers::minisat::Solver::new(),
+                    &problem, 30.0, objective, settings, |_,_| {},
+                ).unwrap();
+                assert_eq!(problem.verify_solution(&solution, objective),Some(optimum));
+                assert!(stats.core_minimize_calls <= checks*stats.n_unsat);
+                if checks == 0 { assert_eq!(stats.core_minimize_calls,0); }
+                observed_checks += stats.core_minimize_calls;
+            }
+        }
+        assert!(observed_checks > 0, "test must exercise the extra SAT queries");
     }
 
     #[test]

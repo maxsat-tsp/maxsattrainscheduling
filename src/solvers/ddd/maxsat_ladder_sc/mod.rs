@@ -20,6 +20,7 @@ mod resource_orders;
 mod sc_amo;
 mod settings;
 mod hardening;
+mod core_minimize;
 mod solve;
 
 pub use settings::{

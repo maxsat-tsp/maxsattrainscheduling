@@ -19,6 +19,13 @@ def variant_for(row: dict) -> str:
     bound = row.get("objective_bound") == "true"
     backend = row.get("backend", "minisat")
     hardening = row.get("residual_hardening") == "true"
+    core_checks = int(row.get("core_minimize_checks", "0"))
+    if core_checks < 0:
+        raise ValueError("core minimization budget cannot be negative")
+    if core_checks:
+        if core_checks != 4 or backend != "minisat" or not orders or not transitive or sparse or bound or hardening or row["assumptions"] != "legacy":
+            raise ValueError("core minimization trial requires four checks and the original transitive MiniSAT configuration")
+        return "orders-transitive-mincore"
     if hardening:
         if backend != "minisat" or not orders or not transitive or sparse or bound or row["assumptions"] != "legacy":
             raise ValueError("hardening trial requires transitive orders with the original MiniSAT configuration")
@@ -62,7 +69,7 @@ def select(rows: list[dict], audit: dict) -> dict:
         if len(variants) != 1:
             raise ValueError(f"{tag}: objective rows have different variants")
         variant = variants.pop()
-        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive", "orders-transitive-full", "orders-transitive-geometric", "orders-bound", "orders-transitive-glucose", "orders-transitive-harden"}:
+        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive", "orders-transitive-full", "orders-transitive-geometric", "orders-transitive-mincore", "orders-bound", "orders-transitive-glucose", "orders-transitive-harden"}:
             raise ValueError(f"unsupported variant {variant}")
         par2 = sum(float(r["par2_seconds"]) for r in items)
         if not math.isfinite(par2) or par2 < 0:

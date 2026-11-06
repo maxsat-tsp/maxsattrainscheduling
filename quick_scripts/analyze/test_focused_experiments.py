@@ -28,6 +28,28 @@ def records(manifest, solved):
 
 
 class FocusTests(unittest.TestCase):
+    def test_core_minimization_is_isolated_and_its_budget_is_locked(self):
+        from select_core_variant import variant_for
+        config=dict(backend="minisat",assumptions="legacy",resource_orders="true",
+                    order_transitivity="true",sparse_costs="false",objective_bound="false",
+                    residual_hardening="false",core_minimize_checks="4")
+        self.assertEqual(variant_for(config),"orders-transitive-mincore")
+        for key,value in (("core_minimize_checks","-1"),("core_minimize_checks","2"),
+                          ("backend","glucose"),("residual_hardening","true"),
+                          ("assumptions","full"),("order_transitivity","false")):
+            with self.assertRaises(ValueError):
+                variant_for(dict(config,**{key:value}))
+
+    def test_auditor_detects_the_wrong_core_minimization_budget(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            (root/"cont.json").write_text(json.dumps([dict(name="origA1",solves=[dict(
+                status="timeout",total_time=120,timeout_seconds=120,maxsat_core_minimize_checks=0)])]))
+            cfg=dict(tag="mincore",kind="exact",core_minimize_checks="4",
+                     instances_by_objective=json.dumps(dict(finsteps123=[],infsteps180=[],cont=["origA1"])))
+            records=audit.load_json_method(root,cfg,120)
+            self.assertEqual(records[0]["errors"],["maxsat_core_minimize_checks differs from the locked configuration"])
+
     def test_hardening_is_an_isolated_variant_and_cannot_change_the_reference_backend(self):
         from select_core_variant import variant_for
         config = dict(backend="minisat", assumptions="legacy", resource_orders="true",

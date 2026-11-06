@@ -1,4 +1,3 @@
-import copy
 import json
 from pathlib import Path
 import tempfile
@@ -117,6 +116,21 @@ class BackendComparisonTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError): dual.run(SimpleNamespace(round_seconds=30))
             kill.assert_called_once_with(12345,dual.signal.SIGTERM)
             self.assertTrue((root/"failure.json").exists())
+
+    def test_read_only_audit_does_not_race_the_campaign_report_writer(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            extended.save(root/"manifest.json",dict(plan=plan()))
+            directory=dual.case_root(root,("minisat","CSOnet","cont","origA1"))
+            directory.mkdir(parents=True)
+            (directory/"measurement.json").write_text("{}")
+            with patch.object(dual,"assess",return_value=record("minisat","CSOnet","origA1")), \
+                 patch.object(extended,"save") as save, \
+                 patch.object(extended.audit,"write_csv") as csv:
+                result=dual.audit_saved(root,write=False)
+            self.assertEqual(result["completed_runs"],1)
+            save.assert_not_called()
+            csv.assert_not_called()
 
 
 if __name__=="__main__": unittest.main()

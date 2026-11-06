@@ -187,14 +187,15 @@ def summarize(plan, records):
         missing=[list(t) for t in tasks(plan) if t not in indexed])
 
 
-def audit_saved(root):
+def audit_saved(root, *, write=True):
     manifest = json.loads((root/"manifest.json").read_text())
     records = [assess(root,t,manifest) for t in tasks(manifest["plan"])
                if (case_root(root,t)/"measurement.json").exists()]
     report = summarize(manifest["plan"], records)
-    extended.save(root/"backend_comparison.json", report)
-    extended.audit.write_csv(root/"backend_comparison.csv", report["comparison"])
-    extended.audit.write_csv(root/"backend_parallel_same_binary.csv", report["matching_binary_parallel_comparison"])
+    if write:
+        extended.save(root/"backend_comparison.json", report)
+        extended.audit.write_csv(root/"backend_comparison.csv", report["comparison"])
+        extended.audit.write_csv(root/"backend_parallel_same_binary.csv", report["matching_binary_parallel_comparison"])
     return report
 
 
@@ -363,7 +364,8 @@ def main():
     if args.action=="run": run(args)
     elif args.action=="worker": worker(args.results,args.backend,args.round_seconds)
     else:
-        report=audit_saved(args.results)
+        # Read-only audit can run alongside the campaign's single report writer.
+        report=audit_saved(args.results,write=False)
         print(json.dumps({k:report[k] for k in ("completed_runs","expected_runs","complete","progress")}))
 
 

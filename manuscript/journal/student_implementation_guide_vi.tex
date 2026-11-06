@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.8}
+\fancyhead[R]{\small Phiên bản 5.9}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.8, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.9, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -72,12 +72,24 @@ Mỗi báo cáo phải ghi rõ giả định này.
 
 \section{Sinh viên đọc phần này trước}
 
-\textbf{Backend của lượt mới là CaDiCaL.} Cả phương pháp mới, đối chứng
-CSOnet và MaxSAT-DDD đều dùng CaDiCaL thật, cùng timeout 300 giây. Các lượt
-MiniSAT cũ được giữ làm chẩn đoán. Mã nguồn sinh viên gọi MiniSAT, còn bài
-hội nghị chỉ ghi RC2; chưa có thông tin binary để xác định backend của lượt
-đã công bố. Không tự suy ra backend SAT từ tên RC2 hoặc tên lệnh solver.
-Mỗi kết quả mới phải ghi backend và chữ ký native; auditor kiểm tra cả hai.
+\textbf{CSOnet dùng RC2; mã được kiểm tra gọi MiniSAT bên trong.}
+RC2 tìm chi phí nhỏ nhất. Khi cần biết các điều kiện hiện tại có thể cùng
+đúng hay không, RC2 gọi một bộ giải SAT, chẳng hạn MiniSAT hoặc CaDiCaL.
+Vì vậy, dùng MiniSAT không có nghĩa là bỏ RC2. Đây là bản cài RC2 trong
+Rust, không phải lời gọi chương trình RC2 của PySAT.
+
+Bản tiền ấn phẩm của tác giả bài COR gốc ghi RC2 với MiniSat 2.1.0; mã công
+khai cũng gọi MiniSAT. Ta giữ \textbf{RC2 + MiniSAT làm mốc theo mã SOTA}.
+Các kết quả MiniSAT đã chạy vẫn có giá trị. Nguồn đối chiếu và hash nằm ở
+\file{manuscript/journal/reviews/solver_stack_20261106/}.
+
+\textbf{Lượt hiện tại là đối chứng RC2 + CaDiCaL.} Phương pháp mới,
+CSOnet và MaxSAT-DDD đều dùng CaDiCaL 1.9.5 thật, cùng timeout 300 giây.
+Để đo hiệu quả của phương pháp, so sánh trong cùng một backend. Để đo hiệu
+quả của việc đổi SAT solver, giữ nguyên phương pháp rồi so hai backend.
+Không gộp thời gian hai backend thành một cấu hình. Gurobi và CPLEX vẫn
+là hai bộ giải riêng cho mô hình MILP. Mỗi kết quả mới phải ghi rõ bộ giải;
+với CaDiCaL, auditor còn kiểm tra chữ ký native.
 
 Phương pháp AGLR đã được cài. Nhiệm vụ trước mắt của sinh viên là kiểm tra môi
 trường và chạy thí nghiệm, không phải viết lại thuật toán. Chỉ sửa mã khi kết
@@ -896,7 +908,9 @@ sót thông tin.
 
 Các vòng 120 giây gần đây chưa giải thêm ca mới. Bây giờ thử giới hạn
 $T=300$ giây cho cả năm phương pháp: bộ ba V5, CSOnet, MaxSAT của bài tạp
-chí trước, Big-M Gurobi và Big-M CPLEX. Ba phương pháp MaxSAT dùng CaDiCaL.
+chí trước, Big-M Gurobi và Big-M CPLEX. Ba phương pháp MaxSAT dùng RC2
+với CaDiCaL, để kiểm tra đổi backend chung cho cả ba. Mốc theo mã gốc
+RC2 + MiniSAT được giữ riêng.
 Cả năm chạy cùng 31 cặp đã khóa tại
 \file{results/sat_research/cadical_300_20261106/plan.json}. Không chạy lại
 \code{finsteps123} trong vòng này vì các đối chứng đã giải hết ở 120 giây.

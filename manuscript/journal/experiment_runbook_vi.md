@@ -9,11 +9,22 @@ Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt ch
 
 ## Vòng hiện tại: 300 giây cho cả phương pháp mới và SOTA
 
-Backend hiện tại được chọn rõ là **CaDiCaL** cho cả ba phương pháp MaxSAT.
-Mã sinh viên cũ gọi MiniSAT; bản hội nghị ghi RC2 và chưa có provenance binary
-để xác định backend của lượt công bố. Do đó không gọi lượt MiniSAT là tái tạo
-chính xác bản chạy hội nghị. Chiến dịch MiniSAT đã dừng ở 91 lượt; lượt thu
-gọn core từng xếp hàng đã hủy. Dữ liệu được giữ làm chẩn đoán.
+**Đã xác nhận CSOnet dùng RC2, với MiniSAT trong mã được kiểm tra.** RC2 xử
+lý tối ưu; MiniSAT/CaDiCaL xử lý các truy vấn SAT bên trong. Bản tiền ấn
+phẩm của tác giả bài COR gốc cũng ghi RC2 + MiniSat 2.1.0. Vì vậy, giữ
+RC2 + MiniSAT làm mốc theo mã SOTA hiện có. Không bỏ kết quả MiniSAT chỉ
+vì tên này khác RC2. Nguồn và cách thống nhất ở
+[báo cáo kiểm tra bộ giải](reviews/solver_stack_20261106/README.md).
+
+Lượt hiện tại dùng **RC2 + CaDiCaL** cho cả ba phương pháp MaxSAT, để đo
+ảnh hưởng khi đổi SAT backend cho cả phương pháp mới và baseline. Đây là
+đối chứng bổ sung; không phải bằng chứng CSOnet gốc dùng CaDiCaL. So sánh
+hiệu quả phương pháp trong từng backend, còn ảnh hưởng của backend được
+so bằng cùng một phương pháp trên MiniSAT/CaDiCaL. Không trộn hai lượt.
+Hai baseline MILP tiếp tục dùng Gurobi/CPLEX. Chiến dịch MiniSAT đã dừng
+ở 91 lượt nhưng dữ liệu hợp lệ vẫn được giữ để dùng lại; lượt thu gọn core
+từng xếp hàng đã hủy. Chưa có metadata riêng của binary hội nghị để xác
+nhận backend độc lập với mã nguồn.
 
 Chưa có ca mới được giải ở 120 giây. Theo yêu cầu của thầy/cô, thử 300 giây
 cho cả phương án bộ ba V5 và CSOnet, MaxSAT-Journal, Big-M Gurobi, Big-M CPLEX.

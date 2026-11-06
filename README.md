@@ -100,6 +100,23 @@ cargo build --release --locked --bin ddd
 
 The compiled binary will be located at `target/release/ddd`.
 
+### MaxSAT algorithm and SAT backend
+
+The CSOnet MaxSAT variants use an RC2-style weighted core-guided optimizer
+integrated in Rust. Their available historical source constructs MiniSAT;
+the original COR authors' preprint also specifies RC2 with MiniSat 2.1.0.
+RC2 is the optimization algorithm, while MiniSAT/CaDiCaL is its SAT backend.
+Installing CaDiCaL or UWrMaxSat does not select it for an RC2 run.
+
+The CLI retains MiniSAT as its historical default. Use
+`--maxsat-ladder-sc-backend minisat|cadical|glucose` to select the SAT backend
+explicitly for SC/AGLR and journal MaxSAT-DDD. Compare the new method and
+both MaxSAT baselines with the same backend. The current 300-second campaign
+uses genuine CaDiCaL for all three; retain its results as a common-backend
+comparison alongside the MiniSAT baseline. MILP baselines retain Gurobi/CPLEX.
+Evidence and reporting rules are in
+[the solver verification report](manuscript/journal/reviews/solver_stack_20261106/README.md).
+
 ### Journal AGLR campaign
 
 The journal branch adds Adaptive Growth-Limited Refinement (AGLR) directly to

@@ -1,4 +1,14 @@
-# CaDiCaL correction: a new, explicit SAT backend comparison
+# Common CaDiCaL comparison, separate from the source-aligned MiniSAT baseline
+
+Follow-up verification confirms that CSOnet uses an integrated Rust RC2
+optimizer and its available source constructs MiniSAT. The original COR
+authors' 2023 preprint explicitly specifies RC2 with MiniSat 2.1.0, and their
+public code also constructs MiniSAT. RC2 and the SAT backend are separate
+layers. The MiniSAT campaign remains valid source-aligned baseline evidence;
+it is not discarded because of its SAT backend. The present CaDiCaL campaign
+is an additional controlled backend comparison, not a reproduction of an
+established CaDiCaL configuration in either paper. See
+`manuscript/journal/reviews/solver_stack_20261106/README.md` for sources.
 
 The student's source at `c427a10` constructs MiniSAT for
 `MaxSatDddLadderSc` and the journal MaxSAT-DDD solver. The accepted manuscript
@@ -27,8 +37,8 @@ The interrupted unfinished case is excluded from that snapshot.
 37 completed Gurobi/CPLEX cases can be reused byte-for-byte at the same
 cutoff, on the same VM and with identical MILP parameters. All 93 SAT cases
 must run again with CaDiCaL; 25 remaining MILP cases also run, for 118 newly
-measured cases. The old SAT times are diagnostic, not CaDiCaL results or an
-exact reproduction of the unidentified conference binary.
+measured cases. The old SAT times remain MiniSAT baseline evidence, not
+CaDiCaL results or an exact reproduction of the unidentified conference binary.
 
 The new campaign started on 2026-11-06 at 10:33:20 UTC (17:33 Vietnam),
 service `maxsat-cadical300-v12-4a43a9c.service`, source `4a43a9c`.

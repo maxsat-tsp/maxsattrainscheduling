@@ -1,0 +1,56 @@
+{
+  "checked_date": "2026-11-06",
+  "original_author_repository_commit": "ab9eeebe1608ca9a247fae2f8b346337eb012a6c",
+  "student_source_commit": "c427a104c3c6f844e515efb7f898b684553b0f3f",
+  "conclusions": {
+    "conference_maxsat_algorithm": "weighted core-guided RC2, integrated Rust implementation",
+    "conference_sat_backend_in_available_source": "minisat",
+    "conference_published_binary_backend": "not independently recorded",
+    "original_preprint_sat_backend": "MiniSat v2.1.0",
+    "original_author_repository_sat_backend": "minisat",
+    "active_common_backend_campaign": "RC2-style Rust implementations with native CaDiCaL 1.9.5 for all three MaxSAT methods"
+  },
+  "sources": [
+    {
+      "id": "original_author_preprint",
+      "sha256": "7508e4d0bb4604b5845ec70ae8b52cdc30617487abcbc4a4b308d2e2bb7d8d82",
+      "url": "https://luteberget.github.io/preprints/maxsatddd-2023-06-14.pdf"
+    },
+    {
+      "id": "original_author_dispatch",
+      "sha256": "edd02606356233a7f49eb1a8a3e135cd37d900089b16b48289b883c763f1df18",
+      "url": "https://raw.githubusercontent.com/luteberget/maxsattrainscheduling/ab9eeebe1608ca9a247fae2f8b346337eb012a6c/src/main.rs"
+    },
+    {
+      "id": "student_src_main.rs",
+      "sha256": "2d682dcb116f65d12c794de34848d06474a56ca756a0c208ba007303e3a5aefe",
+      "commit": "c427a104c3c6f844e515efb7f898b684553b0f3f",
+      "path": "src/main.rs",
+      "url": "https://github.com/maxsat-tsp/maxsattrainscheduling/blob/c427a104c3c6f844e515efb7f898b684553b0f3f/src/main.rs"
+    },
+    {
+      "id": "student_src_solvers_ddd_maxsat_ladder_sc_solve.rs",
+      "sha256": "14ec10c67143a67b8945280ab7a94b12c4ccd4b7cfe4ba08bd9be070e8194e4d",
+      "commit": "c427a104c3c6f844e515efb7f898b684553b0f3f",
+      "path": "src/solvers/ddd/maxsat_ladder_sc/solve.rs",
+      "url": "https://github.com/maxsat-tsp/maxsattrainscheduling/blob/c427a104c3c6f844e515efb7f898b684553b0f3f/src/solvers/ddd/maxsat_ladder_sc/solve.rs"
+    },
+    {
+      "id": "student_quick_scripts_bench_maxsat_default.sh",
+      "sha256": "19ac614bd2ba2befdf0c305b7c104f4239a634d0b0008857fd09ddbf5f94ee44",
+      "commit": "c427a104c3c6f844e515efb7f898b684553b0f3f",
+      "path": "quick_scripts/bench/maxsat_default.sh",
+      "url": "https://github.com/maxsat-tsp/maxsattrainscheduling/blob/c427a104c3c6f844e515efb7f898b684553b0f3f/quick_scripts/bench/maxsat_default.sh"
+    },
+    {
+      "id": "accepted_camera_ready_pdf",
+      "sha256": "3edf4d2c67580001fe91032adc5ee35c5083b97a88e1f9cb9d540f82a775c054",
+      "local_path": "manuscript/submission/camera_ready_resubmission_20261024/Paper56_final.pdf"
+    },
+    {
+      "id": "accepted_manuscript_tex",
+      "sha256": "c45f91649bba1777c7de940d4f332c273501c5e7bf7963b886e1398cfd1d366b",
+      "local_path": "manuscript/submission/main.tex"
+    }
+  ]
+}

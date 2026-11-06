@@ -2,11 +2,23 @@
 
 ## Trạng thái mới nhất
 
+**Đối chiếu lại CSOnet và SOTA:** CSOnet dùng RC2 được cài trong Rust;
+mã `c427a10` gọi MiniSAT bên trong. Bài COR gốc có bản tiền ấn phẩm của tác
+giả ghi RC2 + MiniSat 2.1.0, và mã công khai cũng dùng MiniSAT. RC2 là thuật
+toán tối ưu, không phải tên thay thế MiniSAT/CaDiCaL ở tầng SAT. Bằng chứng
+và cách so sánh ở `reviews/solver_stack_20261106/README.md`.
+
+Lượt MiniSAT vẫn có giá trị làm mốc theo mã hiện có; không loại kết quả
+chỉ vì backend này. Lượt CaDiCaL đang chạy là **đối chứng đổi SAT backend
+cho cả ba phương pháp MaxSAT**, không phải tái tạo cấu hình gốc của CSOnet.
+So cải tiến phương pháp trong cùng backend; đo riêng việc đổi backend bằng
+cùng phương pháp. Không thay đổi plan hoặc binary đang chạy.
+
 **Điều chỉnh backend theo yêu cầu mới:** dừng chiến dịch MiniSAT sau
 91/155 lượt hoàn tất và hủy lượt thu gọn core đang chờ. Mã nguồn sinh viên
 `c427a10` gọi MiniSAT cho MaxSAT-Default; bản hội nghị chỉ ghi RC2, chưa xác
 minh được backend của binary đã tạo bảng. Những lượt MiniSAT được giữ làm
-chẩn đoán, không gọi là tái tạo chính xác binary CSOnet.
+mốc theo mã nguồn, không gọi là tái tạo chính xác binary CSOnet.
 
 Đã bổ sung CaDiCaL thật cho SC/AGLR và MaxSAT-DDD, sửa alias `maxsat_ddd_cdc`,
 ghi chữ ký runtime và kiểm tra chữ ký trong auditor. Kế hoạch mới ở

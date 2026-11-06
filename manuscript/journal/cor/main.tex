@@ -274,7 +274,9 @@ The left endpoint selected in each partial partition gives a relaxed schedule
 and a lower bound. Hard clauses encode the temporal information discovered so
 far, while weighted soft clauses encode the marginal delay cost
 \citep{Croella2024,LiManya2021}. The implementation uses RC2 as its MaxSAT
-optimizer \citep{Ignatiev2019}.
+optimizer \citep{Ignatiev2019}. RC2 controls the optimization loop and calls a
+separate SAT solver for satisfiability queries. We record the SAT backend
+separately and compare encodings using the same SAT backend.
 
 Suppose a restricted solution has $t_a=\alpha$ but violates a known precedence
 $t_b\ge t_a+h$. Adding the point $\alpha+h$ to $\Lambda_b$ permits the hard

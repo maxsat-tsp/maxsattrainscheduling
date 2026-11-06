@@ -2,6 +2,8 @@
 
 ## Trạng thái mới nhất
 
+Vòng focus `b7160db` đã hoàn tất và được kiểm toán lại độc lập: infsteps180 giải 0/4, cont giải 2/14 trong nhóm khó; không chạy finsteps123. Dữ liệu ở `results/sat_research/focus_v7_20261106/`. Đây là kết quả nhóm đã lọc, chưa phải một lượt full của mã mới.
+
 | Lượt full 120 giây | finsteps123 | infsteps180 | cont | Tổng |
 |---|---:|---:|---:|---:|
 | Bộ ba, `eaf0316` | 72 | 68 | 60 | 200 |

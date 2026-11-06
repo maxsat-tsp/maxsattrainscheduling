@@ -112,6 +112,8 @@ pub struct MaxSatDddLadderScSettings {
     pub residual_hardening: bool,
     /// Maximum extra SAT checks per core; zero preserves the published path.
     pub core_minimize_checks: usize,
+    /// Native MiniSAT conflicts per extra core check; zero is unlimited.
+    pub core_minimize_conflicts: usize,
     pub use_precedence_graph: bool,
     pub use_sc_amo: bool,
     pub use_touched_clique_amo: bool,
@@ -140,6 +142,7 @@ impl Default for MaxSatDddLadderScSettings {
             use_objective_bound: false,
             residual_hardening: false,
             core_minimize_checks: 0,
+            core_minimize_conflicts: 0,
             use_precedence_graph: true,
             use_eager_chain_expansion: false,
             use_sc_amo: true,

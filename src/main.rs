@@ -138,6 +138,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_core_minimize_checks: Option<usize>,
 
+    /// MiniSAT conflicts per extra core check; 0 keeps the historical unlimited check.
+    #[structopt(long)]
+    maxsat_ladder_sc_core_minimize_conflicts: Option<usize>,
+
     /// SAT backend for SC/AGLR and journal MaxSAT-DDD: minisat, cadical, or native glucose.
     #[structopt(long, default_value = "minisat", possible_values = &["minisat", "cadical", "glucose"])]
     maxsat_ladder_sc_backend: String,
@@ -488,6 +492,17 @@ fn mk_env() -> grb::Env {
     env
 }
 
+fn emit_native_minisat_stats(mut output:impl FnMut(String,serde_json::Value)) {
+    let stats=minisat_deadline::native_stats();
+    output("maxsat_native_sat_calls".to_string(),stats.calls.into());
+    output("maxsat_native_budgeted_calls".to_string(),stats.budgeted_calls.into());
+    output("maxsat_native_inconclusive_calls".to_string(),stats.inconclusive_calls.into());
+    output("maxsat_native_sat_time".to_string(),stats.sat_time.as_secs_f64().into());
+    let (variables,clauses)=counting_solver::get_counts();
+    output("num_vars_total".to_string(),variables.into());
+    output("num_clauses_total".to_string(),clauses.into());
+}
+
 fn solve_sc_with_backend(
     backend: &str,
     problem: &problem::Problem,
@@ -503,8 +518,10 @@ fn solve_sc_with_backend(
             let solver=minisat_deadline::Solver::new(timeout);
             output("maxsat_backend_signature".to_string(),solver.signature().to_string().into());
             output("maxsat_sat_timeout_mode".to_string(),"native-watchdog-deadline".into());
-            maxsat_ladder_sc::solve_with_settings(&mk_env,counting_solver::CountingSolver::new(solver),
-                problem,timeout,objective,settings,output).map(|(solution,_)|solution)
+            let result=maxsat_ladder_sc::solve_with_settings(&mk_env,counting_solver::CountingSolver::new(solver),
+                problem,timeout,objective,settings,&mut output).map(|(solution,_)|solution);
+            emit_native_minisat_stats(output);
+            result
         },
         "minisat" => maxsat_ladder_sc::solve_with_settings(
             &mk_env,
@@ -656,6 +673,7 @@ fn main() {
         use_objective_bound: opt.maxsat_ladder_sc_use_objective_bound.unwrap_or(false),
         residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),
         core_minimize_checks: opt.maxsat_ladder_sc_core_minimize_checks.unwrap_or(0),
+        core_minimize_conflicts: opt.maxsat_ladder_sc_core_minimize_conflicts.unwrap_or(0),
         assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
             "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
             "full" => maxsat_ladder_sc::AssumptionStrategy::Full,
@@ -675,6 +693,11 @@ fn main() {
         aglr: maxsat_ladder_sc::AglrSettings::default(),
     };
     println!("MaxSatDddLadderSc settings {:?}", maxsat_ladder_sc_settings);
+    if maxsat_ladder_sc_settings.core_minimize_conflicts>0 {
+        assert!(opt.maxsat_ladder_sc_backend=="minisat" && maxsat_ladder_sc_settings.core_minimize_checks>0
+                && maxsat_ladder_sc_settings.core_minimize_conflicts<=i32::MAX as usize,
+                "a core conflict budget requires MiniSAT, positive core checks and an i32-sized budget");
+    }
 
     let aglr_fraction = opt.aglr_fraction.unwrap_or(0.5);
     if !aglr_fraction.is_finite() || !(0.0..=1.0).contains(&aglr_fraction) {
@@ -1332,6 +1355,9 @@ fn main() {
                 Err(payload) => {
                     if payload.is::<cadical_deadline::DeadlineReached>() {
                         solve_data.insert("maxsat_sat_deadline_hit".to_string(), true.into());
+                        if solve_data.get("maxsat_sat_timeout_mode").and_then(|mode|mode.as_str())==Some("native-watchdog-deadline") {
+                            emit_native_minisat_stats(|key,value| {solve_data.insert(key,value);});
+                        }
                         Err(SolverError::Timeout)
                     } else if is_likely_oom_panic(payload.as_ref()) {
                         Err(SolverError::OutOfMemory)

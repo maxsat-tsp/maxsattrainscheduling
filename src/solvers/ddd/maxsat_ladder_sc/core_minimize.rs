@@ -10,8 +10,9 @@ pub(super) struct Outcome<L: Lit> {
     pub minimum_weight_increased: bool,
 }
 
-/// `query` returns a newly proved UNSAT core, or None for SAT. A SAT result
-/// never removes an assumption. Try removing low-weight assumptions first:
+/// `query` returns a newly proved UNSAT core, or None for SAT or an explicitly
+/// abandoned inconclusive check. Neither permits removing an assumption.
+/// Try removing low-weight assumptions first:
 /// excluding one can increase the weight of the subsequent RC2 relaxation.
 pub(super) fn minimize<L: Lit>(
     mut core: Vec<Bool<L>>,

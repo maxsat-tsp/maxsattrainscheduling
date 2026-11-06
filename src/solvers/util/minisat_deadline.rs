@@ -2,6 +2,38 @@
 //! Only the core-reduction experiment uses this adapter; legacy dispatch is
 //! unchanged. No UNKNOWN result is ever exposed as an UNSAT core.
 use super::cadical_deadline::DeadlineReached;
+use std::cell::Cell;
+
+#[derive(Debug)]
+pub struct CoreCheckInconclusive;
+
+thread_local! { static CORE_CHECK_CONFLICTS: Cell<usize> = const { Cell::new(0) }; }
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NativeStats {
+    pub calls: usize,
+    pub budgeted_calls: usize,
+    pub inconclusive_calls: usize,
+    pub sat_time: Duration,
+}
+thread_local! {static NATIVE_STATS: Cell<NativeStats> = Cell::new(NativeStats::default());}
+pub fn native_stats() -> NativeStats {
+    NATIVE_STATS.with(Cell::get)
+}
+
+/// Apply a native conflict limit only within an additional core check.
+/// The guard also restores the context when a query returns UNKNOWN.
+pub fn with_core_check_limit<T>(conflicts: usize, query: impl FnOnce() -> T) -> T {
+    assert!(conflicts <= i32::MAX as usize);
+    struct Restore(usize);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CORE_CHECK_CONFLICTS.with(|limit| limit.set(self.0));
+        }
+    }
+    let _restore = Restore(CORE_CHECK_CONFLICTS.with(|limit| limit.replace(conflicts)));
+    query()
+}
 use minisat::sys;
 use satcoder::{
     Bool, SatInstance, SatModel, SatResult, SatResultWithCore, SatSolver, SatSolverWithCore,
@@ -56,6 +88,7 @@ impl Solver {
     pub fn new(seconds: f64) -> Self {
         assert!(seconds.is_finite() && seconds >= 0.0);
         let started = Instant::now();
+        NATIVE_STATS.with(|stats| stats.set(NativeStats::default()));
         let budget = Duration::from_secs_f64(seconds);
         let signature = minisat::Solver::new().solver_name();
         assert!(
@@ -170,12 +203,38 @@ impl SatSolverWithCore for Solver {
                 },
             }
         }
+        let limit = CORE_CHECK_CONFLICTS.with(Cell::get);
+        if limit > 0 {
+            unsafe {
+                sys::minisat_set_conf_budget(self.ptr, limit as i32);
+            }
+        }
+        let query_start = Instant::now();
         let result = unsafe { sys::minisat_limited_solve_commit(self.ptr) };
+        // The following main SAT query must not inherit a core-check budget.
+        unsafe {
+            sys::minisat_no_budget(self.ptr);
+        }
+        NATIVE_STATS.with(|cell| {
+            let mut stats = cell.get();
+            stats.calls += 1;
+            stats.budgeted_calls += usize::from(limit > 0);
+            stats.inconclusive_calls += usize::from(
+                limit > 0
+                    && result == unsafe { sys::minisat_get_l_Undef() }
+                    && self.started.elapsed() < self.budget,
+            );
+            stats.sat_time += query_start.elapsed();
+            cell.set(stats);
+        });
+        self.check_deadline();
         if result == unsafe { sys::minisat_get_l_Undef() } {
             // The native search has returned to Rust before unwinding.
+            if limit > 0 {
+                std::panic::resume_unwind(Box::new(CoreCheckInconclusive));
+            }
             std::panic::resume_unwind(Box::new(DeadlineReached));
         }
-        self.check_deadline();
         if result == unsafe { sys::minisat_get_l_True() } {
             SatResultWithCore::Sat(Box::new(Model(self)))
         } else {
@@ -267,5 +326,39 @@ mod tests {
         let start = Instant::now();
         drop(Solver::new(60.0));
         assert!(start.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn a_limited_core_check_preserves_the_solver_for_an_unlimited_main_query() {
+        let mut solver = Solver::new(5.0);
+        let guard = solver.new_var();
+        let variables = (0..20)
+            .map(|_| (0..19).map(|_| solver.new_var()).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        for pigeon in &variables {
+            solver.add_clause(std::iter::once(!guard).chain(pigeon.iter().copied()));
+        }
+        for hole in 0..19 {
+            for a in 0..20 {
+                for b in a + 1..20 {
+                    solver.add_clause([!guard, !variables[a][hole], !variables[b][hole]]);
+                }
+            }
+        }
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            with_core_check_limit(1, || {
+                solver.solve_with_assumptions([guard]);
+            })
+        }));
+        assert!(result.unwrap_err().is::<CoreCheckInconclusive>());
+        assert_eq!(CORE_CHECK_CONFLICTS.with(Cell::get), 0);
+        assert_eq!(native_stats().budgeted_calls, 1);
+        assert_eq!(native_stats().inconclusive_calls, 1);
+        assert!(matches!(
+            solver.solve_with_assumptions([!guard]),
+            SatResultWithCore::Sat(_)
+        ));
+        solver.add_clause([!guard]);
+        assert!(matches!(solver.solve(), SatResult::Sat(_)));
     }
 }

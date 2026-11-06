@@ -89,6 +89,7 @@ pub struct SolveStats {
     pub core_minimize_calls: usize,
     pub core_minimize_removed: usize,
     pub core_minimize_weight_increases: usize,
+    pub core_minimize_inconclusive: usize,
     pub core_minimize_time: Duration,
     pub hardening_scans: usize,
     pub hardened_primary: usize,
@@ -964,6 +965,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
     output_stats("maxsat_core_minimize_checks".to_string(), settings.core_minimize_checks.into());
+    output_stats("maxsat_core_minimize_conflicts".to_string(), settings.core_minimize_conflicts.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -2032,10 +2034,21 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     |assumptions| {
                         let call_start = Instant::now();
                         stats.sat_calls += 1;
-                        let result = match solver.solve_with_assumptions(assumptions.iter().copied()) {
-                            satcoder::SatResultWithCore::Sat(_) => None,
-                            satcoder::SatResultWithCore::Unsat(proved) => Some(
-                                proved.iter().map(|&literal| Bool::Lit(literal)).collect()),
+                        let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            crate::solvers::util::minisat_deadline::with_core_check_limit(settings.core_minimize_conflicts,|| {
+                                match solver.solve_with_assumptions(assumptions.iter().copied()) {
+                                    satcoder::SatResultWithCore::Sat(_)=>None,
+                                    satcoder::SatResultWithCore::Unsat(proved)=>Some(
+                                        proved.iter().map(|&literal|Bool::Lit(literal)).collect()),
+                                }
+                            })
+                        })) {
+                            Ok(result)=>result,
+                            Err(payload) if payload.is::<crate::solvers::util::minisat_deadline::CoreCheckInconclusive>()=>{
+                                stats.core_minimize_inconclusive+=1;
+                                None // No new UNSAT proof: preserve the already proved core.
+                            },
+                            Err(payload)=>std::panic::resume_unwind(payload),
                         };
                         solver_time += call_start.elapsed();
                         result
@@ -2170,6 +2183,7 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_core_minimize_calls".to_string(), stats.core_minimize_calls.into());
     output_stats("maxsat_core_minimize_removed".to_string(), stats.core_minimize_removed.into());
     output_stats("maxsat_core_minimize_weight_increases".to_string(), stats.core_minimize_weight_increases.into());
+    output_stats("maxsat_core_minimize_inconclusive".to_string(), stats.core_minimize_inconclusive.into());
     output_stats("maxsat_core_minimize_time".to_string(), stats.core_minimize_time.as_secs_f64().into());
     output_stats("maxsat_hardening_scans".to_string(), stats.hardening_scans.into());
     output_stats("maxsat_hardened_primary".to_string(), stats.hardened_primary.into());
@@ -2725,6 +2739,18 @@ mod aglr_end_to_end_tests {
                 assert!(stats.core_minimize_calls <= checks*stats.n_unsat);
                 if checks == 0 { assert_eq!(stats.core_minimize_calls,0); }
                 observed_checks += stats.core_minimize_calls;
+            }
+            for conflicts in [1,1000] {
+                let mut settings=MaxSatDddLadderScSettings::default();
+                settings.resource_orders=true;
+                settings.order_transitivity=true;
+                settings.core_minimize_checks=4;
+                settings.core_minimize_conflicts=conflicts;
+                let (solution,_)=solve_with_settings(
+                    &quiet_env,crate::solvers::util::minisat_deadline::Solver::new(30.0),
+                    &problem,30.0,objective,settings,|_,_| {},
+                ).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
             }
             for checks in [0,4] {
                 let mut settings = MaxSatDddLadderScSettings::default();

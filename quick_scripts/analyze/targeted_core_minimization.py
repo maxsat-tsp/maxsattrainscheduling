@@ -40,7 +40,12 @@ def run(args):
         raise ValueError("binary differs from its recorded build")
     if subprocess.check_output(["git","status","--porcelain","--untracked-files=all"],cwd=extended.REPO).strip():
         raise ValueError("commit the experiment code first")
+    conflicts=getattr(args,"core_conflicts",0)
+    if not 0<=conflicts<=2147483647:
+        raise ValueError("core conflict budget must fit a nonnegative i32")
     config=dict(dual.definition(source["plan"],"minisat","Orders-Transitive"),core_minimize_checks="4")
+    if conflicts: config["core_minimize_conflicts"]=str(conflicts)
+    tag=TAG if not conflicts else f"{TAG}-C{conflicts}"
     root=args.results.resolve()
     root.mkdir(parents=True,exist_ok=True)
     manifest=dict(schema="targeted-core-minimization-v1",timeout_seconds=source["plan"]["timeout_seconds"],
@@ -60,7 +65,7 @@ def run(args):
             record=dual.assess(args.reference,task,source)
             if record["proven"]: oracle[task[2:]]=record["solve"]["cost"]
     runtime=SimpleNamespace(timeout=manifest["timeout_seconds"],binary=args.binary.resolve(),ram_kb=args.ram_kb,
-                            method_definitions={TAG:config})
+                            method_definitions={tag:config})
     deadline=time.monotonic()+args.round_seconds
     records=[]
     expected=[(o,n) for o,names in selection.items() for n in names]
@@ -69,8 +74,8 @@ def run(args):
         if not (case/f"{objective}.json").exists():
             if deadline-time.monotonic()<runtime.timeout+90: break
             print(f"Core minimization: {objective}/{name}",flush=True)
-            extended.run_case(TAG,objective,name,runtime,case)
-        record=extended.assess_case(case,TAG,objective,name,runtime.timeout,config)
+            extended.run_case(tag,objective,name,runtime,case)
+        record=extended.assess_case(case,tag,objective,name,runtime.timeout,config)
         if record["errors"] or record["status"] in extended.audit.FATAL_STATUSES:
             raise ValueError(f"invalid result {objective}/{name}: {record['errors']}")
         if record["proven"] and (objective,name) in oracle and not extended.common.same_number(record["solve"]["cost"],oracle[objective,name]):
@@ -93,8 +98,15 @@ def main():
     parser.add_argument("--build-manifest",type=Path,required=True)
     parser.add_argument("--results",type=Path,required=True)
     parser.add_argument("--ram-kb",type=int,default=6000000)
+    parser.add_argument("--core-conflicts",type=int,default=0)
     parser.add_argument("--round-seconds",type=int,default=21600)
-    run(parser.parse_args())
+    args=parser.parse_args()
+    try:
+        run(args)
+    except BaseException as error:
+        if args.results.exists():
+            extended.save(args.results/"failure.json",dict(error=str(error) or type(error).__name__))
+        raise
 
 
 if __name__=="__main__": main()

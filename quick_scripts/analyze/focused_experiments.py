@@ -144,15 +144,14 @@ def run_trial(args) -> None:
     repo = Path(__file__).resolve().parents[2]
     if subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=all"], cwd=repo).strip():
         raise ValueError("commit source changes before running a focused trial")
-    if args.variant not in {"orders", "orders-transitive", "orders-transitive-glucose", "orders-transitive-harden", "orders-transitive-cycle", "orders-bound", "orders-sparse", "legacy"}:
+    if args.variant not in {"orders", "orders-transitive", "orders-transitive-glucose", "orders-transitive-harden", "orders-bound", "orders-sparse", "legacy"}:
         raise ValueError("unsupported focused variant")
     config = dict(tag="Focus-" + args.variant, kind="exact", solver="maxsat_ddd_ladder_sc", policy="legacy",
                   assumptions="legacy", sparse_costs=str(args.variant == "orders-sparse").lower(),
                   resource_orders=str(args.variant != "legacy").lower(),
-                  order_transitivity=str(args.variant in {"orders-transitive", "orders-transitive-glucose", "orders-transitive-harden", "orders-transitive-cycle"}).lower(),
+                  order_transitivity=str(args.variant in {"orders-transitive", "orders-transitive-glucose", "orders-transitive-harden"}).lower(),
                   objective_bound=str(args.variant == "orders-bound").lower(),
                   residual_hardening=str(args.variant == "orders-transitive-harden").lower(),
-                  temporal_cycle_cuts=str(args.variant == "orders-transitive-cycle").lower(),
                   backend="glucose" if args.variant.endswith("-glucose") else "minisat",
                   timeout_seconds=str(args.timeout), process_exit_required="true", parallelism="1",
                   instances_by_objective=json.dumps(selected, separators=(",", ":")),
@@ -186,7 +185,6 @@ def run_trial(args) -> None:
                    MAXSATDDD_OBJECTIVE_BOUND=config["objective_bound"],
                    MAXSATDDD_BACKEND=config["backend"],
                    MAXSATDDD_RESIDUAL_HARDENING=config["residual_hardening"],
-                   MAXSATDDD_TEMPORAL_CYCLE_CUTS=config["temporal_cycle_cuts"],
                    JSON_OUT=str(target / f"{objective}.json"), RUN_LOG_DIR=str(target / f"{objective}.logs"))
         subprocess.run(["bash", "quick_scripts/run_all_txt_instances_limited.sh"], cwd=repo, env=env, check=True)
     subprocess.run([sys.executable, "quick_scripts/analyze/audit_aglr_campaign.py", str(root),

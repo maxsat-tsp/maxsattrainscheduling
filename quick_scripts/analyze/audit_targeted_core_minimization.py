@@ -100,7 +100,7 @@ def verify_snapshot(root):
         raise ValueError("snapshot contains a symlink")
 
 
-def audit_saved(root: Path, reference: Path, previous_trials=None):
+def audit_saved(root: Path, reference: Path, previous_trials=None, regression_reference=None):
     verify_snapshot(root)
     manifest = json.loads((root/"manifest.json").read_text())
     saved = json.loads((root/"core_minimization_audit.json").read_text())
@@ -115,7 +115,9 @@ def audit_saved(root: Path, reference: Path, previous_trials=None):
     if manifest.get("previous_trials"):
         if not previous_trials:
             raise ValueError("provide the prior V16 trials to audit the new selection")
-        selection,previous_config,evidence=targeted.unresolved_after_trials(reference,previous_trials)
+        if bool(manifest["previous_trials"].get("regression"))!=(regression_reference is not None):
+            raise ValueError("provide exactly the regression reference frozen for this trial")
+        selection,previous_config,evidence=targeted.unresolved_after_trials(reference,previous_trials,regression_reference)
         if evidence!=manifest["previous_trials"]:
             raise ValueError("prior trial hashes differ from the frozen selection")
         if manifest["definition"].get("core_minimize_conflicts")!=previous_config.get("core_minimize_conflicts"):
@@ -169,7 +171,9 @@ def audit_saved(root: Path, reference: Path, previous_trials=None):
         records.append(record)
     result = dict(schema=manifest["schema"], expected_runs=len(planned_cases(manifest)),
                   completed_runs=len(records), complete=saved["complete"], errors=errors,
-                  submission_passed=False, scope="unresolved cases only; losses on previously solved cases have not been tested",
+                  submission_passed=False,
+                  scope=("unresolved cases and audited regression losses only; other solved cases have not been retested" if regression_reference is not None
+                         else "unresolved cases only; losses on previously solved cases have not been tested"),
                   newly_solved=[dict(objective=r["objective"], name=r["name"], cost=r["solve"]["cost"], seconds=r["time"])
                                 for r in records if r["proven"]],
                   summary=extended.audit.summarize(records, manifest["timeout_seconds"]))
@@ -191,11 +195,12 @@ def main():
     checker.add_argument("results", type=Path)
     checker.add_argument("--reference", type=Path, required=True)
     checker.add_argument("--previous-trials", type=Path, nargs="+")
+    checker.add_argument("--regression-reference",type=Path)
     args = parser.parse_args()
     if args.command == "snapshot":
         result = snapshot(args.results, args.output)
     else:
-        result = audit_saved(args.results, args.reference, args.previous_trials)
+        result = audit_saved(args.results, args.reference, args.previous_trials,args.regression_reference)
     print(json.dumps(result, indent=2))
     if result.get("audit_passed") is False:
         raise SystemExit(1)

@@ -21,7 +21,7 @@ def tag_for(config):
     return tag if not exhaust else f"{tag}-E{exhaust}"
 
 
-def unresolved_after_trials(reference, trials):
+def unresolved_after_trials(reference, trials, regression_reference=None):
     # Import lazily: the independent auditor also imports this module.
     from confirm_targeted_core_minimization import choose
     for path in trials:
@@ -36,6 +36,15 @@ def unresolved_after_trials(reference, trials):
                               report_sha256=extended.focus.sha(path/"core_minimization_audit.json")) for path in trials],
                               key=lambda item:item["manifest_sha256"]),
                   selected_manifest_sha256=extended.focus.sha(best/"manifest.json"))
+    if regression_reference is not None:
+        import core_regression_reference
+        losses,regression=core_regression_reference.audit(regression_reference,reference,prior,
+                                                        evidence["selected_manifest_sha256"])
+        for item in losses:selected[item["objective"]].append(item["name"])
+        selected={o:[n for n in extended.common.EXPECTED_NAMES if any(item['objective']==o and item['name']==n for item in losses)]
+                    +[n for n in extended.common.EXPECTED_NAMES if n in names and not any(item['objective']==o and item['name']==n for item in losses)]
+                  for o,names in selected.items()}
+        evidence["regression"]=regression
     return selected,prior["definition"],evidence
 
 
@@ -60,11 +69,14 @@ def run(args):
     selection=select(args.reference)
     exhaust=getattr(args,"core_exhaust_checks",0)
     previous_trials=getattr(args,"previous_trials",None)
+    regression_reference=getattr(args,"regression_reference",None)
     prior_config=None
     if exhaust<0 or bool(exhaust)!=bool(previous_trials):
         raise ValueError("core exhaustion requires completed prior trials, and vice versa")
+    if regression_reference is not None and not previous_trials:
+        raise ValueError("a regression reference requires the prior parameter trials")
     if previous_trials:
-        selection,prior_config,previous=unresolved_after_trials(args.reference,previous_trials)
+        selection,prior_config,previous=unresolved_after_trials(args.reference,previous_trials,regression_reference)
     if not any(selection.values()):
         raise ValueError("there are no unresolved MiniSAT candidate cases")
     build=json.loads(args.build_manifest.read_text())
@@ -119,7 +131,8 @@ def run(args):
         records.append(record)
         report=dict(schema=manifest["schema"],expected_runs=len(expected),completed_runs=len(records),
                     complete=len(records)==len(expected),errors=[],submission_passed=False,
-                    scope="unresolved cases only; losses on previously solved cases have not been tested",
+                    scope=("unresolved cases and audited regression losses only; other solved cases have not been retested" if regression_reference is not None
+                           else "unresolved cases only; losses on previously solved cases have not been tested"),
                     newly_solved=[dict(objective=r["objective"],name=r["name"],cost=r["solve"]["cost"],seconds=r["time"])
                                   for r in records if r["proven"]],
                     summary=extended.audit.summarize(records,runtime.timeout))
@@ -137,6 +150,7 @@ def main():
     parser.add_argument("--core-conflicts",type=int,default=0)
     parser.add_argument("--core-exhaust-checks",type=int,default=0)
     parser.add_argument("--previous-trials",type=Path,nargs="+")
+    parser.add_argument("--regression-reference",type=Path)
     parser.add_argument("--round-seconds",type=int,default=21600)
     args=parser.parse_args()
     try:

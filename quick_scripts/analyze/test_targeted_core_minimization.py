@@ -43,6 +43,12 @@ class TargetedCoreTests(unittest.TestCase):
             self.assertEqual(chosen["cont"],["origA2"])
             self.assertEqual(cfg,config)
             self.assertEqual(evidence["selected_manifest_sha256"],extended.focus.sha(root/"manifest.json"))
+            with patch("confirm_targeted_core_minimization.choose",return_value=(root,dict(newly_solved=[dict(objective="cont",name="origA1")]))), \
+                 patch.object(targeted,"select",return_value=selection), \
+                 patch("core_regression_reference.audit",return_value=([dict(objective="cont",name="origA3")],dict(manifest_sha256="reg",report_sha256="report"))):
+                chosen,_,evidence=targeted.unresolved_after_trials(root,[root],root/'regression')
+            self.assertEqual(chosen['cont'],['origA3','origA2'])
+            self.assertEqual(evidence['regression']['manifest_sha256'],'reg')
             extended.save(root/"manifest.json",dict(definition=dict(config,core_exhaust_checks="4")))
             with self.assertRaisesRegex(ValueError,"original V16"):
                 targeted.unresolved_after_trials(root,[root])

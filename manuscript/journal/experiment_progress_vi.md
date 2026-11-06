@@ -10,6 +10,15 @@ Cả năm phương pháp đều chạy lại cùng 31 cặp, tuần tự, mỗi 
 Kết quả cũ không được đổi nhãn thành kết quả 300 giây. Lựa chọn đã khóa tại
 `results/sat_research/extended_300_20261106/plan.json`.
 
+Chiến dịch bắt đầu lúc **14:15 ngày 06/11/2026 (giờ Việt Nam)**, từ commit
+`b6a4370`, dịch vụ `maxsat-extended300-b6a4370.service`. Tối đa ba vòng có
+checkpoint, mỗi vòng tối đa 6 giờ, không chạy song song. Trước khi chạy:
+41 test thư viện Rust, 47 test Python và build release đều đạt; cả năm
+solver cùng giải đúng origA1/cont với optimum 5526. Hai cặp đầu đã hoàn tất
+đủ năm solver và chưa có lỗi audit; đây là cập nhật lúc khởi chạy, chưa
+phải kết quả cuối. Hash binary và đường dẫn VM nằm trong `launch.json` cùng
+thư mục kế hoạch. Chưa cập nhật số liệu vào bản thảo COR.
+
 V10 đã được kiểm toán lại độc lập: giả định `full` đạt 0/4 infsteps180 và
 0/14 cont; `geometric` đạt 0/4 và 1/14. Không giải thêm ca mới. V9 có một
 nghiệm không hợp lệ ở stationB1/cont, đã bị loại và revert; nguyên nhân

@@ -30,11 +30,18 @@ quả đẹp hơn. CPLEX dùng Big-M eager, 4 luồng và gap bằng 0; chỉ t�
 khi có lịch hợp lệ và cận khớp.
 
 Đọc `extended_audit.json` và `extended_summary.csv` trong thư mục RUN_ID.
+Trong lúc chưa đủ lượt, dùng `comparable_summary` hoặc
+`extended_comparable_summary.csv` để so trên các cặp đã chạy đủ năm phương pháp.
 `complete=false` nghĩa là còn ca chưa chạy; dùng `missing` để biết phần còn
 lại. `gained` và `lost` so sánh các cặp đã chạy đủ cả hai phương pháp ở
 **cùng 300 giây**. Chỉ kết luận về nhóm khó; cần kiểm tra toàn bộ dataset
 sau khi chọn được cấu hình. Nếu 300 giây chưa giúp phân biệt, xem cận và
 thời gian trước khi quyết định vòng 600 giây cho cả năm phương pháp.
+
+Chiến dịch trên VM dùng `RUN_ID=extended300-b6a4370-20261106`.
+Theo dõi bằng `journalctl -u maxsat-extended300-b6a4370.service`.
+Không đổi mã hoặc binary trong worktree `~/projects/core-v9/maxsattrainscheduling`
+khi dịch vụ này đang chạy.
 
 ## Quy trình nhóm 120 giây đã chạy
 

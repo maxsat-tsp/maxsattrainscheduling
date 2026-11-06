@@ -2,6 +2,25 @@
 
 ## Trạng thái mới nhất
 
+**Hai backend chạy song song theo yêu cầu mới.** Dùng
+`run_sat_backend_comparison.sh` để thử MiniSAT và CaDiCaL với cùng ba phương
+pháp MaxSAT và 31 cặp khó, timeout 300 giây: tổng 186 ca SAT. Dùng lại các ca
+đã hoàn tất; chỉ chạy phần còn thiếu. Hai nhóm CPU không chung lõi vật lý:
+MiniSAT `0,1,4,5`, CaDiCaL `2,3,6,7`; mỗi nhánh có 2 lõi thật và giới hạn
+6.000.000 KB RAM mỗi ca. Không chạy thêm MILP trong vòng chọn backend này.
+
+Các ca chạy mới dùng cùng binary từ `4a43a9c`. Các ca nhập lại giữ nguồn,
+hash và thời gian cũ; bản mã khác nhau được chấp nhận để sàng lọc theo quyết
+định trước của nhóm. Bảng cùng binary/song song được tách riêng. So coverage
+trên các ca chung trước, rồi PAR-2; xác nhận runtime tuần tự khi khóa cấu hình.
+Lượt mới bắt đầu lúc **18:07 ngày 06/11/2026 (giờ Việt Nam)**, dịch vụ
+`maxsat-backends300-v13-fabcc5a.service`, worktree `~/projects/backends-v13/maxsattrainscheduling`.
+Đã nhập 54 ca MiniSAT và 15 ca CaDiCaL, còn 117 ca chạy mới. 65 test Python
+và sáu smoke test native chạy đồng thời đạt trên VM; cả sáu chứng minh
+optimum 5526 của origA1/cont. CPU affinity của hai tiến trình thực tế cũng
+đã được kiểm tra. Bản auditor chỉ đọc bổ sung sau đó có 66 test đạt.
+Thông tin khởi chạy ở `results/sat_research/backend_comparison_20261106/launch.json`.
+
 **Đối chiếu lại CSOnet và SOTA:** CSOnet dùng RC2 được cài trong Rust;
 mã `c427a10` gọi MiniSAT bên trong. Bài COR gốc có bản tiền ấn phẩm của tác
 giả ghi RC2 + MiniSat 2.1.0, và mã công khai cũng dùng MiniSAT. RC2 là thuật

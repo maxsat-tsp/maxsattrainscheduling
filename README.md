@@ -112,8 +112,12 @@ The CLI retains MiniSAT as its historical default. Use
 `--maxsat-ladder-sc-backend minisat|cadical|glucose` to select the SAT backend
 explicitly for SC/AGLR and journal MaxSAT-DDD. Compare the new method and
 both MaxSAT baselines with the same backend. The current 300-second campaign
-uses genuine CaDiCaL for all three; retain its results as a common-backend
-comparison alongside the MiniSAT baseline. MILP baselines retain Gurobi/CPLEX.
+runs MiniSAT and genuine CaDiCaL in parallel on disjoint physical CPU cores,
+using all three MaxSAT methods on the same 31 difficult pairs. Use
+`run_sat_backend_comparison.sh`; audited completed SAT cases are imported
+unchanged, and only missing cases are run. The report compares matched cases
+and separates historical timings from new parallel measurements. MILP
+baselines retain Gurobi/CPLEX and are not rerun just to compare SAT backends.
 Evidence and reporting rules are in
 [the solver verification report](manuscript/journal/reviews/solver_stack_20261106/README.md).
 

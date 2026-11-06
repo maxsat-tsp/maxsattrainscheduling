@@ -4,6 +4,11 @@ Ngày kiểm tra: 06-11-2026. **Có: CSOnet dùng RC2. Mã nguồn được ki�
 gọi MiniSAT bên trong RC2, không gọi CaDiCaL.** Cần sửa cách hiểu rằng dùng
 MiniSAT có nghĩa là không dùng RC2. Hai tên chỉ hai công việc khác nhau.
 
+**Cập nhật triển khai:** theo yêu cầu tiếp theo, cả MiniSAT và CaDiCaL chạy
+đồng thời trên các nhóm lõi vật lý riêng, với cùng ba phương pháp MaxSAT.
+Dùng lại các kết quả đã audit và chỉ chạy phần thiếu. Phần bằng chứng dưới
+đây vẫn giữ nguyên; lệnh và cách đọc bảng hai backend có trong runbook.
+
 ## 1. Hai tầng giải bài toán
 
 RC2 tìm chi phí nhỏ nhất. Khi chưa giải được một tập điều kiện chi phí,

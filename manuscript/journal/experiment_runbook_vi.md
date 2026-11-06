@@ -7,7 +7,65 @@ Mốc chính đã được sửa theo camera-ready: **120 giây**, MaxSAT-Defaul
 Có thể dùng lại lượt 150 giây bằng cách tạo bảng dẫn xuất ở cutoff 120 giây.
 Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt chạy lại.
 
-## Vòng hiện tại: 300 giây cho cả phương pháp mới và SOTA
+## Vòng hiện tại: MiniSAT và CaDiCaL chạy đồng thời
+
+Theo yêu cầu mới, chạy hai nhánh backend cùng lúc để chọn hướng tốt hơn.
+Mỗi nhánh chạy ba phương pháp: Orders-Transitive, CSOnet và MaxSAT-Journal,
+trên cùng 31 cặp instance--objective ở 300 giây. Tổng là **186 ca SAT**.
+Chỉ chạy phần còn thiếu; nhập nguyên byte các ca SAT đã hoàn tất và đã audit.
+Gurobi/CPLEX không phụ thuộc SAT backend nên không chạy lại trong vòng này.
+
+VM có 4 lõi vật lý, 8 vCPU và khoảng 16 GB RAM. Phân bổ:
+
+| Nhánh | CPU logic | Lõi vật lý | Giới hạn RAM mỗi ca |
+|---|---|---|---|
+| MiniSAT | 0,1,4,5 | 0,1 | 6.000.000 KB |
+| CaDiCaL | 2,3,6,7 | 2,3 | 6.000.000 KB |
+
+Hai nhánh không chia sẻ lõi vật lý hoặc hai luồng của cùng một lõi. Mỗi
+nhánh chạy một ca tại một thời điểm. Các ca mới của cả hai nhánh dùng cùng
+binary từ commit `4a43a9c`. Giữ riêng commit, binary hash và điều kiện chạy
+của các ca cũ được nhập; không đổi nhãn chúng thành ca chạy mới.
+
+```bash
+BIN=/home/tuyenkv/projects/cadical-v12/maxsattrainscheduling/target/release/ddd \
+MINISAT_REFERENCE=/home/tuyenkv/projects/core-v9/maxsattrainscheduling/results/aglr/extended300-b6a4370-20261106 \
+CADICAL_REFERENCE=/home/tuyenkv/projects/cadical-v12/maxsattrainscheduling/results/aglr/cadical300-v12-4a43a9c \
+SOLVER_MANIFEST=/home/tuyenkv/projects/cadical-v12/maxsattrainscheduling/results/aglr/cadical300-v12-4a43a9c/manifest.json \
+RUN_ID=backends300-v13-fabcc5a bash run_sat_backend_comparison.sh
+```
+
+Kích hoạt môi trường Gurobi trước. Chạy trong worktree
+`~/projects/backends-v13/maxsattrainscheduling`. Một vòng tối đa 6 giờ;
+giữ cùng RUN_ID để tiếp tục. Hai thư mục reference đã dừng và được giữ
+nguyên. Không chạy đồng thời lệnh này và dịch vụ đang thực hiện cùng RUN_ID.
+
+Đọc `backend_comparison.json` và `backend_comparison.csv`. Mỗi dòng so đúng
+cùng phương pháp, objective và các instance đã hoàn tất ở **cả hai backend**.
+Ưu tiên số optimum, sau đó PAR-2. `preferred_backend` chỉ áp dụng trên mẫu
+đã so sánh; `complete_for_objective=false` nghĩa là vẫn thiếu ca của nhóm đó.
+`complete=true` chỉ có nghĩa đủ 186 ca nhóm khó, không phải full dataset.
+
+`backend_parallel_same_binary.csv` chỉ dùng những ca mới đã chạy với cùng
+binary trong chế độ song song. Các ca cũ có thời gian tuần tự được ghi riêng
+nguồn trong `manifest.json` và `measurement.json`; không coi mọi thời gian là
+cùng điều kiện. Sau khi chọn được backend và phương pháp tốt hơn, chạy xác
+nhận tuần tự các ca quyết định trước khi chốt runtime cho bài báo.
+
+Kiểm toán lại bất kỳ lúc nào bằng bản auditor chỉ đọc trong worktree riêng
+`~/projects/backend-audit-controller` (commit `fa7b3d7` trở lên). Không sửa
+worktree đang chạy để cập nhật công cụ:
+
+```bash
+python3 /home/tuyenkv/projects/backend-audit-controller/quick_scripts/analyze/compare_sat_backends.py audit \
+  /home/tuyenkv/projects/backends-v13/maxsattrainscheduling/results/aglr/backends300-v13-fabcc5a
+```
+
+Nếu một worker lỗi, cả vòng dừng và lưu `failure.json`; kiểm tra thêm
+`minisat.log`/`cadical.log`. Lịch sai, cận mâu thuẫn và dữ liệu bị sửa không
+được bỏ qua để chạy tiếp. Không cần chạy lại những ca đã hoàn tất hợp lệ.
+
+## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 
 **Đã xác nhận CSOnet dùng RC2, với MiniSAT trong mã được kiểm tra.** RC2 xử
 lý tối ưu; MiniSAT/CaDiCaL xử lý các truy vấn SAT bên trong. Bản tiền ấn
@@ -16,7 +74,7 @@ RC2 + MiniSAT làm mốc theo mã SOTA hiện có. Không bỏ kết quả MiniS
 vì tên này khác RC2. Nguồn và cách thống nhất ở
 [báo cáo kiểm tra bộ giải](reviews/solver_stack_20261106/README.md).
 
-Lượt hiện tại dùng **RC2 + CaDiCaL** cho cả ba phương pháp MaxSAT, để đo
+Lượt trước dùng **RC2 + CaDiCaL** cho cả ba phương pháp MaxSAT, để đo
 ảnh hưởng khi đổi SAT backend cho cả phương pháp mới và baseline. Đây là
 đối chứng bổ sung; không phải bằng chứng CSOnet gốc dùng CaDiCaL. So sánh
 hiệu quả phương pháp trong từng backend, còn ảnh hưởng của backend được
@@ -40,10 +98,10 @@ EXTENDED_REUSE_MILP_FROM=/home/tuyenkv/projects/core-v9/maxsattrainscheduling/re
 RUN_ID=cadical300-20261106 bash run_extended_timeout_experiments.sh
 ```
 
-Lượt đang chạy trên VM dùng commit `4a43a9c`, worktree
+Lượt trước trên VM dùng commit `4a43a9c`, worktree
 `~/projects/cadical-v12/maxsattrainscheduling`, RUN_ID
 `cadical300-v12-4a43a9c`, dịch vụ `maxsat-cadical300-v12-4a43a9c.service`.
-Không chạy thêm lệnh trên trong khi dịch vụ này còn hoạt động. Xem log bằng
+Dịch vụ này đã được dừng để chuyển sang hai backend. Xem log cũ bằng
 `journalctl -u maxsat-cadical300-v12-4a43a9c.service -n 30 --no-pager`.
 
 Kích hoạt môi trường Gurobi đã cài trước khi chạy. Lệnh giới hạn một vòng

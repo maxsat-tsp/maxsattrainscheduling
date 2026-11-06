@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.9}
+\fancyhead[R]{\small Phiên bản 5.10}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.9, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.10, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -83,13 +83,28 @@ khai cũng gọi MiniSAT. Ta giữ \textbf{RC2 + MiniSAT làm mốc theo mã SOT
 Các kết quả MiniSAT đã chạy vẫn có giá trị. Nguồn đối chiếu và hash nằm ở
 \file{manuscript/journal/reviews/solver_stack_20261106/}.
 
-\textbf{Lượt hiện tại là đối chứng RC2 + CaDiCaL.} Phương pháp mới,
-CSOnet và MaxSAT-DDD đều dùng CaDiCaL 1.9.5 thật, cùng timeout 300 giây.
+\textbf{Lượt hiện tại chạy cả RC2 + MiniSAT và RC2 + CaDiCaL.} Phương pháp
+mới, CSOnet và MaxSAT-DDD đều được thử với hai backend, cùng timeout 300 giây.
 Để đo hiệu quả của phương pháp, so sánh trong cùng một backend. Để đo hiệu
 quả của việc đổi SAT solver, giữ nguyên phương pháp rồi so hai backend.
 Không gộp thời gian hai backend thành một cấu hình. Gurobi và CPLEX vẫn
 là hai bộ giải riêng cho mô hình MILP. Mỗi kết quả mới phải ghi rõ bộ giải;
 với CaDiCaL, auditor còn kiểm tra chữ ký native.
+
+Hai nhánh chạy đồng thời trên hai nhóm lõi CPU riêng. Mỗi backend có 2 lõi
+vật lý và giới hạn 6.000.000 KB RAM mỗi ca. Ba phương pháp, 31 cặp khó và
+hai backend tạo thành $3\times31\times2=186$ ca SAT. Giữ nguyên kết quả đã
+chạy đúng, chỉ chạy phần thiếu. Các ca mới dùng cùng một binary; các ca cũ
+giữ riêng nguồn và điều kiện chạy. Không chạy lại MILP để chọn SAT backend.
+Lệnh hiện tại là \file{run_sat_backend_comparison.sh}; thông số đầy đủ ở
+\file{manuscript/journal/experiment_runbook_vi.md}.
+
+Bảng \file{backend_comparison.csv} chỉ so những ca cả hai backend đã chạy
+xong. Chẳng hạn MiniSAT đã chạy 20 ca, CaDiCaL đã chạy 12 ca, trong đó chỉ
+10 ca trùng nhau: phải so trên 10 ca đó. Chọn theo số ca tối ưu trước, rồi
+PAR-2. Bảng \file{backend_parallel_same_binary.csv} tách riêng các ca mới
+dùng cùng binary trong chế độ song song. Sau khi chọn cấu hình, xác nhận
+tuần tự các ca quyết định để chốt thời gian cho bài báo.
 
 Phương pháp AGLR đã được cài. Nhiệm vụ trước mắt của sinh viên là kiểm tra môi
 trường và chạy thí nghiệm, không phải viết lại thuật toán. Chỉ sửa mã khi kết
@@ -905,6 +920,10 @@ Sinh viên điền trực tiếp mẫu
 sót thông tin.
 
 \section{Thử timeout dài hơn}
+
+\textbf{Lệnh ưu tiên hiện tại là \file{run_sat_backend_comparison.sh}.}
+Script thử hai backend đồng thời và dùng lại các ca đã audit. Phần dưới ghi
+lại lượt đối chứng năm phương pháp trước khi chuyển sang so hai backend.
 
 Các vòng 120 giây gần đây chưa giải thêm ca mới. Bây giờ thử giới hạn
 $T=300$ giây cho cả năm phương pháp: bộ ba V5, CSOnet, MaxSAT của bài tạp

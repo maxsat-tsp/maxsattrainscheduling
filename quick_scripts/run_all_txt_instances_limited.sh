@@ -72,6 +72,7 @@ MAXSATDDD_ORDER_TRANSITIVITY="${MAXSATDDD_ORDER_TRANSITIVITY:-}"
 MAXSATDDD_OBJECTIVE_BOUND="${MAXSATDDD_OBJECTIVE_BOUND:-}"
 MAXSATDDD_BACKEND="${MAXSATDDD_BACKEND:-}"
 MAXSATDDD_RESIDUAL_HARDENING="${MAXSATDDD_RESIDUAL_HARDENING:-}"
+MAXSATDDD_TEMPORAL_CYCLE_CUTS="${MAXSATDDD_TEMPORAL_CYCLE_CUTS:-}"
 
 tmpdir="$(mktemp -d /tmp/ddd-run-all.XXXXXX)"
 order_file="$tmpdir/order.txt"
@@ -286,6 +287,7 @@ run_fingerprint="$(python3 - \
   "${MAXSATDDD_OBJECTIVE_BOUND:-default}" \
   "${MAXSATDDD_BACKEND:-default}" \
   "${MAXSATDDD_RESIDUAL_HARDENING:-default}" \
+  "${MAXSATDDD_TEMPORAL_CYCLE_CUTS:-default}" \
   "${cpu_model:-unavailable}" "$logical_cpus" "$memory_bytes" "$system_description" \
   "$cargo_lock_sha256" "$dataset_file_count" "$dataset_sha256" \
   "$salvers_commit" "$salvers_diff_sha256" "$salvers_state_sha256" "$salvers_dirty_count" \
@@ -368,6 +370,7 @@ else
     printf 'maxsatddd_objective_bound=%s\n' "${MAXSATDDD_OBJECTIVE_BOUND:-default}"
     printf 'maxsatddd_backend=%s\n' "${MAXSATDDD_BACKEND:-default}"
     printf 'maxsatddd_residual_hardening=%s\n' "${MAXSATDDD_RESIDUAL_HARDENING:-default}"
+    printf 'maxsatddd_temporal_cycle_cuts=%s\n' "${MAXSATDDD_TEMPORAL_CYCLE_CUTS:-default}"
     printf 'rustc=%s\n' "$(rustc --version 2>/dev/null || printf unavailable)"
     printf 'gurobi=%s\n' "${gurobi_version:-unavailable}"
     printf 'cpu_model=%s\n' "${cpu_model:-unavailable}"
@@ -451,6 +454,9 @@ run_one() {
   fi
   if [[ -n "$MAXSATDDD_RESIDUAL_HARDENING" ]]; then
     extra_args+=(--maxsat-ladder-sc-residual-hardening "$MAXSATDDD_RESIDUAL_HARDENING")
+  fi
+  if [[ -n "$MAXSATDDD_TEMPORAL_CYCLE_CUTS" ]]; then
+    extra_args+=(--maxsat-ladder-sc-temporal-cycle-cuts "$MAXSATDDD_TEMPORAL_CYCLE_CUTS")
   fi
   if [[ -n "$MAXSAT_RC2_BOUND_MODE" ]]; then
     extra_args+=(--maxsat-rc2-bound-mode "$MAXSAT_RC2_BOUND_MODE")

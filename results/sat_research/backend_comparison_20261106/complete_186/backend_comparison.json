@@ -1,0 +1,234 @@
+{
+  "schema": "sat-backend-comparison-v1",
+  "expected_runs": 186,
+  "completed_runs": 186,
+  "complete": true,
+  "errors": [],
+  "submission_passed": false,
+  "scope": "31 difficult pairs if using the frozen research plan; not full-dataset coverage",
+  "ranking": "coverage first; PAR-2 is secondary development evidence; confirm final timings sequentially",
+  "runtime_note": "historical sequential times and new parallel-development times retain separate provenance",
+  "comparison": [
+    {
+      "method": "Orders-Transitive",
+      "objective": "infsteps180",
+      "paired_completed": 5,
+      "planned": 5,
+      "minisat_optimal": 1,
+      "minisat_par2_seconds": 485.84853069519994,
+      "minisat_median_solved_seconds": 29.242653476,
+      "cadical_optimal": 1,
+      "cadical_par2_seconds": 504.0565087658,
+      "cadical_median_solved_seconds": 120.282543829,
+      "cadical_gained": [],
+      "cadical_lost": [],
+      "preferred_backend": "minisat",
+      "complete_for_objective": true
+    },
+    {
+      "method": "Orders-Transitive",
+      "objective": "cont",
+      "paired_completed": 26,
+      "planned": 26,
+      "minisat_optimal": 15,
+      "minisat_par2_seconds": 270.40442567953846,
+      "minisat_median_solved_seconds": 6.933641786,
+      "cadical_optimal": 14,
+      "cadical_par2_seconds": 295.31355526873074,
+      "cadical_median_solved_seconds": 23.678044298,
+      "cadical_gained": [],
+      "cadical_lost": [
+        "stationA9"
+      ],
+      "preferred_backend": "minisat",
+      "complete_for_objective": true
+    },
+    {
+      "method": "CSOnet",
+      "objective": "infsteps180",
+      "paired_completed": 5,
+      "planned": 5,
+      "minisat_optimal": 1,
+      "minisat_par2_seconds": 489.92563222999996,
+      "minisat_median_solved_seconds": 49.62816115,
+      "cadical_optimal": 1,
+      "cadical_par2_seconds": 489.8198504416,
+      "cadical_median_solved_seconds": 49.099252208,
+      "cadical_gained": [],
+      "cadical_lost": [],
+      "preferred_backend": "cadical",
+      "complete_for_objective": true
+    },
+    {
+      "method": "CSOnet",
+      "objective": "cont",
+      "paired_completed": 26,
+      "planned": 26,
+      "minisat_optimal": 15,
+      "minisat_par2_seconds": 281.84729298511536,
+      "minisat_median_solved_seconds": 7.422085082,
+      "cadical_optimal": 14,
+      "cadical_par2_seconds": 292.09245088688465,
+      "cadical_median_solved_seconds": 11.239558382,
+      "cadical_gained": [
+        "trackB12"
+      ],
+      "cadical_lost": [
+        "origB11",
+        "stationA9"
+      ],
+      "preferred_backend": "minisat",
+      "complete_for_objective": true
+    },
+    {
+      "method": "MaxSAT-Journal",
+      "objective": "infsteps180",
+      "paired_completed": 5,
+      "planned": 5,
+      "minisat_optimal": 1,
+      "minisat_par2_seconds": 512.5775912392,
+      "minisat_median_solved_seconds": 162.887956196,
+      "cadical_optimal": 1,
+      "cadical_par2_seconds": 490.22876533500005,
+      "cadical_median_solved_seconds": 51.143826675,
+      "cadical_gained": [],
+      "cadical_lost": [],
+      "preferred_backend": "cadical",
+      "complete_for_objective": true
+    },
+    {
+      "method": "MaxSAT-Journal",
+      "objective": "cont",
+      "paired_completed": 26,
+      "planned": 26,
+      "minisat_optimal": 16,
+      "minisat_par2_seconds": 271.0762370162692,
+      "minisat_median_solved_seconds": 11.9706630365,
+      "cadical_optimal": 12,
+      "cadical_par2_seconds": 328.3827743263461,
+      "cadical_median_solved_seconds": 2.9396526520000004,
+      "cadical_gained": [],
+      "cadical_lost": [
+        "origB11",
+        "stationA9",
+        "stationB11",
+        "stationB12"
+      ],
+      "preferred_backend": "minisat",
+      "complete_for_objective": true
+    }
+  ],
+  "matching_binary_parallel_comparison": [
+    {
+      "method": "Orders-Transitive",
+      "objective": "infsteps180",
+      "paired_completed": 2,
+      "planned": 5,
+      "minisat_optimal": 0,
+      "minisat_par2_seconds": 600.0,
+      "minisat_median_solved_seconds": null,
+      "cadical_optimal": 0,
+      "cadical_par2_seconds": 600.0,
+      "cadical_median_solved_seconds": null,
+      "cadical_gained": [],
+      "cadical_lost": [],
+      "preferred_backend": "tie",
+      "complete_for_objective": false
+    },
+    {
+      "method": "Orders-Transitive",
+      "objective": "cont",
+      "paired_completed": 7,
+      "planned": 26,
+      "minisat_optimal": 4,
+      "minisat_par2_seconds": 261.96777502885715,
+      "minisat_median_solved_seconds": 7.7981984845,
+      "cadical_optimal": 4,
+      "cadical_par2_seconds": 276.5879850227143,
+      "cadical_median_solved_seconds": 26.727956487,
+      "cadical_gained": [],
+      "cadical_lost": [],
+      "preferred_backend": "minisat",
+      "complete_for_objective": false
+    },
+    {
+      "method": "CSOnet",
+      "objective": "infsteps180",
+      "paired_completed": 2,
+      "planned": 5,
+      "minisat_optimal": 0,
+      "minisat_par2_seconds": 600.0,
+      "minisat_median_solved_seconds": null,
+      "cadical_optimal": 0,
+      "cadical_par2_seconds": 600.0,
+      "cadical_median_solved_seconds": null,
+      "cadical_gained": [],
+      "cadical_lost": [],
+      "preferred_backend": "tie",
+      "complete_for_objective": false
+    },
+    {
+      "method": "CSOnet",
+      "objective": "cont",
+      "paired_completed": 7,
+      "planned": 26,
+      "minisat_optimal": 4,
+      "minisat_par2_seconds": 263.7079065182857,
+      "minisat_median_solved_seconds": 6.5359267995,
+      "cadical_optimal": 4,
+      "cadical_par2_seconds": 264.35406525428573,
+      "cadical_median_solved_seconds": 10.825068436,
+      "cadical_gained": [],
+      "cadical_lost": [],
+      "preferred_backend": "minisat",
+      "complete_for_objective": false
+    },
+    {
+      "method": "MaxSAT-Journal",
+      "objective": "infsteps180",
+      "paired_completed": 2,
+      "planned": 5,
+      "minisat_optimal": 0,
+      "minisat_par2_seconds": 600.0,
+      "minisat_median_solved_seconds": null,
+      "cadical_optimal": 0,
+      "cadical_par2_seconds": 600.0,
+      "cadical_median_solved_seconds": null,
+      "cadical_gained": [],
+      "cadical_lost": [],
+      "preferred_backend": "tie",
+      "complete_for_objective": false
+    },
+    {
+      "method": "MaxSAT-Journal",
+      "objective": "cont",
+      "paired_completed": 7,
+      "planned": 26,
+      "minisat_optimal": 5,
+      "minisat_par2_seconds": 217.73558766214282,
+      "minisat_median_solved_seconds": 9.388913171,
+      "cadical_optimal": 4,
+      "cadical_par2_seconds": 265.35739621557144,
+      "cadical_median_solved_seconds": 11.0037952305,
+      "cadical_gained": [],
+      "cadical_lost": [
+        "stationB12"
+      ],
+      "preferred_backend": "minisat",
+      "complete_for_objective": false
+    }
+  ],
+  "progress": [
+    {
+      "backend": "minisat",
+      "completed": 93,
+      "reused": 93
+    },
+    {
+      "backend": "cadical",
+      "completed": 93,
+      "reused": 81
+    }
+  ],
+  "missing": []
+}

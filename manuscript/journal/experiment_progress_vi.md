@@ -18,6 +18,14 @@ Vòng tiếp theo chỉ đổi MiniSAT sang Glucose trong phương án bộ ba. 
 `run_maxsat_focused_experiments.sh`, không tự chạy full. Kết quả nhóm khó
 không được ghép với các ca dễ cũ để công bố coverage full của mã mới.
 
+Vòng `maxsat-focus-v7-b7160db` đã bắt đầu trên VM vào sáng 06/11/2026
+(giờ Việt Nam), từ mã `b7160db`. Manifest xác nhận backend Glucose,
+finsteps123 rỗng, infsteps180 đúng 4 ca, cont đúng 14 ca. Không có lượt full
+được xếp tự động sau vòng này. Đã qua 36 test thư viện Rust, 40 test Python,
+kiểm tra Bash và build release trên VM; tài liệu LaTeX biên dịch không tràn
+lề. Thư mục kết quả:
+`~/projects/experiment-audit/rounds/maxsat-focus-v7-b7160db/`.
+
 Đối chiếu lại camera-ready theo ý kiến của thầy/cô: mốc đúng là **120 giây**,
 `(72,68,60)`, tổng 200 optimum. Bộ JSON 150 giây `(72,68,58)` là lượt khác;
 không dùng làm mốc chính. Tiêu chí: không giảm coverage ở từng objective và tổng ít nhất 201;

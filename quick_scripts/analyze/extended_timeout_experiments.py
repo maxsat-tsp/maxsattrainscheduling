@@ -132,6 +132,11 @@ def summarize(plan: dict, records: list[dict]) -> dict:
         if any(not common.same_number(values[0], v) for v in values[1:]):
             errors.append(dict(objective=objective, name=name, status="cost-disagreement", costs=costs))
     cutoff = plan["timeout_seconds"]
+    by_pair = defaultdict(set)
+    for record in records:
+        by_pair[record["objective"], record["name"]].add(record["tag"])
+    common_pairs = {key for key, tags in by_pair.items() if tags == set(METHODS)}
+    comparable = [r for r in records if (r["objective"], r["name"]) in common_pairs]
     comparisons = []
     candidate = {(r["objective"], r["name"]): r for r in records if r["tag"] == "Orders-Transitive"}
     for baseline in METHODS:
@@ -150,7 +155,16 @@ def summarize(plan: dict, records: list[dict]) -> dict:
                 expected_runs=len(expected), completed_runs=len(records),
                 complete=len(records) == len(expected), errors=errors,
                 submission_passed=False, full_validation_required=True,
-                summary=audit.summarize(records, cutoff), comparisons=comparisons,
+                summary=audit.summarize(records, cutoff),
+                common_completed_pairs=len(common_pairs),
+                comparable_summary=audit.summarize(comparable, cutoff), comparisons=comparisons,
+                completed_after_120=[dict(method=r["tag"], objective=r["objective"], name=r["name"],
+                                         seconds=r["time"], cost=r["solve"].get("cost"))
+                                     for r in records if r["proven"] and r["time"] > 120],
+                case_bounds=[dict(method=r["tag"], objective=r["objective"], name=r["name"],
+                                  status=r["status"], proven=r["proven"], seconds=r["time"],
+                                  reported_lb=r["solve"].get("lb"), reported_ub=r["solve"].get("ub"))
+                             for r in records],
                 missing=[list(k) for k in tasks_for(plan) if k not in set(keys)])
 
 
@@ -321,6 +335,7 @@ def run(args) -> None:
     report = summarize(plan, records)
     save(root/"extended_audit.json", report)
     audit.write_csv(root/"extended_summary.csv", report["summary"])
+    audit.write_csv(root/"extended_comparable_summary.csv", report["comparable_summary"])
     print(json.dumps({k: report[k] for k in ("completed_runs", "expected_runs", "complete", "errors")}), flush=True)
 
 

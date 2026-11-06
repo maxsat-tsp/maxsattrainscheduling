@@ -54,7 +54,11 @@ class ExtendedTests(unittest.TestCase):
         self.assertTrue(report["complete"])
         self.assertFalse(report["submission_passed"])
         self.assertFalse(report["errors"])
-        self.assertFalse(extended.summarize(source,records[:-1])["complete"])
+        self.assertEqual(report["common_completed_pairs"],2)
+        partial=extended.summarize(source,records[:-1])
+        self.assertFalse(partial["complete"])
+        self.assertEqual(partial["common_completed_pairs"],1)
+        self.assertTrue(all(r["instances"] == 1 for r in partial["comparable_summary"]))
         records[0]["solve"]["cost"] = 2
         self.assertTrue(extended.summarize(source,records)["errors"])
         with self.assertRaises(ValueError):

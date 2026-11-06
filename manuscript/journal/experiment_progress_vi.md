@@ -38,6 +38,12 @@ MiniSAT/Glucose. Bài hai tàu xác nhận thực tế có điều kiện chi ph
 Chưa có kết quả hiệu năng của quy tắc này; dùng lại nhóm 18 cặp và các đối
 chứng đã có để thử một lần ở 120 giây.
 
+Vòng `maxsat-harden-v8-270d1ce` đã bắt đầu trên VM sáng 06/11/2026, từ
+mã `270d1ce`. Config xác nhận MiniSAT, bộ ba và residual hardening bật,
+objective bound nhị phân tắt; vẫn chỉ có 4 ca infsteps180 và 14 ca cont.
+Thư mục: `~/projects/experiment-audit/rounds/maxsat-harden-v8-270d1ce/`.
+Mã, kiểm thử và hướng dẫn đã push; chưa có kết quả cuối của vòng này.
+
 Đối chiếu lại camera-ready theo ý kiến của thầy/cô: mốc đúng là **120 giây**,
 `(72,68,60)`, tổng 200 optimum. Bộ JSON 150 giây `(72,68,58)` là lượt khác;
 không dùng làm mốc chính. Tiêu chí: không giảm coverage ở từng objective và tổng ít nhất 201;

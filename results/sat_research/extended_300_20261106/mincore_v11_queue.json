@@ -1,0 +1,33 @@
+{
+  "source_commit": "86cdc5f",
+  "service": "maxsat-mincore300-v11-86cdc5f.service",
+  "queued_utc": "2026-11-06T10:15:41Z",
+  "queued_vietnam": "2026-11-06 17:15:41 +07:00",
+  "state_at_registration": "waiting_for_reference",
+  "reference_service": "maxsat-extended300-b6a4370.service",
+  "reference_directory": "/home/tuyenkv/projects/core-v9/maxsattrainscheduling/results/aglr/extended300-b6a4370-20261106",
+  "required_reference_runs": 155,
+  "required_reference_errors": 0,
+  "trial_worktree": "/home/tuyenkv/projects/core-v11/maxsattrainscheduling",
+  "run_id": "mincore300-v11-86cdc5f",
+  "new_candidate_runs": 31,
+  "reused_baseline_runs": 124,
+  "timeout_seconds": 300,
+  "round_limit_seconds": 21600,
+  "core_minimize_checks": 4,
+  "validation_before_solver": [
+    "reference service inactive and all 155 results complete without audit errors",
+    "no other ddd process active",
+    "Rust library tests including exhaustive scheduling checks",
+    "Python auditor and baseline reuse tests",
+    "Bash syntax and release build",
+    "independent audit of the complete reference"
+  ],
+  "local_validation": {
+    "real_minisat_core_unit_tests_passed": 3,
+    "python_tests_passed": 56,
+    "cargo_check_library_cli_tests_passed": true,
+    "full_linux_validation_pending": true
+  },
+  "submission_passed": false
+}

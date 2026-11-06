@@ -19,6 +19,15 @@ sẽ thực hiện sau khi chiến dịch 300 giây kết thúc. Lượt mới c
 candidate ở 300 giây, dùng lại nguyên 124 kết quả baseline đã kiểm toán;
 không chạy lại bốn baseline. Chưa có kết quả hiệu năng của tính năng này.
 
+Dịch vụ `maxsat-mincore300-v11-86cdc5f.service` đã được xếp hàng lúc
+17:15 ngày 06/11 (giờ Việt Nam). Dịch vụ chỉ chờ, không build hoặc chạy SAT
+song song với đối chứng. Khi đối chứng hoàn tất và không lỗi, nó tạo
+worktree `~/projects/core-v11/maxsattrainscheduling`, chạy kiểm thử Linux
+và build từ commit `86cdc5f`; chỉ khi tất cả đạt mới chạy candidate 300 giây.
+Nếu kiểm thử hoặc audit thất bại, dịch vụ dừng và giữ log để xử lý.
+Trạng thái lúc xếp hàng và điều kiện chạy ở
+`results/sat_research/extended_300_20261106/mincore_v11_queue.json`.
+
 Theo yêu cầu ngày 06/11, vòng kế tiếp tăng timeout chung lên **300 giây**
 cho phương án bộ ba V5 và bốn đối chứng: CSOnet, MaxSAT-Journal, Big-M Gurobi,
 Big-M CPLEX. Danh sách mở rộng là hợp những ca các phương pháp chưa giải ở

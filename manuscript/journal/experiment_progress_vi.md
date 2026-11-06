@@ -1,6 +1,72 @@
-# Tiến độ thử nghiệm trên VM, cập nhật 06-11-2026
+# Tiến độ thử nghiệm trên VM, cập nhật 07-11-2026
 
 ## Trạng thái mới nhất
+
+**Đối chứng hai backend đã hoàn tất: 186/186 ca hợp lệ.** Lượt V14 kết
+thúc lúc 22:33:58 ngày 06/11, giờ Việt Nam. Đã lấy dữ liệu về máy local và
+kiểm toán lại độc lập; không có lỗi lịch hoặc chi phí. Giữ nguyên 174 ca
+đã chạy đúng, chỉ đo mới 12 ca còn thiếu. Dữ liệu và bảng cuối nằm ở
+`results/sat_research/backend_comparison_20261106/complete_186/`.
+
+| Phương pháp | infsteps180, MiniSAT | infsteps180, CaDiCaL | cont, MiniSAT | cont, CaDiCaL |
+|---|---:|---:|---:|---:|
+| Bộ ba (Orders-Transitive) | 1/5 | 1/5 | 15/26 | 14/26 |
+| CSOnet | 1/5 | 1/5 | 15/26 | 14/26 |
+| MaxSAT-Journal | 1/5 | 1/5 | 16/26 | 12/26 |
+
+MiniSAT giải được nhiều ca `cont` hơn ở cả ba phương pháp, nên vòng kế
+tiếp giữ MiniSAT. Ở `infsteps180`, coverage bằng nhau; CaDiCaL có PAR-2
+thấp hơn với CSOnet và Journal. Chưa có căn cứ nói một backend luôn nhanh
+hơn. Đây là kết quả trên nhóm khó, chưa phải full 72 instance hoặc thắng SOTA.
+
+**V15 dừng sau hai timeout hợp lệ và một lượt lỗi.** Hai ca `trackA11` và
+`trackA12` của `infsteps180` chưa chứng minh tối ưu. Ca thứ ba,
+`stationA11/infsteps180`, bị ngắt từ bên ngoài với mã 124; 12 ca còn lại chưa
+chạy. Không ghi lượt này thành 0/15. Bản chụp và kết quả kiểm tra ở
+`results/sat_research/core_minimization_v15_20261106/stopped_2/`.
+
+**V16 giới hạn công việc của từng lần thử thu gọn core.** Mỗi core vẫn
+được thử thêm tối đa bốn lần. Có hai cấu hình, chỉ khác ngân sách của mỗi
+lần thử: 100 hoặc 1.000 xung đột SAT. Nếu ngân sách hết mà chưa có kết luận,
+giữ tập mâu thuẫn đã chứng minh trước đó. Ngân sách này không áp dụng cho
+lời gọi SAT chính. Mọi lời gọi SAT cùng chịu timeout 300 giây của instance,
+được MiniSAT kiểm tra ngay trong quá trình tìm kiếm.
+
+Hai cấu hình chạy song song trên hai nhóm lõi vật lý riêng, dùng cùng mã
+`57aa220` và cùng binary. Chỉ chạy **15 cặp chưa giải được** của phương án
+bộ ba: 4 `infsteps180`, 11 `cont`; dùng lại toàn bộ đối chứng đã có. Nhánh
+1.000 bắt đầu lúc 23:40:53, nhánh 100 lúc 23:53:12 ngày 06/11, giờ Việt Nam.
+Mỗi ca có 6.000.000 KB RAM; mỗi vòng tối đa 6 giờ. Trước khi chạy, 54 test
+Rust, 69 test Python, ba kiểm tra lịch nhỏ và kiểm tra dừng SAT đều đạt.
+
+Lệnh chạy và cách đọc báo cáo ở `experiment_runbook_vi.md`; thông tin
+khởi chạy ở `results/sat_research/limited_core_v16_20261106/`. Khi có ca
+mới, phải xác nhận lại và kiểm tra các ca cũ trước khi đánh giá full.
+Không ghép kết quả các cấu hình để công bố coverage của một phương pháp.
+
+**Tín hiệu đầu tiên, bản chụp lúc 00:12:48 ngày 07/11:** nhánh 1.000 đã
+xong 6/15, nhánh 100 xong 3/15; cả chín ca đã qua kiểm toán độc lập sau
+khi tải về. Nhánh 1.000 giải được `origB11/cont` ở 153,39 giây, chi phí
+75.494 và `cost=lb=ub`. Phương án bộ ba cũ timeout ở 300 giây. Mô hình mới
+có 49.890 biến, so với 66.414 ở lượt cũ; đã bỏ được 2.905 điều kiện khỏi
+các core. Tuy nhiên CSOnet và Journal đã giải được ca này. Đây là tiến
+triển của phương án mới, chưa phải thắng SOTA hoặc kết quả full.
+Dữ liệu gốc, hash và báo cáo độc lập ở `limited_core_v16_20261106/progress_6_3/`
+trong thư mục `results/sat_research/`.
+
+Đã xếp hàng bước xác nhận bằng dịch vụ `maxsat-core-v16-confirm-v2.service`,
+bắt đầu chờ lúc **00:19:10 ngày 07/11**, giờ Việt Nam. Sau khi hai cấu hình
+hoàn tất và qua kiểm toán, chọn một cấu hình theo coverage rồi PAR-2 và chạy
+lại ba lần các ca giải thêm, tuần tự. Dùng nguyên binary V16; không chạy
+thêm SAT trong lúc hai lượt còn hoạt động. Công cụ đã qua 82 test Python
+trên VM. Thông tin và script ở `limited_core_v16_20261106/confirmation_queue.json`
+và `run_confirmation_after_trials.sh`. Đây là trạng thái xếp hàng, chưa có
+kết quả xác nhận.
+
+## Lịch sử trước lượt V16
+
+Các đoạn dưới ghi trạng thái tại từng thời điểm trước đó. Trạng thái mới
+nhất và vị trí dữ liệu cuối nằm ở phần trên.
 
 **Đã lấy và kiểm toán 174/186 ca:** MiniSAT xong 93/93; CaDiCaL xong 81/93
 rồi bị ngắt từ bên ngoài ở Orders-Transitive/stationA12/infsteps180. Giữ

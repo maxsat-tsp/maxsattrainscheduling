@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.11}
+\fancyhead[R]{\small Phiên bản 5.12}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.11, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.12, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -72,18 +72,33 @@ Mỗi báo cáo phải ghi rõ giả định này.
 
 \section{Sinh viên đọc phần này trước}
 
-\textbf{Cập nhật mới nhất:} đã kiểm tra lại 174 ca hợp lệ. MiniSAT đã chạy
-xong 93 ca; CaDiCaL đang chạy tiếp 12 ca còn thiếu. Một ca trước đó bị ngắt
-từ bên ngoài vì truy vấn SAT không dừng kịp. Bản mới áp dụng thời gian còn
-lại ngay trong SAT: hết giờ trả \code{timeout}, không coi là vô nghiệm.
-Không chạy lại 174 ca đã hoàn tất.
+\textbf{Cập nhật mới nhất:} đối chứng MiniSAT và CaDiCaL đã hoàn tất đủ
+186 ca và qua kiểm tra độc lập. Giữ lại 174 ca đã chạy đúng, chỉ đo mới
+12 ca còn thiếu. Trên 26 ca khó của \code{cont}, MiniSAT giải được nhiều
+hơn: phương án bộ ba đạt 15 so với 14, CSOnet 15 so với 14, Journal 16 so
+với 12. Trên 5 ca khó của \code{infsteps180}, mỗi phương pháp giải được
+1 ca với mỗi backend. Chưa có phương án vượt SOTA.
 
-Đồng thời, MiniSAT thử một cải tiến nhỏ trên đúng 15 ca chưa giải: giảm nhóm
-điều kiện mâu thuẫn trước khi cập nhật chi phí, với tối đa bốn kiểm tra bổ
-sung cho mỗi nhóm. Chỉ bỏ điều kiện khi một lần gọi SAT mới chứng minh nhóm còn lại vẫn
-mâu thuẫn. Giữ nguyên mô hình, timeout 300 giây và các thiết lập khác. Nếu
-có ca mới giải được, còn phải kiểm tra lại các ca cũ trước khi kết luận tốt
-hơn. Lệnh và vị trí kết quả của V14/V15 có trong runbook.
+\textbf{Việc đang làm:} giữ MiniSAT, chỉ thử thu gọn nhóm điều kiện mâu
+thuẫn trên 15 cặp chưa giải được: 4 \code{infsteps180}, 11 \code{cont}.
+Mỗi nhóm được thử thêm tối đa bốn lần. Mỗi lần thử có ngân sách riêng,
+100 hoặc 1.000 xung đột SAT. Nếu chưa có kết luận khi hết ngân sách thì
+giữ nhóm đã chứng minh trước đó. Chỉ bỏ điều kiện sau một chứng minh
+mâu thuẫn mới. Hai cấu hình chạy song song trên hai nhóm lõi riêng, cùng
+binary và timeout 300 giây. Không chạy lại baseline ở vòng này.
+
+Lượt cũ V15 dừng sau hai timeout hợp lệ và một ca lỗi; không ghi là 0/15.
+V16 thêm ngân sách cho mỗi lần thử và cho MiniSAT dừng ngay trong tìm kiếm
+khi hết thời gian của instance. Lệnh, vị trí kết quả và cách tiếp tục có
+trong runbook. Nếu có ca mới giải được, cần xác nhận lại và kiểm tra các
+ca cũ trước khi kết luận tốt hơn.
+
+Bản chụp đầu tiên đã có một tiến triển: ngân sách 1.000 giải được
+\code{origB11/cont} ở 153,39 giây, chi phí 75.494; phương án bộ ba cũ
+timeout ở 300 giây. Lịch và các cận đã được kiểm tra độc lập. CSOnet và
+Journal cũng đã giải được ca này, nên chưa gọi đây là thắng SOTA. Hệ thống
+đã xếp hàng bước chạy lại ba lần các ca giải thêm của cấu hình được chọn;
+chỉ bắt đầu sau khi cả hai lượt hiện tại hoàn tất và qua kiểm toán.
 
 \textbf{CSOnet dùng RC2; mã được kiểm tra gọi MiniSAT bên trong.}
 RC2 tìm chi phí nhỏ nhất. Khi cần biết các điều kiện hiện tại có thể cùng
@@ -96,7 +111,7 @@ khai cũng gọi MiniSAT. Ta giữ \textbf{RC2 + MiniSAT làm mốc theo mã SOT
 Các kết quả MiniSAT đã chạy vẫn có giá trị. Nguồn đối chiếu và hash nằm ở
 \file{manuscript/journal/reviews/solver_stack_20261106/}.
 
-\textbf{Lượt hiện tại chạy cả RC2 + MiniSAT và RC2 + CaDiCaL.} Phương pháp
+\textbf{Lượt đối chứng đã chạy cả RC2 + MiniSAT và RC2 + CaDiCaL.} Phương pháp
 mới, CSOnet và MaxSAT-DDD đều được thử với hai backend, cùng timeout 300 giây.
 Để đo hiệu quả của phương pháp, so sánh trong cùng một backend. Để đo hiệu
 quả của việc đổi SAT solver, giữ nguyên phương pháp rồi so hai backend.
@@ -109,7 +124,7 @@ vật lý và giới hạn 6.000.000 KB RAM mỗi ca. Ba phương pháp, 31 cặ
 hai backend tạo thành $3\times31\times2=186$ ca SAT. Giữ nguyên kết quả đã
 chạy đúng, chỉ chạy phần thiếu. Các ca mới dùng cùng một binary; các ca cũ
 giữ riêng nguồn và điều kiện chạy. Không chạy lại MILP để chọn SAT backend.
-Lệnh hiện tại là \file{run_sat_backend_comparison.sh}; thông số đầy đủ ở
+Lệnh tái tạo là \file{run_sat_backend_comparison.sh}; thông số đầy đủ ở
 \file{manuscript/journal/experiment_runbook_vi.md}.
 
 Bảng \file{backend_comparison.csv} chỉ so những ca cả hai backend đã chạy
@@ -130,8 +145,7 @@ cải tiến solver CSOnet. Phương án dùng biến thứ tự và điều ki�
 Chưa có phương án vượt baseline tốt nhất. Tiến độ và vị trí dữ liệu được ghi tại
 \file{manuscript/journal/experiment_progress_vi.md}.
 
-\textbf{Việc làm hiện tại:} thử thời gian dài hơn cho cả phương pháp mới và
-các đối chứng. Lượt 300 giây dùng 31 cặp bài toán--hàm mục tiêu đã chọn:
+\textbf{Danh sách đối chứng 300 giây} gồm 31 cặp bài toán--hàm mục tiêu đã chọn:
 5 cặp \code{infsteps180}, 26 cặp \code{cont}. Danh sách gồm cả những ca SOTA
 chưa giải được. Xem phần ``Thử timeout dài hơn'' ở cuối tài liệu để chạy.
 Các lệnh 120 giây bên dưới giúp tái tạo các lượt đã hoàn tất.
@@ -990,7 +1004,7 @@ kết quả 300 giây bằng cách đổi nhãn. Kết quả 31 cặp chỉ mô 
 chưa phải coverage toàn bộ dataset. Sau khi có cấu hình tốt hơn, kiểm tra
 lại toàn bộ dữ liệu trước khi đưa vào bảng chính của bài báo.
 
-\section{Thử nghiệm kế tiếp: thu gọn tập gây mâu thuẫn}
+\section{Thử nghiệm hiện tại: thu gọn tập gây mâu thuẫn}
 
 Ở những ca khó đã đo, phần lớn thời gian nằm trong SAT. Một số mô hình
 đã có gần 100 nghìn biến. Thử nghiệm mới giữ cách phát hiện xung đột và
@@ -1003,9 +1017,17 @@ chứng minh không thể đồng thời thỏa. Ta thử bỏ một điều ki�
  F\land\bigwedge_{q\in C\setminus\{\ell\}}q.
 \]
 Nếu SAT vẫn báo không có nghiệm, tập nhỏ hơn vẫn đủ gây mâu thuẫn và
-được dùng thay $C$. Nếu SAT tìm được nghiệm, giữ nguyên tập cũ. Mỗi tập
-chỉ được thử thêm tối đa bốn lần, và không thử mới khi đã hết timeout.
-Một lời gọi SAT đang chạy vẫn chịu giới hạn tiến trình của runner.
+được dùng thay $C$. Nếu SAT tìm được nghiệm hoặc hết ngân sách mà chưa
+kết luận, giữ nguyên tập đã chứng minh trước đó. Mỗi tập chỉ được thử thêm
+tối đa bốn lần. Mỗi lần thử được xử lý tối đa $B$ xung đột SAT mới, với
+$B\in\{100,1000\}$. Đây là công việc tìm kiếm bên trong SAT, khác với
+xung đột giữa hai tàu và khác giới hạn thời gian.
+
+Lời gọi SAT chính không bị giới hạn bởi $B$. Mọi lời gọi cùng dùng phần
+thời gian còn lại của 300 giây cho instance. Hết thời gian thì trả
+\code{timeout}; chưa tìm được nghiệm không có nghĩa là đã chứng minh vô
+nghiệm. Kiểm thử đã xác nhận trường hợp hết ngân sách không làm sai core
+và lời gọi chính sau đó vẫn hoạt động đúng.
 
 Ưu tiên thử bỏ điều kiện có trọng số còn lại nhỏ nhất. Ví dụ, $C$ gồm
 $a,b,c$ có trọng số $5,7,1$. Nếu chỉ $a,b$ đã gây mâu thuẫn, bỏ $c$ sau
@@ -1014,29 +1036,55 @@ thể tăng cận dưới nhiều hơn trong bước đó. Bộ đếm mới cũ
 hơn. Đây là lý do để thử; các lời gọi SAT bổ sung cũng có thể làm chậm.
 
 Trong mã, cờ \file{--maxsat-ladder-sc-core-minimize-checks} mặc định bằng
-0; cấu hình thử dùng 4. Theo dõi số lời gọi thêm
+0; cấu hình thử dùng 4. Cờ
+\file{--maxsat-ladder-sc-core-minimize-conflicts} đặt ngân sách $B$;
+mặc định 0 nghĩa là không giới hạn theo số xung đột. Ngân sách dương hiện
+chỉ dùng với MiniSAT khi bật thu gọn core. Hai cấu hình V16 dùng lần lượt
+100 và 1.000. Theo dõi số lời gọi thêm
 \code{maxsat\_core\_minimize\_calls}, số điều kiện bỏ được
 \code{maxsat\_core\_minimize\_removed}, số lần trọng số nhỏ nhất tăng
 \code{maxsat\_core\_minimize\_weight\_increases} và thời gian
 \code{maxsat\_core\_minimize\_time}. Thời gian này đã nằm trong thời gian
 SAT, không cộng hai trường để tính tổng.
 
-Chỉ chạy sau khi chiến dịch 300 giây hiện tại hoàn tất và được kiểm toán.
-Giữ lại nguyên kết quả 300 giây của bốn baseline, chạy lại 31 cặp cho
-phương pháp mới. Lệnh chuẩn bị sẵn là:
+Khi timeout, xem thêm \code{maxsat\_native\_budgeted\_calls} và
+\code{maxsat\_native\_inconclusive\_calls}: số lần thử có ngân sách và số
+lần chưa kết luận được. Các trường này được ghi ngay cả khi lượt giải
+chưa kết thúc bình thường.
+
+Vòng hiện tại chỉ chạy 15 cặp chưa giải được của phương án bộ ba, dùng
+lại đối chứng đã hoàn tất. Chạy trong worktree đã build và kiểm thử;
+thay ba đường dẫn mẫu dưới đây bằng đường dẫn thực tế trong runbook:
 \begin{verbatim}
-EXTENDED_REFERENCE=/thu/muc/ket/qua/300s \
-BIN=./target/release/ddd \
-EXPORT_BIN=./target/release/export_lp \
-CPLEX_BIN=/duong/dan/toi/cplex \
-RUN_ID=mincore300-v11 \
-  bash run_core_minimization_trial.sh
+taskset -c 0,1,4,5 python3 \
+  quick_scripts/analyze/targeted_core_minimization.py \
+  --reference /thu/muc/doi/chung/186-ca \
+  --binary ./target/release/ddd \
+  --build-manifest /thu/muc/build/manifest.json \
+  --core-conflicts 1000 \
+  --results results/aglr/core-v16-conflicts1000-unresolved300 \
+  --ram-kb 6000000 --round-seconds 21600
 \end{verbatim}
-Script từ chối đối chứng còn thiếu ca hoặc có lỗi. Các file baseline được
-chép nguyên byte, ghi nguồn và hash, không đổi thời gian chạy. Báo cáo ghi
-riêng số lượt đo mới và số lượt tái sử dụng. Trước khi chạy, kiểm thử thư
-viện Rust và các bài lịch nhỏ vét cạn phải đạt trên VM; không build hoặc
-chạy solver mới trong lúc chiến dịch đối chứng còn hoạt động.
+Với cấu hình 100, đổi ngân sách thành 100, dùng thư mục kết quả khác và
+nhóm CPU \code{2,3,6,7}. Hai nhóm CPU này dành riêng cho VM hiện tại.
+Không chạy lệnh trùng với dịch vụ đang hoạt động. Mỗi vòng tối đa 6 giờ;
+giữ cùng lệnh, nguồn, binary và tham số khi tiếp tục. Không build lại trong
+worktree đang chạy. Trước V16, 54 test Rust và 69 test Python đều đạt trên VM.
+
+Đọc \file{core_minimization_audit.json}. \code{newly\_solved} là danh sách
+ca mới chứng minh tối ưu; \code{complete=false} nghĩa là chưa chạy đủ.
+Kiểm tra cả \file{failure.json} và trạng thái dịch vụ, vì báo cáo sau ca
+trước chưa phản ánh lỗi có thể xảy ra ở ca sau. Nếu không giải thêm được
+ca nào thì dùng số đo để chọn hướng sửa tiếp. Nếu có ca mới, chọn một
+cấu hình, chạy xác nhận ba lần và kiểm tra các ca cũ trước khi chạy full.
+Không ghép ca tốt nhất của hai cấu hình thành coverage của một solver.
+
+Có thể lấy bản chụp các ca đã xong mà không ngắt thí nghiệm bằng
+\file{quick_scripts/analyze/audit_targeted_core_minimization.py}.
+Lệnh \code{snapshot} lưu dữ liệu và hash; lệnh \code{audit} kiểm tra lại
+trên máy khác với bộ đối chứng gốc. Xem lệnh đầy đủ trong runbook. Báo cáo
+\code{audit\_passed=true} chỉ áp dụng cho số ca trong bản chụp; vẫn phải
+đọc \code{complete} để biết đã đủ 15 ca chưa.
 
 \section{Nội dung được phép đưa vào bài báo}
 

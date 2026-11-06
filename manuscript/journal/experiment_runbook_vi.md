@@ -7,16 +7,15 @@ Mốc chính đã được sửa theo camera-ready: **120 giây**, MaxSAT-Defaul
 Có thể dùng lại lượt 150 giây bằng cách tạo bảng dẫn xuất ở cutoff 120 giây.
 Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt chạy lại.
 
-## Vòng hiện tại: MiniSAT và CaDiCaL chạy đồng thời
+## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 
-**Cập nhật sau 174 ca:** MiniSAT đã xong 93/93, CaDiCaL xong 81/93 rồi bị
-ngắt từ bên ngoài ở `stationA12/infsteps180`. Đã sửa để một truy vấn SAT của
-CaDiCaL cũng dừng theo thời gian còn lại. Hết giờ được ghi là `timeout`,
-không phải vô nghiệm. Không chấp nhận lại mã thoát 124 của lần cũ.
-Giữ nguyên 174 ca hợp lệ và chỉ chạy 12 ca còn thiếu trong RUN_ID mới.
-Bản chụp gốc ở `results/sat_research/backend_comparison_20261106/progress_174/`.
+**Đã kiểm toán đủ 186/186 ca**, kết thúc lúc 22:33:58 ngày 06/11/2026,
+giờ Việt Nam. MiniSAT xong 93/93, CaDiCaL xong 93/93. Giữ nguyên 174 ca
+hợp lệ từ lượt trước, chạy bổ sung 12 ca sau khi sửa timeout CaDiCaL.
+Ca lỗi mã 124 của lượt cũ được giữ trong lịch sử, không tính là kết quả hợp lệ.
+Bản chụp cuối ở `results/sat_research/backend_comparison_20261106/complete_186/`.
 
-Theo yêu cầu mới, chạy hai nhánh backend cùng lúc để chọn hướng tốt hơn.
+Lượt này chạy hai nhánh backend cùng lúc để chọn hướng tốt hơn.
 Mỗi nhánh chạy ba phương pháp: Orders-Transitive, CSOnet và MaxSAT-Journal,
 trên cùng 31 cặp instance--objective ở 300 giây. Tổng là **186 ca SAT**.
 Chỉ chạy phần còn thiếu; nhập nguyên byte các ca SAT đã hoàn tất và đã audit.
@@ -73,37 +72,128 @@ Nếu một worker lỗi, cả vòng dừng và lưu `failure.json`; kiểm tra 
 `minisat.log`/`cadical.log`. Lịch sai, cận mâu thuẫn và dữ liệu bị sửa không
 được bỏ qua để chạy tiếp. Không cần chạy lại những ca đã hoàn tất hợp lệ.
 
-## Thử thu gọn nhóm điều kiện mâu thuẫn trên 15 ca chưa giải
+## Vòng hiện tại: thu gọn core trên 15 ca chưa giải
 
-Trong 25 ca cont đã có đủ hai backend, MiniSAT chứng minh tối ưu nhiều hơn:
+Trên đủ 26 ca cont của nhóm khó, MiniSAT chứng minh tối ưu nhiều hơn:
 Orders-Transitive 15 so với 14, CSOnet 15 so với 14, Journal 16 so với 12.
-Thời gian SAT gần bằng tổng thời gian. Vì vậy bước thử tiếp theo giữ MiniSAT
-và mô hình bộ ba, chỉ thêm tối đa bốn kiểm tra cho mỗi core trước khi cập
-nhật chi phí. Chỉ chấp nhận việc bỏ một điều kiện sau một chứng minh mâu
-thuẫn mới. Mọi thành phần khác và timeout 300 giây được giữ nguyên.
+Vì vậy bước thử tiếp theo giữ MiniSAT và mô hình bộ ba, chỉ thay bước thu
+gọn core. Core là một tập điều kiện SAT đã chứng minh không thể đồng thời
+thỏa. Thử bỏ một điều kiện; chỉ chấp nhận nếu SAT chứng minh tập còn lại vẫn
+mâu thuẫn. Mỗi core được thử thêm tối đa bốn lần.
+
+V15 chỉ giới hạn số lần thử. Nó hoàn tất hai timeout hợp lệ rồi ca thứ ba
+bị ngắt bên ngoài, mã 124. Không dùng ca lỗi; giữ dữ liệu ở
+`results/sat_research/core_minimization_v15_20261106/stopped_2/`.
+V16 sửa hai điểm cần thiết để tiếp tục thử:
+
+- MiniSAT tự dừng truy vấn đang chạy khi hết 300 giây của instance; trả
+  `timeout`, không coi là vô nghiệm.
+- Mỗi lần thử thu gọn core có ngân sách riêng: 100 hoặc 1.000 xung đột SAT.
+  Hết ngân sách mà chưa kết luận thì giữ core đã chứng minh trước đó.
+  Đây là giới hạn công việc tìm kiếm, không phải số mili giây. Lời gọi SAT
+  chính không chịu ngân sách này.
 
 Script `quick_scripts/analyze/targeted_core_minimization.py` đọc 93 ca MiniSAT
 đã hoàn tất, chọn đúng **4 ca infsteps180 và 11 ca cont** chưa chứng minh tối
-ưu của phương án bộ ba. Không chọn lại các ca đã giải. Cấu hình chỉ khác ở
-`core_minimize_checks=4`; không chạy lại ba baseline. Lịch mới vẫn được kiểm
-tra độc lập và đối chiếu chi phí tối ưu với reference nếu có.
+ưu của phương án bộ ba. Không chọn lại các ca đã giải hoặc chạy lại baseline.
+Hai cấu hình V16 chỉ khác `core_minimize_conflicts=100|1000`, đều có
+`core_minimize_checks=4`. Lịch mới được kiểm tra độc lập và đối chiếu chi phí
+tối ưu với reference nếu có.
 
-Lệnh trên VM, trong worktree `~/projects/core-v15/maxsattrainscheduling`:
+Lệnh cho cấu hình 1.000 trên VM, trong worktree
+`~/projects/limited-core-v16/maxsattrainscheduling`, sau khi kích hoạt môi
+trường Gurobi:
 
 ```bash
 taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_core_minimization.py \
-  --reference /home/tuyenkv/projects/backends-v13/maxsattrainscheduling/results/aglr/backends300-v13-fabcc5a \
-  --binary /home/tuyenkv/projects/deadline-v14/maxsattrainscheduling/target/release/ddd \
-  --build-manifest /home/tuyenkv/projects/deadline-v14/maxsattrainscheduling/results/aglr/deadline-v14-build/manifest.json \
-  --results results/aglr/core-v15-unresolved300 --ram-kb 6000000
+  --reference /home/tuyenkv/projects/deadline-v14/maxsattrainscheduling/results/aglr/backends300-v14-1908b22 \
+  --binary ./target/release/ddd \
+  --build-manifest results/aglr/limited-core-v16-build/manifest.json \
+  --core-conflicts 1000 \
+  --results results/aglr/core-v16-conflicts1000-unresolved300 \
+  --ram-kb 6000000 --round-seconds 21600
 ```
 
-Không chạy thêm lệnh khi dịch vụ `maxsat-core-v15-unresolved300.service`
-đang hoạt động. Nó dùng nhóm lõi MiniSAT đã trống; CaDiCaL tiếp tục ở nhóm
-`2,3,6,7`. Một vòng tối đa 6 giờ. Đọc `core_minimization_audit.json`:
-`newly_solved` chỉ liệt kê ca mới chứng minh tối ưu. Chưa thể kết luận không
-mất ca cũ vì lượt này không chạy lại các ca đã giải. Nếu có cải thiện, chạy
-kiểm tra hồi quy và xác nhận trước khi đánh giá đầy đủ.
+Với cấu hình 100, đổi `--core-conflicts` thành `100`, thư mục kết quả thành
+`core-v16-conflicts100-unresolved300`, CPU thành `2,3,6,7`. Hai cấu hình
+dùng cùng binary từ `57aa220`, mỗi cấu hình có 2 lõi vật lý riêng và tối đa
+6 giờ. Không chạy thêm lệnh nếu dịch vụ tương ứng đang hoạt động:
+
+```bash
+systemctl status maxsat-core-v16-conflicts1000.service --no-pager
+systemctl status maxsat-core-v16-conflicts100.service --no-pager
+```
+
+Trước khi khởi chạy, 54 test Rust và 69 test Python đã đạt trên VM. Ba
+cấu hình kiểm tra nhỏ đều có optimum 5526; ca khó ở hạn 2 giây trả timeout
+đúng, mã thoát 0. Không sửa mã hoặc build lại binary của worktree đang chạy.
+Muốn tiếp tục sau gián đoạn, dùng lại đúng lệnh và thư mục kết quả; script
+từ chối nếu binary, mã nguồn, tham số hoặc dataset thay đổi.
+
+Đọc `core_minimization_audit.json`: `completed_runs` là số đã xong;
+`newly_solved` liệt kê ca mới chứng minh tối ưu. Kiểm tra cả `failure.json`
+và trạng thái dịch vụ: báo cáo viết sau ca trước không chứng minh ca đang
+chạy sau đó đã thành công. Khi lỗi, giữ dữ liệu và dừng tìm nguyên nhân.
+
+Trong JSON từng ca, theo dõi số điều kiện bỏ được, thời gian thu gọn core,
+`maxsat_native_budgeted_calls` và `maxsat_native_inconclusive_calls`.
+Hai trường native vẫn được ghi khi hết timeout. Thời gian thu gọn đã nằm
+trong thời gian SAT, không cộng hai trường để tính tổng.
+
+Lượt này chưa kiểm tra các ca đã giải trước đây, nên chưa thể kết luận không
+mất ca cũ. Nếu có cải thiện, chọn một cấu hình, chạy xác nhận ba lần các ca
+mới và kiểm tra hồi quy trước khi đánh giá full. Không ghép ca tốt nhất
+của hai ngân sách thành kết quả của một cấu hình.
+
+Công cụ sau tạo bản chụp chỉ gồm các ca đã hoàn tất; không dừng dịch vụ,
+không lấy JSON còn đang viết. Gọi từ một bản mã riêng nếu worktree thí
+nghiệm đang khóa ở commit cũ:
+
+```bash
+python3 quick_scripts/analyze/audit_targeted_core_minimization.py snapshot \
+  results/aglr/core-v16-conflicts1000-unresolved300 /tmp/core-v16-c1000.tar.gz
+```
+
+Sau khi giải nén vào thư mục mới, kiểm tra độc lập trên máy local:
+
+```bash
+python3 quick_scripts/analyze/audit_targeted_core_minimization.py audit \
+  /thu/muc/ban-chup-v16 --reference /thu/muc/doi-chung-186 \
+  > /tmp/core-v16-independent-audit.json
+```
+
+Thư mục đối chứng phải là bản gốc V14, giữ nguyên manifest và report để
+khớp hash đã khóa. Auditor kiểm tra hash bản chụp, nguồn của từng ca, tham
+số, lịch, chi phí, cận và dựng lại summary. `audit_passed=true` chỉ xác
+nhận các ca trong bản chụp; đọc cả `complete` để biết đã đủ 15 ca chưa.
+Nếu có lỗi dịch vụ được lưu trong `failure.json`, auditor trả mã lỗi dù
+các ca trước đó hợp lệ. Sau khi thêm công cụ chụp, kiểm toán và xác nhận,
+82 test Python đạt trên VM; số test lúc khởi chạy V16 vẫn là 69 như manifest
+ghi nhận.
+
+### Xác nhận tự động sau hai lượt
+
+Dịch vụ `maxsat-core-v16-confirm-v2.service` đang chờ hai lượt V16 kết thúc.
+Nó không chạy SAT thứ ba trong lúc hai lượt còn hoạt động. Sau đó, công cụ
+`confirm_targeted_core_minimization.py` kiểm toán lại, yêu cầu đủ 15/15 ở
+cả hai cấu hình, chọn theo số ca giải thêm rồi tổng PAR-2. Dùng đúng một
+cấu hình để chạy lại ba lần từng ca giải thêm. Các lần này chạy tuần tự,
+cùng binary, timeout 300 giây và 6.000.000 KB RAM. Cả dịch vụ, kể cả thời
+gian chờ, có giới hạn khoảng 6 giờ.
+
+```bash
+systemctl status maxsat-core-v16-confirm-v2.service --no-pager
+journalctl -u maxsat-core-v16-confirm-v2.service -n 25 --no-pager
+```
+
+Worktree riêng: `~/projects/limited-core-confirm-v16/maxsattrainscheduling`,
+runner `cfdcccc`, binary giữ nguyên từ `57aa220`. Không build lại solver.
+Kết quả ở `results/aglr/core-v16-confirm-selected/confirmation_audit.json`.
+`confirmed=true` nghĩa là mọi ca đã chọn đều được chứng minh cùng chi phí
+ở cả ba lần. Nếu có timeout thì giữ kết quả đó và báo chưa xác nhận được;
+không chạy lặp để chọn ba lần tốt nhất. Nếu có nghiệm sai hoặc chi phí tối
+ưu mâu thuẫn, dịch vụ dừng. Vẫn cần kiểm tra hồi quy và full; bước xác nhận
+này không tự cho phép kết luận thắng SOTA.
 
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 
@@ -176,12 +266,13 @@ Auditor xác minh hash từng file, kiểm tra lịch độc lập và dựng l�
 Chỉ các thống kê thời gian tính lại được chấp nhận sai khác làm tròn cỡ máy;
 chi phí, số ca tối ưu và dữ liệu đầu vào vẫn phải khớp.
 
-## Lượt kế tiếp: thu gọn core, dùng lại baseline 300 giây
+## Lệnh cũ cho thử thu gọn core sau đủ năm đối chứng
 
 Tính năng `--maxsat-ladder-sc-core-minimize-checks 4` thử bỏ điều kiện có
 trọng số nhỏ trước; chỉ bỏ khi một lời gọi SAT mới chứng minh tập còn lại
 vẫn mâu thuẫn. Mặc định là 0. Giới hạn bốn lời gọi bổ sung cho mỗi core,
-ngừng thử mới khi hết timeout. Đây là thử nghiệm, chưa có số liệu hiệu năng.
+ngừng thử mới khi hết timeout. Hướng hiện tại là V16 trên 15 ca chưa giải,
+đã nêu ở trên. Phần này giữ lệnh cũ để tra cứu; không phải việc cần chạy ngay.
 
 Khi chiến dịch năm phương pháp ở trên kết thúc, chạy kiểm thử Rust/Python
 và build release trong một worktree khác. Sau đó:
@@ -256,7 +347,8 @@ với bản đồ chi phí MaxSAT và optimum khớp vét cạn trên bài ba t�
 Giá trị mặc định CLI vẫn là MiniSAT để giữ hành vi của mã lịch sử;
 không dùng điều này để suy ra backend binary hội nghị. Cờ chọn hiện tại là
 `--maxsat-ladder-sc-backend minisat|cadical|glucose`. Chiến dịch mới luôn
-chọn `cadical` tường minh cho cả ba phương pháp MaxSAT.
+ghi backend tường minh. Đối chứng hai backend đã hoàn tất; V16 giữ MiniSAT
+theo coverage trên nhóm khó.
 
 Ở lượt hardening, nếu trọng số còn lại của một điều kiện lớn hơn `UB-LB`,
 thêm mệnh đề đơn để điều kiện đó luôn được thỏa và bỏ nó khỏi danh sách mềm.

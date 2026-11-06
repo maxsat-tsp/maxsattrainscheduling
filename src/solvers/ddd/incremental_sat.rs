@@ -123,6 +123,15 @@ struct NativeSolver {
     next_var: u32,
     solve_timeout: Option<Duration>,
     was_interrupted: bool,
+    // SAT-DDD consumes the native conflict clause; MaxSAT needs its inverted
+    // assumption literals as keys in the weighted soft-constraint map.
+    maxsat_core_convention: bool,
+}
+
+/// Genuine Glucose backend for the MaxSAT refinement experiments. The external
+/// satcoder compatibility alias is MiniSAT and is deliberately not used here.
+pub fn new_maxsat_glucose_solver() -> impl SatInstance<RsLit> + SatSolverWithCore<Lit = RsLit> + std::fmt::Debug {
+    NativeSolver { maxsat_core_convention: true, ..NativeSolver::new() }
 }
 
 impl NativeSolver {
@@ -268,8 +277,16 @@ impl SatSolverWithCore for NativeSolver {
     ) -> SatResultWithCore<'a, Self::Lit> {
         match self.solve_with_assumptions_owned(assumptions) {
             NativeSolveResult::Sat(model) => SatResultWithCore::Sat(model),
-            NativeSolveResult::Unsat(core) => SatResultWithCore::Unsat(core),
+            NativeSolveResult::Unsat(core) => {
+                if self.maxsat_core_convention {
+                    SatResultWithCore::Unsat(core.iter().map(|literal| !*literal).collect::<Vec<_>>().into_boxed_slice())
+                } else {
+                    SatResultWithCore::Unsat(core)
+                }
+            }
             NativeSolveResult::Interrupted => {
+                assert!(!self.maxsat_core_convention,
+                        "an interrupted MaxSAT query must not be interpreted as UNSAT");
                 self.was_interrupted = true;
                 SatResultWithCore::Unsat(Box::new([]))
             }
@@ -284,6 +301,43 @@ impl SatSolver for NativeSolver {
         match self.solve_with_assumptions(std::iter::empty()) {
             SatResultWithCore::Sat(m) => SatResult::Sat(m),
             SatResultWithCore::Unsat(_) => SatResult::Unsat,
+        }
+    }
+}
+
+#[cfg(test)]
+mod maxsat_backend_tests {
+    use super::*;
+
+    #[test]
+    fn glucose_maxsat_core_contains_assumptions_with_the_correct_polarity() {
+        for mask in 0..8 {
+            let mut solver = new_maxsat_glucose_solver();
+            let a = solver.new_var();
+            let b = solver.new_var();
+            let c = solver.new_var();
+            solver.add_clause(vec![!a, !b]);
+            solver.add_clause(vec![b, c]);
+            let values = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0];
+            let assumptions = [a, b, c].into_iter().zip(values)
+                .map(|(literal, value)| if value { literal } else { !literal })
+                .collect::<Vec<_>>();
+            let expected = (!values[0] || !values[1]) && (values[1] || values[2]);
+            let core = match solver.solve_with_assumptions(assumptions.iter().copied()) {
+                SatResultWithCore::Sat(_) => { assert!(expected); None }
+                SatResultWithCore::Unsat(core) => {
+                    assert!(!expected);
+                    assert!(!core.is_empty());
+                    let core = core.iter().map(|l| Bool::Lit(*l)).collect::<Vec<_>>();
+                    assert!(core.iter().all(|l| assumptions.contains(l)));
+                    Some(core)
+                }
+            };
+            if let Some(core) = core {
+                assert!(matches!(solver.solve_with_assumptions(core), SatResultWithCore::Unsat(_)));
+            }
+            // Earlier assumptions must not become permanent hard clauses.
+            assert!(matches!(solver.solve_with_assumptions([!a, b]), SatResultWithCore::Sat(_)));
         }
     }
 }

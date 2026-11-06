@@ -7,6 +7,57 @@ Mốc chính đã được sửa theo camera-ready: **120 giây**, MaxSAT-Defaul
 Có thể dùng lại lượt 150 giây bằng cách tạo bảng dẫn xuất ở cutoff 120 giây.
 Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt chạy lại.
 
+## Quy trình hiện tại: chỉ thử các instance chưa giải được
+
+Từ 06/11/2026, mỗi ý tưởng mới chạy trên danh sách đã lọc theo objective.
+Không chạy lại toàn bộ dataset ở mỗi vòng. Hai lượt full mới nhất đã xong:
+bộ ba đạt `(72,68,60)`, giới hạn chi phí đạt `(72,68,59)`; cả hai qua audit
+và chưa vượt baseline tốt nhất. Raw results được giữ trong
+`results/sat_research/transitivity_v5_20261105/` và `bounds_v6_20261105/`.
+
+Danh sách cố định: `results/sat_research/focus_20261106/selection.json`.
+
+| Objective | Số ca cần thử | Cách xử lý |
+|---|---:|---|
+| finsteps123 | 0 | Bỏ qua trong vòng ý tưởng |
+| infsteps180 | 4 | Chạy đúng bốn ca trong danh sách |
+| cont | 14 | Gồm các ca timeout và các ca có kết quả chưa ổn định |
+
+Tập này là hợp các ca chưa chứng minh tối ưu trong các lượt full bộ ba,
+giới hạn chi phí và hội nghị. Giữ cả ca mới giải được và ca bị mất để theo
+dõi hai chiều. Không chạy mỗi tên với cả ba objective; tổng là **18 cặp**.
+Hash nguồn và hash dataset nằm trong file lựa chọn. Không sửa file này giữa
+một vòng; nếu cần nhóm khác, tạo một file có tên mới.
+
+Ví dụ một vòng chỉ thay bộ giải SAT MiniSAT bằng Glucose:
+
+```bash
+FOCUS_MANIFEST=results/sat_research/focus_20261106/selection.json \
+BIN=./target/release/ddd CORE_VARIANT=orders-transitive-glucose \
+RUN_ID=focus-glucose-v7 bash run_maxsat_focused_experiments.sh
+```
+
+Lệnh chạy tuần tự, mỗi ca 120 giây, cả vòng tối đa 6 giờ. Kết quả ở
+`results/aglr/focus-glucose-v7/`. Giữ cùng `RUN_ID`, binary, mã và file lựa
+chọn để tiếp tục sau gián đoạn. Dữ liệu cũ của một cấu hình được tái sử dụng
+làm đối chứng; không chạy lại chỉ để tạo bảng nhóm khó.
+
+Đọc `aglr_audit.json`, rồi `Focus-orders-transitive-glucose/focus_comparison.json`.
+`gained`/`lost` là danh sách giải thêm/bị mất so với từng đối chứng.
+`projected_coverage` là ước tính nếu các ca chưa chạy lại vẫn giữ kết quả cũ,
+không phải coverage full đã đo. `submission_passed` luôn là false ở báo cáo
+nhóm khó. Script không tự chạy full. Khi có tiến triển và xác nhận được các
+ca mới, mới chọn một cấu hình để đánh giá đầy đủ và lập bảng bài báo.
+
+Glucose trong phép thử này là bộ native RustSAT, không dùng alias tương thích
+trong salvers. Kiểm thử xác nhận dấu của các literal trong UNSAT core đúng
+với bản đồ chi phí MaxSAT và optimum khớp vét cạn trên bài ba tàu.
+Backend mặc định của CSOnet vẫn là MiniSAT; cờ mới là
+`--maxsat-ladder-sc-backend minisat|glucose`.
+
+Các lệnh `screen`/`promote` ở các phần sau mô tả các chiến dịch đã chạy và
+phục vụ tái tạo. Khi thử ý tưởng mới, dùng quy trình nhóm khó ở trên.
+
 ## Tái sử dụng dữ liệu 150 giây ở cutoff 120 giây
 
 Với cùng cách đo `total_time` theo giây, lịch tối ưu hoàn tất trong 120 giây
@@ -82,7 +133,7 @@ làm mốc PAR-2 thứ cấp. Manifest của chiến dịch phải ghi rõ giả
 Mỗi cấu hình ban đầu chỉ chạy một lần. Khi coverage từng objective không giảm
 so với `(72,68,60)` và tổng ít nhất 201, chạy thêm ba lần để xác nhận.
 
-## Việc sinh viên làm ngay
+## Chuẩn bị máy và tái tạo chiến dịch AGLR ban đầu
 
 Lưới 18 cấu hình `screen` và ba cấu hình `promote` đã chạy trên VM. Không cần
 chạy lại các lượt cũ. Đọc `experiment_progress_vi.md` để biết kết quả và vị trí

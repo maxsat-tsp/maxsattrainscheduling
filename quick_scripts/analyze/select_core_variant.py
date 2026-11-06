@@ -17,6 +17,13 @@ def variant_for(row: dict) -> str:
     orders = row.get("resource_orders") == "true"
     transitive = row.get("order_transitivity") == "true"
     bound = row.get("objective_bound") == "true"
+    backend = row.get("backend", "minisat")
+    if backend == "glucose":
+        if not transitive or not orders or sparse or bound or row["assumptions"] != "legacy":
+            raise ValueError("Glucose trial requires the explicitly tested transitive-orders configuration")
+        return "orders-transitive-glucose"
+    if backend != "minisat":
+        raise ValueError("unsupported SAT backend")
     if bound and (not orders or sparse or transitive):
         raise ValueError("objective-bound trial requires the explicitly tested orders configuration")
     if transitive and (not orders or sparse):
@@ -48,7 +55,7 @@ def select(rows: list[dict], audit: dict) -> dict:
         if len(variants) != 1:
             raise ValueError(f"{tag}: objective rows have different variants")
         variant = variants.pop()
-        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive", "orders-bound"}:
+        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive", "orders-bound", "orders-transitive-glucose"}:
             raise ValueError(f"unsupported variant {variant}")
         par2 = sum(float(r["par2_seconds"]) for r in items)
         if not math.isfinite(par2) or par2 < 0:

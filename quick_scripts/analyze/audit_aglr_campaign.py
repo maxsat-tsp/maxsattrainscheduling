@@ -67,7 +67,20 @@ def canonical_name(name: str) -> str:
     return name
 
 
-def expected_names(config: dict[str, str]) -> list[str]:
+def expected_names(config: dict[str, str], objective: str | None = None) -> list[str]:
+    if "instances_by_objective" in config:
+        selection = json.loads(config["instances_by_objective"])
+        if not isinstance(selection, dict) or set(selection) != set(OBJECTIVES):
+            raise ValueError("instances_by_objective must declare all three objectives")
+        for names in selection.values():
+            if (not isinstance(names, list) or any(not isinstance(n, str) for n in names)
+                    or len(names) != len(set(names))
+                    or not set(names).issubset(journal_audit.EXPECTED_NAMES)):
+                raise ValueError("invalid, duplicate, or unknown focused instance names")
+        if not any(selection.values()):
+            raise ValueError("focused selection cannot be empty for every objective")
+        requested = set(selection[objective]) if objective else set().union(*map(set, selection.values()))
+        return [name for name in journal_audit.EXPECTED_NAMES if name in requested]
     raw = config.get("instances", "").strip()
     if not raw:
         return journal_audit.EXPECTED_NAMES
@@ -89,22 +102,33 @@ def missing_record(tag: str, objective: str, name: str, timeout: float, message:
     }
 
 
-def elapsed_seconds(solve: dict, timeout: float) -> float:
+def reported_seconds(solve: dict) -> float | None:
     total = finite_number(solve.get("total_time"))
     if total is not None and total >= 0:
-        return min(total, timeout)
+        return total
+    if "total_time" in solve:
+        return None
     milliseconds = finite_number(solve.get("sol_time"))
     if milliseconds is not None and milliseconds >= 0:
-        return min(milliseconds / 1000.0, timeout)
-    return timeout
+        return milliseconds / 1000.0
+    return None
+
+
+def elapsed_seconds(solve: dict, timeout: float) -> float:
+    reported = reported_seconds(solve)
+    return reported if reported is not None else timeout
 
 
 def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -> list[dict]:
     records: list[dict] = []
     tag = config["tag"]
     kind = config.get("kind", "exact")
-    wanted = expected_names(config)
     for objective in OBJECTIVES:
+        wanted = expected_names(config, objective)
+        if not wanted:
+            if (config_dir / f"{objective}.json").exists():
+                raise ValueError(f"unexpected {objective}.json for an explicitly skipped objective")
+            continue
         path = config_dir / f"{objective}.json"
         if not path.is_file():
             records.extend(
@@ -136,12 +160,16 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append(f"duplicate instance name {name!r}")
             if status not in journal_audit.ALLOWED_STATUSES:
                 errors.append(f"unsupported status {status!r}")
+            if reported_seconds(solve) is None:
+                errors.append("missing or invalid runtime")
             if solve.get("process_exit_code", 0) != 0:
                 errors.append(f"nonzero process exit {solve['process_exit_code']}")
             if config.get("process_exit_required") == "true" and "process_exit_code" not in solve:
                 errors.append("process exit evidence is missing")
             if "assumptions" in config and solve.get("maxsat_assumptions") != config["assumptions"]:
                 errors.append("maxsat_assumptions differs from the locked configuration")
+            if "backend" in config and solve.get("maxsat_backend") != config["backend"]:
+                errors.append("maxsat_backend differs from the locked configuration")
             if "sparse_costs" in config and str(solve.get("maxsat_sparse_costs")).lower() != config["sparse_costs"].lower():
                 errors.append("maxsat_sparse_costs differs from the locked configuration")
             if "resource_orders" in config and str(solve.get("maxsat_resource_orders")).lower() != config["resource_orders"].lower():
@@ -175,6 +203,7 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
             proven = (
                 status == "ok"
                 and not errors
+                and elapsed_seconds(solve, timeout) <= timeout
                 and (kind != "milp" or bounds_prove_optimal(solve))
             )
             records.append(
@@ -231,6 +260,8 @@ def load_cplex(campaign_dir: Path, timeout: float) -> list[dict]:
                     "CPLEX status=ok lacks explicit valid=true evidence from the "
                     "schedule validator"
                 )
+            if reported_seconds(solve) is None:
+                errors.append("missing or invalid CPLEX runtime")
             records.append(
                 {
                     "tag": "BigM-CPLEX",
@@ -240,6 +271,7 @@ def load_cplex(campaign_dir: Path, timeout: float) -> list[dict]:
                     "proven": (
                         status == "ok"
                         and not errors
+                        and elapsed_seconds(solve, timeout) <= timeout
                         and recorded_validation_passed(solve)
                         and bounds_prove_optimal(solve)
                     ),
@@ -291,6 +323,7 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
                 "use_objective_bound": config.get("use_objective_bound", "false"),
                 "filter_duplicates": config.get("filter_duplicates", "false"),
                 "assumptions": config.get("assumptions", "legacy"),
+                "backend": config.get("backend", "minisat"),
                 "sparse_costs": config.get("sparse_costs", "false"),
                 "resource_orders": config.get("resource_orders", "false"),
                 "order_transitivity": config.get("order_transitivity", "false"),

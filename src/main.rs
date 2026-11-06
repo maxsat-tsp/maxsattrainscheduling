@@ -130,6 +130,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_use_objective_bound: Option<bool>,
 
+    /// SAT backend for SC/AGLR: minisat (default) or genuine native glucose.
+    #[structopt(long, default_value = "minisat", possible_values = &["minisat", "glucose"])]
+    maxsat_ladder_sc_backend: String,
+
     /// AGLR refinement policy: legacy, all-scanned, or adaptive.
     #[structopt(long)]
     aglr_policy: Option<String>,
@@ -474,6 +478,31 @@ fn mk_env() -> grb::Env {
     env.set(grb::param::Cuts, 0).unwrap();
     env.set(grb::param::Heuristics, 0.0).unwrap();
     env
+}
+
+fn solve_sc_with_backend(
+    backend: &str,
+    problem: &problem::Problem,
+    timeout: f64,
+    objective: DelayCostType,
+    settings: maxsat_ladder_sc::MaxSatDddLadderScSettings,
+    mut output: impl FnMut(String, serde_json::Value),
+) -> Result<Vec<Vec<i32>>, SolverError> {
+    counting_solver::reset_counts();
+    output("maxsat_backend".to_string(), backend.into());
+    match backend {
+        "minisat" => maxsat_ladder_sc::solve_with_settings(
+            &mk_env,
+            counting_solver::CountingSolver::new(satcoder::solvers::minisat::Solver::new()),
+            problem, timeout, objective, settings, output,
+        ).map(|(solution, _)| solution),
+        "glucose" => maxsat_ladder_sc::solve_with_settings(
+            &mk_env,
+            counting_solver::CountingSolver::new(ddd_solvers::incremental_sat::new_maxsat_glucose_solver()),
+            problem, timeout, objective, settings, output,
+        ).map(|(solution, _)| solution),
+        _ => unreachable!("CLI validates the SC backend"),
+    }
 }
 
 fn main() {
@@ -917,12 +946,8 @@ fn main() {
                         // counted. The solve function reads the final
                         // counts via counting_solver::get_counts() and
                         // emits them as num_vars_total / num_clauses_total.
-                        counting_solver::reset_counts();
-                        maxsat_ladder_sc::solve_with_settings(
-                            &mk_env,
-                            counting_solver::CountingSolver::new(
-                                satcoder::solvers::minisat::Solver::new(),
-                            ),
+                        solve_sc_with_backend(
+                            &opt.maxsat_ladder_sc_backend,
                             &p.problem,
                             timeout,
                             delay_cost_type,
@@ -931,15 +956,10 @@ fn main() {
                                 solve_data.insert(k, v);
                             },
                         )
-                        .map(|(v, _)| v)
                     }
                     SolverType::MaxSatDddLadderAglr => {
-                        counting_solver::reset_counts();
-                        maxsat_ladder_sc::solve_with_settings(
-                            &mk_env,
-                            counting_solver::CountingSolver::new(
-                                satcoder::solvers::minisat::Solver::new(),
-                            ),
+                        solve_sc_with_backend(
+                            &opt.maxsat_ladder_sc_backend,
                             &p.problem,
                             timeout,
                             delay_cost_type,
@@ -948,7 +968,6 @@ fn main() {
                                 solve_data.insert(k, v);
                             },
                         )
-                        .map(|(v, _)| v)
                     }
                     SolverType::MaxSatDddLadderRC2 => {
                         counting_solver::reset_counts();

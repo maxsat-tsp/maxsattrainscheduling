@@ -1,4 +1,22 @@
-# Tiến độ thử nghiệm trên VM, 05-11-2026
+# Tiến độ thử nghiệm trên VM, cập nhật 06-11-2026
+
+## Trạng thái mới nhất
+
+| Lượt full 120 giây | finsteps123 | infsteps180 | cont | Tổng |
+|---|---:|---:|---:|---:|
+| Bộ ba, `eaf0316` | 72 | 68 | 60 | 200 |
+| Giới hạn chi phí, `6ba1b71` | 72 | 68 | 59 | 199 |
+
+Hai lượt đều qua audit, chưa vượt mốc hội nghị 200 hoặc Big-M Gurobi 206.
+Theo yêu cầu mới, từ nay thử ý tưởng trên nhóm khó theo từng objective:
+0 ca finsteps123, 4 ca infsteps180, 14 ca cont. Danh sách gồm mọi ca chưa
+giải được trong ít nhất một trong hai lượt này hoặc ở mốc hội nghị; giữ cả
+ca mới giải được và ca bị mất. Dữ liệu cũ làm đối chứng, không chạy lại.
+
+Danh sách và hash nguồn ở `results/sat_research/focus_20261106/selection.json`.
+Vòng tiếp theo chỉ đổi MiniSAT sang Glucose trong phương án bộ ba. Dùng
+`run_maxsat_focused_experiments.sh`, không tự chạy full. Kết quả nhóm khó
+không được ghép với các ca dễ cũ để công bố coverage full của mã mới.
 
 Đối chiếu lại camera-ready theo ý kiến của thầy/cô: mốc đúng là **120 giây**,
 `(72,68,60)`, tổng 200 optimum. Bộ JSON 150 giây `(72,68,58)` là lượt khác;

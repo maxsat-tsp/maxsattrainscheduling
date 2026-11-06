@@ -2564,6 +2564,18 @@ mod aglr_end_to_end_tests {
                   }
                 }
             }
+            for use_bound in [false, true] {
+                let mut settings = MaxSatDddLadderScSettings::default();
+                settings.resource_orders = true;
+                settings.order_transitivity = true;
+                settings.use_objective_bound = use_bound;
+                let (solution, _) = solve_with_settings(
+                    &quiet_env,
+                    crate::solvers::ddd::incremental_sat::new_maxsat_glucose_solver(),
+                    &problem, 30.0, objective, settings, |_, _| {},
+                ).unwrap();
+                assert_eq!(problem.verify_solution(&solution, objective), Some(optimum));
+            }
         }
     }
 

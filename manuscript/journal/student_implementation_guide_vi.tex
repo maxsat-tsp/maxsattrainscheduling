@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.3}
+\fancyhead[R]{\small Phiên bản 5.4}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.3, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.4, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -77,9 +77,10 @@ trường và chạy thí nghiệm, không phải viết lại thuật toán. Ch
 quả và các số đo trong log chỉ ra một vấn đề cụ thể. Mỗi lần chỉ sửa một thành
 phần.
 
-Lưới 18 cấu hình và ba cấu hình được chọn đã chạy trên VM. Kết quả tốt nhất
-trên 24 instance phát triển là $(24,22,19)$ cho ba objective. Đây chưa phải
-coverage trên toàn bộ 72 instance. Tiến độ và vị trí dữ liệu được ghi tại
+Lưới 18 cấu hình đã chạy; không cần chạy lại. Các vòng gần đây chuyển sang
+cải tiến solver CSOnet. Phương án dùng biến thứ tự và điều kiện bộ ba đã
+đạt full $(72,68,60)$; phương án giới hạn chi phí đạt $(72,68,59)$.
+Chưa có phương án vượt baseline tốt nhất. Tiến độ và vị trí dữ liệu được ghi tại
 \file{manuscript/journal/experiment_progress_vi.md}.
 
 Khi tiếp tục công việc, thực hiện các bước sau:
@@ -89,8 +90,9 @@ Khi tiếp tục công việc, thực hiện các bước sau:
 \item Kiểm tra rằng cây Git sạch, các thư viện phụ thuộc đúng vị trí và Gurobi
       hoạt động.
 \item Chạy toàn bộ test AGLR trên máy Linux.
-\item Dùng script chu kỳ để thử riêng từng cải tiến, chọn cấu hình rồi chạy
-      toàn bộ dataset. Mỗi chu kỳ tối đa 6 giờ và có thể tiếp tục nếu bị ngắt.
+\item Thử từng ý tưởng trên nhóm instance chưa giải được, theo hướng dẫn ngay
+      dưới đây. Chỉ chạy full sau khi chọn được phương án có tiến triển.
+      Mỗi vòng tối đa 6 giờ và có thể tiếp tục nếu bị ngắt.
 \item Gửi lại thư mục kết quả, file tóm tắt và lỗi audit; không sửa JSON/CSV.
 \end{enumerate}
 
@@ -106,7 +108,7 @@ git status --short
 command -v timeout
 gurobi_cl --version
 cargo check --manifest-path Cargo.toml -p ddd --all-targets
-cargo test --manifest-path Cargo.toml -p ddd aglr --lib
+cargo test --manifest-path Cargo.toml -p ddd --lib -- --test-threads=1
 \end{verbatim}
 
 Lệnh \code{git status --short} phải không in gì. Hai repository
@@ -114,7 +116,7 @@ Lệnh \code{git status --short} phải không in gì. Hai repository
 \code{screen} và \code{promote} cần Gurobi nhưng chưa cần CPLEX. Kết quả CPLEX
 chỉ được chuẩn bị trước giai đoạn \code{full}.
 
-Sau \code{screen}, sinh viên gửi lại đường dẫn thư mục chiến dịch và năm file:
+Với các chiến dịch \code{screen} cũ, sinh viên gửi lại đường dẫn và năm file:
 
 \begin{itemize}
 \item \file{campaign.txt};
@@ -127,6 +129,52 @@ Sau \code{screen}, sinh viên gửi lại đường dẫn thư mục chiến d�
 Nếu auditor báo lỗi, gửi thêm file \code{*.stderr.log} của instance liên quan.
 Không sửa CSV hoặc JSON bằng tay. Toàn bộ thư mục \file{results/aglr/} phải được
 giữ nguyên và sao lưu, dù thư mục này không được commit lên Git.
+
+\subsection{Từ nay, thử ý tưởng trên các instance chưa giải được}
+
+Không cần chạy lại 72 instance cho từng ý tưởng. Lọc riêng theo objective,
+dựa trên kết quả hội nghị và hai lượt full mới nhất. Nếu một ca chưa được
+chứng minh tối ưu ở ít nhất một lượt, giữ nó trong nhóm thử. Cách này giữ cả
+các ca vừa giải được và các ca vừa bị mất; tránh chỉ nhìn thấy phần cải thiện.
+
+Gọi $I$ là 72 instance, $S_{a,o}$ là các instance đã giải đúng và chứng minh
+tối ưu trong 120 giây ở lượt $a$, với objective $o$. Nhóm cần thử là:
+\[
+H_o=\bigcup_{a\in A}(I\setminus S_{a,o}).
+\]
+Danh sách đã khóa nằm trong
+\file{results/sat_research/focus_20261106/selection.json}:
+\code{finsteps123} có 0 ca, \code{infsteps180} có 4 ca, \code{cont} có 14 ca.
+Tổng cộng 18 cặp instance--objective. Không chạy chéo mỗi instance với cả
+ba objective. Việc không có file \code{finsteps123.json} trong lượt này là
+đúng, vì cấu hình đã ghi rõ danh sách rỗng cho objective đó.
+
+Ví dụ lệnh cho phép thử bộ giải SAT Glucose:
+
+\begin{verbatim}
+FOCUS_MANIFEST=results/sat_research/focus_20261106/selection.json \
+BIN=./target/release/ddd CORE_VARIANT=orders-transitive-glucose \
+RUN_ID=focus-glucose-v7 bash run_maxsat_focused_experiments.sh
+\end{verbatim}
+
+Lượt này dùng cùng phương án bộ ba, chỉ thay MiniSAT bằng Glucose. Không
+đổi các ràng buộc hoặc hàm mục tiêu. Các kết quả full đã có được dùng làm
+đối chứng; không chạy lại chúng chỉ để lập bảng tập con. Mỗi ca mới chạy một
+lần, tối đa 120 giây, tuần tự. Script không tự chuyển sang full.
+
+Đọc \file{aglr_audit.json} trước. Sau đó đọc
+\file{Focus-orders-transitive-glucose/focus_comparison.json}: các mục
+\code{gained} và \code{lost} liệt kê ca giải thêm và ca bị mất so với từng
+lượt đối chứng. Giải thêm một ca nhưng mất một ca khác chưa làm tổng coverage
+tăng. Các trường \code{projected\_coverage} chỉ là ước tính với giả định
+nhóm chưa chạy lại không thay đổi; không dùng chúng làm số liệu full của bài.
+
+Nếu không có tiến triển, đọc thời gian SAT, cận dưới/cận trên và kích thước
+mô hình trước khi chọn đúng một thay đổi tiếp theo. Nếu có ca mới giải được
+và không mất ca trong nhóm thử, chạy xác nhận các ca mới rồi mới đánh giá
+toàn bộ 72 instance. Lượt full cuối giúp kiểm tra ý tưởng mới có làm mất
+những ca đã bỏ qua trong lúc phát triển hay không. Không ghép kết quả cũ
+của các ca dễ với kết quả mới của các ca khó thành một lượt full.
 
 \section{Kết quả hội nghị đã có và cách sử dụng}
 
@@ -761,7 +809,7 @@ vẫn tìm optimum như trước; điều kiện mới chỉ bỏ các lựa ch�
 Phép thử dự phòng là \code{EXPERIMENT\_SET=bounds}; đối chứng là orders cũ,
 cấu hình mới là \code{orders-bound}. Giữ cây chi phí cũ và tắt điều kiện bộ
 ba để đo riêng tác động của cận. Cờ trực tiếp là
-\code{--maxsat-ladder-sc-use-objective-bound true}; mặc định tắt. Cần kiểm
+\file{--maxsat-ladder-sc-use-objective-bound} \code{true}; mặc định tắt. Cần kiểm
 tra lại trên Linux trước khi chạy, gồm bảng chân trị, giảm cận, thêm hạng tử
 không theo thứ tự và optimum vét cạn ở cả ba objective. Theo dõi số hạng tử,
 số lần giảm cận và thời gian tạo điều kiện qua các trường

@@ -1,0 +1,51 @@
+{
+  "schema": "core-exhaust-v17-queue-v1",
+  "solver_source_commit": "43cae7674338e0468db1c7be04c446cddb983eef",
+  "runner_commit": "43cae7674338e0468db1c7be04c446cddb983eef",
+  "service": "maxsat-core-exhaust-v17.service",
+  "user": "tuyenkv",
+  "group": "tuyenkv",
+  "worktree": "/home/tuyenkv/projects/core-exhaust-v17/maxsattrainscheduling",
+  "results": "results/aglr/core-exhaust-v17-unresolved300",
+  "queued_prerequisites": [
+    "maxsat-core-v16-conflicts1000.service",
+    "maxsat-core-v16-conflicts100.service",
+    "maxsat-core-v16-confirm-v2.service"
+  ],
+  "prerequisite": "V16 trials complete, independently audited, and selected gains confirmed in three repeats",
+  "change": "add at most four conflict-limited cardinality-floor checks per new core; retain the selected V16 configuration",
+  "selection": "only pairs unresolved by the winning V16 configuration",
+  "timeout_seconds": 300,
+  "ram_kb_per_case": 6000000,
+  "cpu_affinity": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "sequential": true,
+  "controller_wall_limit_seconds": 21600,
+  "systemd_wall_limit_seconds": 21630,
+  "validation": {
+    "local_native_harness_passed": 14,
+    "python_tests_passed_on_vm": 85,
+    "full_rust_tests_on_vm": "pending; required before any development case",
+    "smokes": "pending; all must pass before the trial",
+    "v16_regression": "pending; all previously solved MiniSAT Orders-Transitive difficult pairs must retain their proven costs"
+  },
+  "script_sha256": {
+    "validate_before_trial.py": "003ea377ba1b1d622ee8647ddb6d49636eb910561c3f8617512ada6af6dfc189",
+    "validate_before_trial_initial.py": "2d25f6d113de98e7614ffc087bc0cb8a8ad29b4fea2f8218f13e566a5aee2ffc",
+    "run_after_v16.sh": "0389a61f96d9862ee68bad07c338cb843ce5d9169a4383d1ee5d4bd71fb8ec52"
+  },
+  "source_reference": "https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.exhaust_core",
+  "submission_passed": false,
+  "scope": "queued development experiment; no V17 performance result yet",
+  "started_utc": "2026-11-06T17:46:37Z",
+  "phase_at_launch": "waiting for V16 and confirmations",
+  "amendment": {
+    "at_utc": "2026-11-06T17:58:54.366958+00:00",
+    "reason": "Two audited V16 gains justify regression on the 16 previously solved difficult pairs before V17",
+    "validator_state": "not yet executing; controller waits for V16 and confirmations"
+  }
+}

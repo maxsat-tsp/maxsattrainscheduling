@@ -5,6 +5,53 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use satcoder::{Bool, Lit, SatInstance};
 
+#[derive(Clone, Copy, Debug)]
+pub(super) struct TemporalVisit {
+    pub next: Option<u32>,
+    pub travel_time: i32,
+}
+
+#[derive(Clone, Copy)]
+struct TemporalEdge<L: Lit> {
+    from: u32,
+    to: u32,
+    weight: i32,
+    selected: Option<Bool<L>>,
+}
+
+fn dfs_temporal_cycle<L: Lit>(
+    node: usize,
+    outgoing: &[Vec<usize>],
+    edges: &[TemporalEdge<L>],
+    colors: &mut [u8],
+    nodes: &mut Vec<usize>,
+    edge_stack: &mut Vec<usize>,
+) -> Option<Vec<usize>> {
+    colors[node] = 1;
+    nodes.push(node);
+    for &edge_index in &outgoing[node] {
+        let edge = edges[edge_index];
+        let target = edge.to as usize;
+        if colors[target] == 0 {
+            edge_stack.push(edge_index);
+            if let Some(cycle) = dfs_temporal_cycle(target, outgoing, edges, colors, nodes, edge_stack) {
+                return Some(cycle);
+            }
+            edge_stack.pop();
+        } else if colors[target] == 1 {
+            let start = nodes.iter().position(|&entry| entry == target)?;
+            let mut cycle = edge_stack[start..].to_vec();
+            cycle.push(edge_index);
+            if cycle.iter().map(|&index| edges[index].weight).sum::<i32>() > 0 {
+                return Some(cycle);
+            }
+        }
+    }
+    nodes.pop();
+    colors[node] = 2;
+    None
+}
+
 pub(super) struct ResourceOrders<L: Lit> {
     bits: HashMap<(u32, u32), Bool<L>>,
     rows: HashSet<(u32, u32, i32)>,
@@ -84,6 +131,84 @@ impl<L: Lit> ResourceOrders<L> {
             added += 1;
         }
         (created, added, triangles)
+    }
+
+    pub(super) fn pairs(&self) -> Vec<(u32, u32, Bool<L>)> {
+        let mut pairs = self
+            .bits
+            .iter()
+            .map(|(&(first, second), &literal)| (first, second, literal))
+            .collect::<Vec<_>>();
+        pairs.sort_by_key(|(first, second, _)| (*first, *second));
+        pairs
+    }
+
+    pub(super) fn positive_cycle_cut<M: satcoder::prelude::SymbolicModel<L> + ?Sized>(
+        &self,
+        visits: &[TemporalVisit],
+        model: &M,
+    ) -> Option<Vec<Bool<L>>> {
+        let mut edges = Vec::<TemporalEdge<L>>::new();
+        for (id, visit) in visits.iter().enumerate() {
+            if let Some(next) = visit.next {
+                edges.push(TemporalEdge {
+                    from: id as u32,
+                    to: next,
+                    weight: visit.travel_time,
+                    selected: None,
+                });
+            }
+        }
+        for (first, second, bit) in self.pairs() {
+            let first_selected = model.value(&bit);
+            let (from, to, selected) = if first_selected {
+                (self.exit_node(first, visits), second, bit)
+            } else {
+                (self.exit_node(second, visits), first, !bit)
+            };
+            edges.push(TemporalEdge {
+                from,
+                to,
+                weight: if from == first || from == second {
+                    visits[from as usize].travel_time
+                } else {
+                    0
+                },
+                selected: Some(selected),
+            });
+        }
+        edges.sort_by_key(|edge| (edge.from, edge.to, edge.weight, edge.selected.is_some()));
+        let n = visits.len();
+        let mut outgoing = vec![Vec::<usize>::new(); n];
+        for (index, edge) in edges.iter().enumerate() {
+            if (edge.from as usize) < n && (edge.to as usize) < n {
+                outgoing[edge.from as usize].push(index);
+            }
+        }
+        let mut colors = vec![0u8; n];
+        let mut nodes = Vec::new();
+        let mut found = None;
+        for node in 0..n {
+            if colors[node] == 0 {
+                let mut edge_stack = Vec::new();
+                found = dfs_temporal_cycle(node, &outgoing, &edges, &mut colors, &mut nodes, &mut edge_stack);
+                if found.is_some() {
+                    break;
+                }
+            }
+        }
+        let cycle = found?;
+        let mut clause = cycle
+            .iter()
+            .filter_map(|&index| edges[index].selected.map(|literal| !literal))
+            .collect::<Vec<_>>();
+        clause.sort();
+        clause.dedup();
+        (!clause.is_empty()).then_some(clause)
+    }
+
+    fn exit_node(&self, visit: u32, visits: &[TemporalVisit]) -> u32 {
+        visits[visit as usize].next.unwrap_or(visit)
     }
 }
 
@@ -252,6 +377,55 @@ mod tests {
             (false, 0, 0)
         );
         assert_eq!(orders.bits.len(), 1);
+    }
+
+    #[test]
+    fn positive_temporal_cycle_returns_the_clause_that_breaks_the_cycle() {
+        let visits = vec![
+            TemporalVisit { next: Some(1), travel_time: 2 },
+            TemporalVisit { next: None, travel_time: 2 },
+            TemporalVisit { next: Some(3), travel_time: 2 },
+            TemporalVisit { next: None, travel_time: 2 },
+        ];
+        let mut solver = satcoder::solvers::minisat::Solver::new();
+        let mut orders = ResourceOrders::new(false);
+        orders.add(&mut solver, 0, 3, 1, 1, false.into(), false.into(), true.into(), true.into());
+        orders.add(&mut solver, 1, 2, 1, 1, false.into(), false.into(), true.into(), true.into());
+        let p03 = orders.bits[&(0, 3)];
+        let p12 = orders.bits[&(1, 2)];
+
+        let cut = match solver.solve_with_assumptions([!p03, p12]) {
+            SatResultWithCore::Sat(model) => orders.positive_cycle_cut(&visits, model.as_ref()),
+            SatResultWithCore::Unsat(_) => panic!("test formula must be SAT"),
+        };
+        assert_eq!(cut, Some(vec![p03, !p12]));
+
+        let cut = match solver.solve_with_assumptions([p03, !p12]) {
+            SatResultWithCore::Sat(model) => orders.positive_cycle_cut(&visits, model.as_ref()),
+            SatResultWithCore::Unsat(_) => panic!("test formula must be SAT"),
+        };
+        assert_eq!(cut, None);
+    }
+
+    #[test]
+    fn zero_duration_routes_do_not_create_temporal_cuts() {
+        let visits = vec![
+            TemporalVisit { next: Some(1), travel_time: 0 },
+            TemporalVisit { next: None, travel_time: 0 },
+            TemporalVisit { next: Some(3), travel_time: 0 },
+            TemporalVisit { next: None, travel_time: 0 },
+        ];
+        let mut solver = satcoder::solvers::minisat::Solver::new();
+        let mut orders = ResourceOrders::new(false);
+        orders.add(&mut solver, 0, 3, 1, 1, false.into(), false.into(), true.into(), true.into());
+        orders.add(&mut solver, 1, 2, 1, 1, false.into(), false.into(), true.into(), true.into());
+        let p03 = orders.bits[&(0, 3)];
+        let p12 = orders.bits[&(1, 2)];
+        let cut = match solver.solve_with_assumptions([!p03, p12]) {
+            SatResultWithCore::Sat(model) => orders.positive_cycle_cut(&visits, model.as_ref()),
+            SatResultWithCore::Unsat(_) => panic!("test formula must be SAT"),
+        };
+        assert_eq!(cut, None);
     }
 
     #[test]

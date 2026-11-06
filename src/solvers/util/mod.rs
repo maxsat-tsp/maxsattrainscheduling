@@ -7,6 +7,7 @@
 //! - `value_trace`       — per-iteration trace of cost values during a solve.
 pub mod counting_solver;
 pub mod cadical_deadline;
+pub mod minisat_deadline;
 pub mod greedy;
 pub mod heuristic;
 pub mod minimize;

@@ -11,7 +11,7 @@ use ddd::{
         legacy::{maxsat_ddd, maxsat_ti},
         milp::{bigm, milp_ti},
         util::{
-            counting_solver, cadical_deadline,
+            counting_solver, cadical_deadline, minisat_deadline,
             greedy::{self, default_heuristic},
             heuristic,
         },
@@ -499,6 +499,13 @@ fn solve_sc_with_backend(
     counting_solver::reset_counts();
     output("maxsat_backend".to_string(), backend.into());
     match backend {
+        "minisat" if settings.core_minimize_checks>0 => {
+            let solver=minisat_deadline::Solver::new(timeout);
+            output("maxsat_backend_signature".to_string(),solver.signature().to_string().into());
+            output("maxsat_sat_timeout_mode".to_string(),"native-watchdog-deadline".into());
+            maxsat_ladder_sc::solve_with_settings(&mk_env,counting_solver::CountingSolver::new(solver),
+                problem,timeout,objective,settings,output).map(|(solution,_)|solution)
+        },
         "minisat" => maxsat_ladder_sc::solve_with_settings(
             &mk_env,
             counting_solver::CountingSolver::new(satcoder::solvers::minisat::Solver::new()),

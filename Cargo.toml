@@ -10,6 +10,7 @@ edition = "2021"
 
 [dependencies]
 satcoder = { path = "../salvers/satcoder", default-features = false, features = ["solver_minisat", "solver_cadical", "solver_rustsat_glucose"] }
+minisat = { git = "https://github.com/luteberget/minisat-rs.git", rev = "26396130fb86072c64ba18bad9867b4964dea389" }
 rustsat = { version = "0.7.5", optional = true }
 rustsat-glucose = { version = "0.7.5", optional = true }
 

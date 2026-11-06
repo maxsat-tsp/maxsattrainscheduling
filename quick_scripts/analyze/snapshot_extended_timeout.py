@@ -19,6 +19,9 @@ def snapshot(root: Path, output: Path) -> dict:
              "plan.json": (root/"plan.json").read_bytes(),
              "manifest.json": (root/"manifest.json").read_bytes()}
     plan = json.loads(files["plan.json"])
+    if plan.get("candidate_variant") is not None:
+        for name in ("reference_manifest.json", "reference_audit.json"):
+            files[name] = (root/name).read_bytes()
     allowed = {(method, objective, name)
                for method in json.loads(files["manifest.json"])["methods"]
                for objective, names in plan["instances_by_objective"].items() for name in names}

@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import platform
 import random
+import shutil
 import signal
 import subprocess
 import sys
@@ -34,6 +35,18 @@ METHODS = {
     "BigM-Gurobi": dict(solver="bigm_lazy", kind="milp"),
     "BigM-CPLEX": dict(solver="cplex-eager", kind="milp"),
 }
+
+
+def methods_for(plan: dict) -> dict:
+    variant = plan.get("candidate_variant")
+    if variant is None:
+        return METHODS
+    if variant != "mincore4" or plan.get("candidate_tag") != "Orders-Transitive-Mincore":
+        raise ValueError("unsupported extended-timeout candidate variant")
+    return {("Orders-Transitive-Mincore" if tag == "Orders-Transitive" else tag):
+            (dict(cfg, core_minimize_checks="4") if tag == "Orders-Transitive"
+             else dict(cfg, result_source="reused-audited-same-timeout"))
+            for tag, cfg in METHODS.items()}
 
 
 def save(path: Path, value) -> None:
@@ -80,6 +93,7 @@ def validate_plan(plan: dict) -> dict:
     selected = {o: audit.expected_names(cfg, o) for o in audit.OBJECTIVES}
     if focus.dataset_hash() != plan.get("dataset_sha256"):
         raise ValueError("dataset changed after selecting the difficult instances")
+    methods_for(plan)
     return selected
 
 
@@ -90,21 +104,21 @@ def tasks_for(plan: dict) -> list[tuple[str, str, str]]:
     rng.shuffle(pairs)
     tasks = []
     for objective, name in pairs:
-        methods = list(METHODS)
+        methods = list(methods_for(plan))
         rng.shuffle(methods)
         tasks.extend((method, objective, name) for method in methods)
     return tasks
 
 
-def method_config(method: str, selection: dict, cutoff: int) -> dict:
-    return dict(METHODS[method], tag=method, timeout_seconds=str(cutoff),
+def method_config(method: str, selection: dict, cutoff: int, definition: dict | None = None) -> dict:
+    return dict(METHODS[method] if definition is None else definition, tag=method, timeout_seconds=str(cutoff),
                 process_exit_required="true", parallelism="1",
                 instances_by_objective=json.dumps(selection, separators=(",", ":")))
 
 
-def assess_case(root: Path, method: str, objective: str, name: str, cutoff: int) -> dict:
+def assess_case(root: Path, method: str, objective: str, name: str, cutoff: int, definition: dict | None = None) -> dict:
     selection = {o: [name] if o == objective else [] for o in audit.OBJECTIVES}
-    records = audit.load_json_method(root, method_config(method, selection, cutoff), cutoff)
+    records = audit.load_json_method(root, method_config(method, selection, cutoff, definition), cutoff)
     if len(records) != 1 or records[0]["name"] != name:
         raise ValueError("a case must contain exactly its planned objective and instance")
     record = records[0]
@@ -132,15 +146,17 @@ def summarize(plan: dict, records: list[dict]) -> dict:
         if any(not common.same_number(values[0], v) for v in values[1:]):
             errors.append(dict(objective=objective, name=name, status="cost-disagreement", costs=costs))
     cutoff = plan["timeout_seconds"]
+    definitions = methods_for(plan)
+    candidate_tag = plan.get("candidate_tag", "Orders-Transitive")
     by_pair = defaultdict(set)
     for record in records:
         by_pair[record["objective"], record["name"]].add(record["tag"])
-    common_pairs = {key for key, tags in by_pair.items() if tags == set(METHODS)}
+    common_pairs = {key for key, tags in by_pair.items() if tags == set(definitions)}
     comparable = [r for r in records if (r["objective"], r["name"]) in common_pairs]
     comparisons = []
-    candidate = {(r["objective"], r["name"]): r for r in records if r["tag"] == "Orders-Transitive"}
-    for baseline in METHODS:
-        if baseline == "Orders-Transitive":
+    candidate = {(r["objective"], r["name"]): r for r in records if r["tag"] == candidate_tag}
+    for baseline in definitions:
+        if baseline == candidate_tag:
             continue
         reference = {(r["objective"], r["name"]): r for r in records if r["tag"] == baseline}
         paired = sorted(set(candidate) & set(reference))
@@ -151,7 +167,7 @@ def summarize(plan: dict, records: list[dict]) -> dict:
             gained=[list(k) for k in paired if candidate[k]["proven"] and not reference[k]["proven"]],
             lost=[list(k) for k in paired if reference[k]["proven"] and not candidate[k]["proven"]],
             paired_solved=len(both), paired_geomean_speedup=math.exp(sum(ratios)/len(ratios)) if ratios else None))
-    return dict(scope=plan["scope"], timeout_seconds=cutoff,
+    report = dict(scope=plan["scope"], timeout_seconds=cutoff,
                 expected_runs=len(expected), completed_runs=len(records),
                 complete=len(records) == len(expected), errors=errors,
                 submission_passed=False, full_validation_required=True,
@@ -166,6 +182,10 @@ def summarize(plan: dict, records: list[dict]) -> dict:
                                   reported_lb=r["solve"].get("lb"), reported_ub=r["solve"].get("ub"))
                              for r in records],
                 missing=[list(k) for k in tasks_for(plan) if k not in set(keys)])
+    if plan.get("candidate_variant") is not None:
+        report.update(measured_runs=sum(r["tag"] == candidate_tag for r in records),
+                      reused_baseline_runs=sum(r["tag"] != candidate_tag for r in records))
+    return report
 
 
 def execute(command: list[str], cwd: Path, log: Path, limit: float, env: dict, ram_kb: int) -> float:
@@ -249,7 +269,7 @@ def run_case(method: str, objective: str, name: str, args, root: Path) -> None:
     cutoff = args.timeout
     env = {k: v for k, v in os.environ.items() if not k.startswith(("AGLR_", "MAXSATDDD_", "MAXSAT_RC2_", "SATDDD_"))}
     if method != "BigM-CPLEX":
-        cfg = METHODS[method]
+        cfg = getattr(args, "method_definitions", METHODS)[method]
         env.update(BIN=str(args.binary.resolve()), SOLVER=cfg["solver"], OBJECTIVE=objective,
                    INSTANCE_NAMES=name, INSTANCE_ORDER_SEED="20261106", INSTANCE_TIMEOUT_SECS=str(cutoff),
                    RAM_LIMIT_KB=str(args.ram_kb), JSON_OUT=str(root/f"{objective}.json"),
@@ -257,7 +277,8 @@ def run_case(method: str, objective: str, name: str, args, root: Path) -> None:
         for key, suffix in (("assumptions", "ASSUMPTIONS"), ("backend", "BACKEND"),
                             ("sparse_costs", "SPARSE_COSTS"), ("resource_orders", "RESOURCE_ORDERS"),
                             ("order_transitivity", "ORDER_TRANSITIVITY"),
-                            ("objective_bound", "OBJECTIVE_BOUND"), ("residual_hardening", "RESIDUAL_HARDENING")):
+                            ("objective_bound", "OBJECTIVE_BOUND"), ("residual_hardening", "RESIDUAL_HARDENING"),
+                            ("core_minimize_checks", "CORE_MINIMIZE_CHECKS")):
             if key in cfg:
                 env["MAXSATDDD_" + suffix] = cfg[key]
         execute(["bash", "quick_scripts/run_all_txt_instances_limited.sh"], REPO, root/"runner.log",
@@ -319,8 +340,14 @@ def audit_saved(root: Path) -> dict:
     canonical_plan = json.dumps(plan, indent=2) + "\n"
     if locked["plan_sha256"] != hashlib.sha256(canonical_plan.encode()).hexdigest():
         raise ValueError("saved plan does not match the locked source manifest")
-    if locked.get("methods") != METHODS:
+    definitions = methods_for(plan)
+    if locked.get("methods") != definitions:
         raise ValueError("saved method settings differ from this auditor")
+    if plan.get("candidate_variant") is not None:
+        for file, key in (("reference_manifest.json", "reference_manifest_sha256"),
+                          ("reference_audit.json", "reference_audit_sha256")):
+            if focus.sha(root/file) != plan[key]:
+                raise ValueError("saved baseline provenance differs from the frozen reference")
     original = json.loads((root/"extended_audit.json").read_text())
     if original.get("expected_runs") != len(tasks_for(plan)):
         raise ValueError("saved report has an incorrect planned run count")
@@ -330,7 +357,16 @@ def audit_saved(root: Path) -> dict:
         if (method, objective, name) not in set(tasks_for(plan)):
             raise ValueError("saved report contains an unplanned case")
         records.append(assess_case(root/"cases"/method/objective/name,
-                                   method, objective, name, plan["timeout_seconds"]))
+                                   method, objective, name, plan["timeout_seconds"], definitions[method]))
+        if plan.get("candidate_variant") is not None and method != plan["candidate_tag"]:
+            case = root/"cases"/method/objective/name
+            evidence = json.loads((case/"reused_from.json").read_text())
+            if focus.sha(case/f"{objective}.json") != evidence["sha256"] or (
+                evidence["manifest_sha256"] != plan["reference_manifest_sha256"]
+                or evidence["report_sha256"] != plan["reference_audit_sha256"]
+                or evidence.get("measured_again") is not False
+            ):
+                raise ValueError("reused baseline bytes or provenance changed")
     rebuilt = summarize(plan, records)
     if not reports_match(rebuilt, original):
         raise ValueError("saved report differs from the independently regenerated result")
@@ -341,11 +377,48 @@ def audit_saved(root: Path) -> dict:
     return rebuilt
 
 
+def candidate_plan(reference: Path) -> dict:
+    report = audit_saved(reference)
+    if not report["complete"]:
+        raise ValueError("finish and audit the baseline campaign before reusing it")
+    plan = json.loads((reference/"plan.json").read_text())
+    if plan.get("candidate_variant") is not None:
+        raise ValueError("reuse must come from the original five-method comparison")
+    plan.update(candidate_variant="mincore4", candidate_tag="Orders-Transitive-Mincore",
+                reference_manifest_sha256=focus.sha(reference/"manifest.json"),
+                reference_audit_sha256=focus.sha(reference/"extended_audit.json"),
+                scope="new candidate measured at the same cutoff; four audited baseline runs reused; no full-dataset claim")
+    validate_plan(plan)
+    return plan
+
+
+def reuse_case(source: Path, destination: Path, plan: dict) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    evidence = dict(source=str(source.resolve()), sha256=focus.sha(source),
+                    manifest_sha256=plan["reference_manifest_sha256"],
+                    report_sha256=plan["reference_audit_sha256"], measured_again=False)
+    evidence_path = destination.parent/"reused_from.json"
+    if destination.exists():
+        if focus.sha(destination) != evidence["sha256"] or json.loads(evidence_path.read_text()) != evidence:
+            raise ValueError("resume would replace a changed baseline result")
+    else:
+        shutil.copy2(source, destination)
+        save(evidence_path, evidence)
+
+
 def run(args) -> None:
     plan = json.loads(args.plan.read_text())
     selected = validate_plan(plan)
     if args.timeout != plan["timeout_seconds"]:
         raise ValueError("runner cutoff must equal the frozen plan cutoff")
+    definitions = methods_for(plan)
+    args.method_definitions = definitions
+    reference = getattr(args, "reference_results", None)
+    if (plan.get("candidate_variant") is not None) != (reference is not None):
+        raise ValueError("a new candidate requires its locked baseline reference")
+    if reference is not None:
+        if candidate_plan(reference) != plan:
+            raise ValueError("baseline reference differs from the frozen candidate plan")
     if subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=all"], cwd=REPO).strip():
         raise ValueError("commit source changes before starting the campaign")
     root = args.results.resolve()
@@ -354,7 +427,7 @@ def run(args) -> None:
         ["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip(),
         binary_sha256=focus.sha(args.binary), export_binary_sha256=focus.sha(args.export_binary),
         cplex_binary_sha256=focus.sha(args.cplex_binary), ram_kb=args.ram_kb,
-        methods=METHODS, sequential=True, threads_milp=4,
+        methods=definitions, sequential=True, threads_milp=4,
         cargo_lock_sha256=focus.sha(REPO/"Cargo.lock"), python=sys.version,
         platform=platform.platform(), machine=sorted(set(line for line in Path("/proc/cpuinfo").read_text().splitlines()
             if line.startswith(("model name", "cpu family", "model\t", "stepping"))))
@@ -366,18 +439,24 @@ def run(args) -> None:
         raise ValueError("resume would change source, dependencies, binaries, environment or parameters")
     save(manifest, locked)
     save(root/"plan.json", plan)
+    if reference is not None:
+        for source, target in (("manifest.json", "reference_manifest.json"),
+                               ("extended_audit.json", "reference_audit.json")):
+            shutil.copy2(reference/source, root/target)
     deadline = time.monotonic()+args.round_seconds
     records = []
     for method, objective, name in tasks_for(plan):
         case = root/"cases"/method/objective/name
         result = case/f"{objective}.json"
-        if not result.exists():
+        if reference is not None and method != plan["candidate_tag"]:
+            reuse_case(reference/"cases"/method/objective/name/f"{objective}.json", result, plan)
+        elif not result.exists():
             # Leave enough room to finish one instance and write the audit.
             if deadline-time.monotonic() < args.timeout+90:
                 break
             print(f"Running {method}/{objective}/{name} at {args.timeout}s", flush=True)
             run_case(method, objective, name, args, case)
-        record = assess_case(case, method, objective, name, args.timeout)
+        record = assess_case(case, method, objective, name, args.timeout, definitions[method])
         records.append(record)
         report = summarize(plan, records)
         save(root/"extended_audit.json", report)
@@ -407,6 +486,10 @@ def main():
     runner.add_argument("--timeout", type=int, default=300)
     runner.add_argument("--round-seconds", type=int, default=21600)
     runner.add_argument("--ram-kb", type=int, default=15000000)
+    runner.add_argument("--reference-results", type=Path)
+    trial = sub.add_parser("candidate-plan")
+    trial.add_argument("--reference-results", type=Path, required=True)
+    trial.add_argument("--output", type=Path, required=True)
     saved = sub.add_parser("audit-saved")
     saved.add_argument("results", type=Path)
     args = parser.parse_args()
@@ -417,6 +500,11 @@ def main():
         args.output.parent.mkdir(parents=True, exist_ok=True)
         save(args.output, plan)
         print(json.dumps(plan["instances_by_objective"], indent=2))
+    elif args.action == "candidate-plan":
+        if args.output.exists():
+            raise ValueError("preserve the frozen candidate plan")
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        save(args.output, candidate_plan(args.reference_results))
     elif args.action == "audit-saved":
         report = audit_saved(args.results)
         print(json.dumps({k:report[k] for k in ("completed_runs", "expected_runs", "complete", "errors", "common_completed_pairs")}))

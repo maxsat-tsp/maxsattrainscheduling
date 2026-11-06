@@ -17,6 +17,98 @@ def plan():
 
 
 class ExtendedTests(unittest.TestCase):
+    def test_complete_reference_can_be_reused_without_running_baselines_again(self):
+        with tempfile.TemporaryDirectory() as raw:
+            reference=Path(raw)/"reference"
+            reference.mkdir()
+            original=plan()
+            extended.save(reference/"plan.json",original)
+            extended.save(reference/"manifest.json",dict(methods=extended.METHODS,
+                plan_sha256=extended.focus.sha(reference/"plan.json")))
+            records=[]
+            for method,objective,name in extended.tasks_for(original):
+                case=reference/"cases"/method/objective/name
+                case.mkdir(parents=True)
+                solve=dict(status="timeout",timeout_seconds=300,total_time=300,process_exit_code=0)
+                for key,value in extended.METHODS[method].items():
+                    if key not in {"solver","kind"}:
+                        solve["maxsat_"+key]=value
+                extended.save(case/f"{objective}.json",[dict(name=name,solves=[solve])])
+                records.append(extended.assess_case(case,method,objective,name,300))
+            extended.save(reference/"extended_audit.json",extended.summarize(original,records))
+            trial=extended.candidate_plan(reference)
+            root=Path(raw)/"trial"
+            root.mkdir()
+            extended.save(root/"plan.json",trial)
+            definitions=extended.methods_for(trial)
+            extended.save(root/"manifest.json",dict(methods=definitions,
+                plan_sha256=extended.focus.sha(root/"plan.json")))
+            for source,target in (("manifest.json","reference_manifest.json"),
+                                  ("extended_audit.json","reference_audit.json")):
+                (root/target).write_bytes((reference/source).read_bytes())
+            records=[]
+            for method,objective,name in extended.tasks_for(trial):
+                case=root/"cases"/method/objective/name
+                if method==trial["candidate_tag"]:
+                    case.mkdir(parents=True)
+                    solve=dict(status="timeout",timeout_seconds=300,total_time=300,process_exit_code=0)
+                    for key,value in definitions[method].items():
+                        if key not in {"solver","kind"}:
+                            solve["maxsat_"+key]=value
+                    extended.save(case/f"{objective}.json",[dict(name=name,solves=[solve])])
+                else:
+                    extended.reuse_case(reference/"cases"/method/objective/name/f"{objective}.json",
+                                        case/f"{objective}.json",trial)
+                records.append(extended.assess_case(case,method,objective,name,300,definitions[method]))
+            report=extended.summarize(trial,records)
+            extended.save(root/"extended_audit.json",report)
+            self.assertEqual(report["measured_runs"],2)
+            self.assertEqual(report["reused_baseline_runs"],8)
+            self.assertTrue(report["complete"])
+            self.assertFalse(report["errors"])
+            self.assertEqual(extended.audit_saved(root),report)
+
+    def test_new_candidate_uses_the_same_pairs_and_cannot_change_any_baseline(self):
+        trial=plan()
+        trial.update(candidate_variant="mincore4",candidate_tag="Orders-Transitive-Mincore")
+        definitions=extended.methods_for(trial)
+        self.assertNotIn("Orders-Transitive",definitions)
+        self.assertEqual(definitions[trial["candidate_tag"]]["core_minimize_checks"],"4")
+        for method in extended.METHODS:
+            if method == "Orders-Transitive": continue
+            expected=dict(extended.METHODS[method],result_source="reused-audited-same-timeout")
+            self.assertEqual(definitions[method],expected)
+        self.assertEqual(len(extended.tasks_for(trial)),len(extended.tasks_for(plan())))
+        with self.assertRaises(ValueError):
+            extended.methods_for(dict(trial,candidate_variant="unknown"))
+
+    def test_baseline_reuse_preserves_bytes_and_rejects_changed_runtime_or_provenance(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            source=root/"source.json"
+            source.write_text('[{"runtime":123}]\n')
+            target=root/"trial"/"cont.json"
+            frozen=dict(reference_manifest_sha256="manifest",reference_audit_sha256="report")
+            extended.reuse_case(source,target,frozen)
+            self.assertEqual(source.read_bytes(),target.read_bytes())
+            extended.reuse_case(source,target,frozen)
+            self.assertIs(json.loads((target.parent/"reused_from.json").read_text())["measured_again"],False)
+            with self.assertRaises(ValueError):
+                extended.reuse_case(source,target,dict(frozen,reference_audit_sha256="changed"))
+            target.write_text('[{"runtime":1}]\n')
+            with self.assertRaises(ValueError):
+                extended.reuse_case(source,target,frozen)
+
+    def test_partial_reference_cannot_be_promoted_to_a_new_candidate_plan(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            extended.save(root/"plan.json",plan())
+            extended.save(root/"manifest.json",dict(methods=extended.METHODS,
+                plan_sha256=extended.focus.sha(root/"plan.json")))
+            extended.save(root/"extended_audit.json",extended.summarize(plan(),[]))
+            with self.assertRaises(ValueError):
+                extended.candidate_plan(root)
+
     def test_only_derived_runtime_rounding_is_tolerated_in_a_saved_report(self):
         left=dict(completed_runs=82,cost=7655,reported_lb=7655,par2_seconds=117.357240881375)
         self.assertTrue(extended.reports_match(left,dict(left,par2_seconds=117.35724088137502)))

@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.10}
+\fancyhead[R]{\small Phiên bản 5.11}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.10, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.11, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -71,6 +71,19 @@ Mỗi báo cáo phải ghi rõ giả định này.
 \newpage
 
 \section{Sinh viên đọc phần này trước}
+
+\textbf{Cập nhật mới nhất:} đã kiểm tra lại 174 ca hợp lệ. MiniSAT đã chạy
+xong 93 ca; CaDiCaL đang chạy tiếp 12 ca còn thiếu. Một ca trước đó bị ngắt
+từ bên ngoài vì truy vấn SAT không dừng kịp. Bản mới áp dụng thời gian còn
+lại ngay trong SAT: hết giờ trả \code{timeout}, không coi là vô nghiệm.
+Không chạy lại 174 ca đã hoàn tất.
+
+Đồng thời, MiniSAT thử một cải tiến nhỏ trên đúng 15 ca chưa giải: giảm nhóm
+điều kiện mâu thuẫn trước khi cập nhật chi phí, với tối đa bốn kiểm tra bổ
+sung cho mỗi nhóm. Chỉ bỏ điều kiện khi một lần gọi SAT mới chứng minh nhóm còn lại vẫn
+mâu thuẫn. Giữ nguyên mô hình, timeout 300 giây và các thiết lập khác. Nếu
+có ca mới giải được, còn phải kiểm tra lại các ca cũ trước khi kết luận tốt
+hơn. Lệnh và vị trí kết quả của V14/V15 có trong runbook.
 
 \textbf{CSOnet dùng RC2; mã được kiểm tra gọi MiniSAT bên trong.}
 RC2 tìm chi phí nhỏ nhất. Khi cần biết các điều kiện hiện tại có thể cùng

@@ -2,6 +2,28 @@
 
 ## Trạng thái mới nhất
 
+**Đã lấy và kiểm toán 174/186 ca:** MiniSAT xong 93/93; CaDiCaL xong 81/93
+rồi bị ngắt từ bên ngoài ở Orders-Transitive/stationA12/infsteps180. Giữ
+nguyên dữ liệu và lỗi ở `results/sat_research/backend_comparison_20261106/progress_174/`.
+174 ca có receipt đều hợp lệ; ca lỗi không được đổi thành timeout bình thường.
+
+Trên cùng 25 ca cont: bộ ba đạt 15/25 với MiniSAT và 14/25 với CaDiCaL;
+CSOnet 15/25 và 14/25; Journal 16/25 và 12/25. Chưa đủ để chốt backend
+cuối cùng hoặc tuyên bố vượt SOTA. Đây là số liệu nhóm khó, không phải full.
+
+V14 đã sửa việc dừng truy vấn SAT bên trong CaDiCaL. 49 test Rust, 67 test
+Python và sáu ca smoke native đều đạt trên VM. Thử lại ca khó với hạn ngắn
+đã trả `timeout`, mã thoát 0 và xác nhận bộ đếm trong SAT thực sự kích hoạt.
+Lượt `maxsat-backends300-v14-1908b22.service` bắt đầu lúc **21:45 ngày 06/11**,
+giữ lại toàn bộ 174 ca và chỉ chạy 12 ca thiếu. Ca gây lỗi trước đó đã hoàn
+tất thành timeout hợp lệ ở vòng mới; tiến độ đã lên 175/186.
+
+Nhánh MiniSAT chuyển sang V15: thử thu gọn core, tối đa bốn kiểm tra mới,
+trên đúng 15 cặp chưa giải của phương án bộ ba (4 infsteps180, 11 cont).
+Không chạy lại baseline hoặc các ca đã giải. Mã script và lựa chọn có 68
+test Python đạt; kết quả chưa có để kết luận hiệu năng. Xem runbook để chạy
+và đọc `core_minimization_audit.json`.
+
 **Hai backend chạy song song theo yêu cầu mới.** Dùng
 `run_sat_backend_comparison.sh` để thử MiniSAT và CaDiCaL với cùng ba phương
 pháp MaxSAT và 31 cặp khó, timeout 300 giây: tổng 186 ca SAT. Dùng lại các ca

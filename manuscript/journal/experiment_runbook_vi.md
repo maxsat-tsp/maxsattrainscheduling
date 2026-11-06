@@ -9,6 +9,13 @@ Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt ch
 
 ## Vòng hiện tại: MiniSAT và CaDiCaL chạy đồng thời
 
+**Cập nhật sau 174 ca:** MiniSAT đã xong 93/93, CaDiCaL xong 81/93 rồi bị
+ngắt từ bên ngoài ở `stationA12/infsteps180`. Đã sửa để một truy vấn SAT của
+CaDiCaL cũng dừng theo thời gian còn lại. Hết giờ được ghi là `timeout`,
+không phải vô nghiệm. Không chấp nhận lại mã thoát 124 của lần cũ.
+Giữ nguyên 174 ca hợp lệ và chỉ chạy 12 ca còn thiếu trong RUN_ID mới.
+Bản chụp gốc ở `results/sat_research/backend_comparison_20261106/progress_174/`.
+
 Theo yêu cầu mới, chạy hai nhánh backend cùng lúc để chọn hướng tốt hơn.
 Mỗi nhánh chạy ba phương pháp: Orders-Transitive, CSOnet và MaxSAT-Journal,
 trên cùng 31 cặp instance--objective ở 300 giây. Tổng là **186 ca SAT**.
@@ -24,19 +31,21 @@ VM có 4 lõi vật lý, 8 vCPU và khoảng 16 GB RAM. Phân bổ:
 
 Hai nhánh không chia sẻ lõi vật lý hoặc hai luồng của cùng một lõi. Mỗi
 nhánh chạy một ca tại một thời điểm. Các ca mới của cả hai nhánh dùng cùng
-binary từ commit `4a43a9c`. Giữ riêng commit, binary hash và điều kiện chạy
+binary từ commit `4a43a9c` trong V13. V14 dùng bản sửa timeout ở `1908b22`
+cho các ca còn thiếu. Giữ riêng commit, binary hash và điều kiện chạy
 của các ca cũ được nhập; không đổi nhãn chúng thành ca chạy mới.
 
 ```bash
-BIN=/home/tuyenkv/projects/cadical-v12/maxsattrainscheduling/target/release/ddd \
+BIN=/home/tuyenkv/projects/deadline-v14/maxsattrainscheduling/target/release/ddd \
 MINISAT_REFERENCE=/home/tuyenkv/projects/core-v9/maxsattrainscheduling/results/aglr/extended300-b6a4370-20261106 \
 CADICAL_REFERENCE=/home/tuyenkv/projects/cadical-v12/maxsattrainscheduling/results/aglr/cadical300-v12-4a43a9c \
-SOLVER_MANIFEST=/home/tuyenkv/projects/cadical-v12/maxsattrainscheduling/results/aglr/cadical300-v12-4a43a9c/manifest.json \
-RUN_ID=backends300-v13-fabcc5a bash run_sat_backend_comparison.sh
+SOLVER_MANIFEST=/home/tuyenkv/projects/deadline-v14/maxsattrainscheduling/results/aglr/deadline-v14-build/manifest.json \
+COMPLETED_BACKEND_TRIAL=/home/tuyenkv/projects/backends-v13/maxsattrainscheduling/results/aglr/backends300-v13-fabcc5a \
+RUN_ID=backends300-v14-1908b22 bash run_sat_backend_comparison.sh
 ```
 
 Kích hoạt môi trường Gurobi trước. Chạy trong worktree
-`~/projects/backends-v13/maxsattrainscheduling`. Một vòng tối đa 6 giờ;
+`~/projects/deadline-v14/maxsattrainscheduling`. Một vòng tối đa 6 giờ;
 giữ cùng RUN_ID để tiếp tục. Hai thư mục reference đã dừng và được giữ
 nguyên. Không chạy đồng thời lệnh này và dịch vụ đang thực hiện cùng RUN_ID.
 
@@ -52,18 +61,49 @@ nguồn trong `manifest.json` và `measurement.json`; không coi mọi thời gi
 cùng điều kiện. Sau khi chọn được backend và phương pháp tốt hơn, chạy xác
 nhận tuần tự các ca quyết định trước khi chốt runtime cho bài báo.
 
-Kiểm toán lại bất kỳ lúc nào bằng bản auditor chỉ đọc trong worktree riêng
-`~/projects/backend-audit-controller` (commit `fa7b3d7` trở lên). Không sửa
+Kiểm toán lại bất kỳ lúc nào bằng bản auditor chỉ đọc của V14. Không sửa
 worktree đang chạy để cập nhật công cụ:
 
 ```bash
-python3 /home/tuyenkv/projects/backend-audit-controller/quick_scripts/analyze/compare_sat_backends.py audit \
-  /home/tuyenkv/projects/backends-v13/maxsattrainscheduling/results/aglr/backends300-v13-fabcc5a
+python3 quick_scripts/analyze/compare_sat_backends.py audit \
+  results/aglr/backends300-v14-1908b22
 ```
 
 Nếu một worker lỗi, cả vòng dừng và lưu `failure.json`; kiểm tra thêm
 `minisat.log`/`cadical.log`. Lịch sai, cận mâu thuẫn và dữ liệu bị sửa không
 được bỏ qua để chạy tiếp. Không cần chạy lại những ca đã hoàn tất hợp lệ.
+
+## Thử thu gọn nhóm điều kiện mâu thuẫn trên 15 ca chưa giải
+
+Trong 25 ca cont đã có đủ hai backend, MiniSAT chứng minh tối ưu nhiều hơn:
+Orders-Transitive 15 so với 14, CSOnet 15 so với 14, Journal 16 so với 12.
+Thời gian SAT gần bằng tổng thời gian. Vì vậy bước thử tiếp theo giữ MiniSAT
+và mô hình bộ ba, chỉ thêm tối đa bốn kiểm tra cho mỗi core trước khi cập
+nhật chi phí. Chỉ chấp nhận việc bỏ một điều kiện sau một chứng minh mâu
+thuẫn mới. Mọi thành phần khác và timeout 300 giây được giữ nguyên.
+
+Script `quick_scripts/analyze/targeted_core_minimization.py` đọc 93 ca MiniSAT
+đã hoàn tất, chọn đúng **4 ca infsteps180 và 11 ca cont** chưa chứng minh tối
+ưu của phương án bộ ba. Không chọn lại các ca đã giải. Cấu hình chỉ khác ở
+`core_minimize_checks=4`; không chạy lại ba baseline. Lịch mới vẫn được kiểm
+tra độc lập và đối chiếu chi phí tối ưu với reference nếu có.
+
+Lệnh trên VM, trong worktree `~/projects/core-v15/maxsattrainscheduling`:
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_core_minimization.py \
+  --reference /home/tuyenkv/projects/backends-v13/maxsattrainscheduling/results/aglr/backends300-v13-fabcc5a \
+  --binary /home/tuyenkv/projects/deadline-v14/maxsattrainscheduling/target/release/ddd \
+  --build-manifest /home/tuyenkv/projects/deadline-v14/maxsattrainscheduling/results/aglr/deadline-v14-build/manifest.json \
+  --results results/aglr/core-v15-unresolved300 --ram-kb 6000000
+```
+
+Không chạy thêm lệnh khi dịch vụ `maxsat-core-v15-unresolved300.service`
+đang hoạt động. Nó dùng nhóm lõi MiniSAT đã trống; CaDiCaL tiếp tục ở nhóm
+`2,3,6,7`. Một vòng tối đa 6 giờ. Đọc `core_minimization_audit.json`:
+`newly_solved` chỉ liệt kê ca mới chứng minh tối ưu. Chưa thể kết luận không
+mất ca cũ vì lượt này không chạy lại các ca đã giải. Nếu có cải thiện, chạy
+kiểm tra hồi quy và xác nhận trước khi đánh giá đầy đủ.
 
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 

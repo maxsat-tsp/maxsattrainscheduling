@@ -11,7 +11,7 @@ use ddd::{
         legacy::{maxsat_ddd, maxsat_ti},
         milp::{bigm, milp_ti},
         util::{
-            counting_solver,
+            counting_solver, cadical_deadline,
             greedy::{self, default_heuristic},
             heuristic,
         },
@@ -510,8 +510,9 @@ fn solve_sc_with_backend(
             problem, timeout, objective, settings, output,
         ).map(|(solution, _)| solution),
         "cadical" => {
-            let solver = satcoder::solvers::cadical::Solver::new();
-            output("maxsat_backend_signature".to_string(), solver.cadical.signature().to_string().into());
+            let solver = cadical_deadline::Solver::new(timeout);
+            output("maxsat_backend_signature".to_string(), solver.signature().to_string().into());
+            output("maxsat_sat_timeout_mode".to_string(), "native-remaining-budget".into());
             maxsat_ladder_sc::solve_with_settings(
                 &mk_env, counting_solver::CountingSolver::new(solver),
                 problem, timeout, objective, settings, output,
@@ -538,8 +539,9 @@ fn solve_journal_with_backend(
             counting_solver::CountingSolver::new(ddd_solvers::incremental_sat::new_maxsat_glucose_solver()),
             problem, timeout, objective, output).map(|(solution, _)| solution),
         "cadical" => {
-            let solver = satcoder::solvers::cadical::Solver::new();
-            output("maxsat_backend_signature".to_string(), solver.cadical.signature().to_string().into());
+            let solver = cadical_deadline::Solver::new(timeout);
+            output("maxsat_backend_signature".to_string(), solver.signature().to_string().into());
+            output("maxsat_sat_timeout_mode".to_string(), "native-remaining-budget".into());
             maxsat_ladder::solve(&mk_env, counting_solver::CountingSolver::new(solver),
                 problem, timeout, objective, output).map(|(solution, _)| solution)
         }
@@ -1321,7 +1323,10 @@ fn main() {
             })) {
                 Ok(result) => result,
                 Err(payload) => {
-                    if is_likely_oom_panic(payload.as_ref()) {
+                    if payload.is::<cadical_deadline::DeadlineReached>() {
+                        solve_data.insert("maxsat_sat_deadline_hit".to_string(), true.into());
+                        Err(SolverError::Timeout)
+                    } else if is_likely_oom_panic(payload.as_ref()) {
                         Err(SolverError::OutOfMemory)
                     } else {
                         std::panic::resume_unwind(payload);

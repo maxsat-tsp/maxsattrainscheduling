@@ -45,3 +45,19 @@ Previously solved cases are not measured in this selection. Any gain must
 be independently audited, confirmed three times and followed by regression
 checks before a full evaluation. Do not merge the best cases of C100 and
 C1000 into the result of a single configuration. Submission has not passed.
+
+A partial independently audited capture is in `progress_6_3/`. C1000 has
+recovered `origB11/cont` relative to the old candidate, but this case was
+already solved by CSOnet and MaxSAT-Journal.
+
+`confirmation_queue.json` and `run_confirmation_after_trials.sh` record the
+queued follow-up. Service `maxsat-core-v16-confirm-v2.service` began waiting
+at 17:19:10 UTC on 2026-11-06 under user/group `tuyenkv`. It waits for both
+parameter services to finish successfully, independently audits both complete
+trials, chooses one profile by gained coverage then total PAR-2, and runs
+three sequential repeats of its gains using the same binary. The entire
+controller, including waiting, has a six-hour limit. The confirmation runner
+passed all 82 Python tests on the VM and lives in a separate pinned worktree.
+The initial queue service omitted its user identity and failed before any
+SAT run; that startup failure is retained in the queue metadata. The second
+service uses the same account as the parameter services.

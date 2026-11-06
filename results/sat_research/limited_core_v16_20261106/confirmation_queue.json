@@ -1,0 +1,40 @@
+{
+  "schema": "bounded-core-confirmation-queue-v1",
+  "service": "maxsat-core-v16-confirm-v2.service",
+  "runner_commit": "cfdcccc",
+  "solver_source_commit": "57aa220e8abfcf392c6fb41620938e5fa51b5924",
+  "binary_sha256": "f0bb18ba21efd5b3e6b6dd11b5508ffab237fd7ea6e28593938e586127862e30",
+  "controller_sha256": "76124050ea7e0743c91ab29962dca59206d826a425980dd32c578a00c9919e8e",
+  "user": "tuyenkv",
+  "group": "tuyenkv",
+  "worktree": "/home/tuyenkv/projects/limited-core-confirm-v16/maxsattrainscheduling",
+  "results": "results/aglr/core-v16-confirm-selected",
+  "prerequisite_services": [
+    "maxsat-core-v16-conflicts1000.service",
+    "maxsat-core-v16-conflicts100.service"
+  ],
+  "prerequisite": "both services finish successfully; every trial complete and independently audited",
+  "selection": "more gained optima first, then lower total PAR-2; pick one configuration",
+  "repeats": 3,
+  "timeout_seconds": 300,
+  "ram_kb_per_case": 6000000,
+  "cpu_affinity": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "sequential": true,
+  "controller_wall_limit_seconds": 21600,
+  "systemd_wall_limit_seconds": 21630,
+  "python_tests_passed_on_vm": 82,
+  "scope": "confirm selected candidate gains only; regression/full-dataset checks still required",
+  "submission_passed": false,
+  "initial_queue_attempt": {
+    "service": "maxsat-core-v16-confirm.service",
+    "started_utc": "2026-11-06T17:18:25Z",
+    "result": "failed before any SAT run; launched without User; HOME unavailable to cargo environment",
+    "exit_code": 1
+  },
+  "started_utc": "2026-11-06T17:19:10Z"
+}

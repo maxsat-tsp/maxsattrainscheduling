@@ -63,6 +63,13 @@ trên VM. Thông tin và script ở `limited_core_v16_20261106/confirmation_queu
 và `run_confirmation_after_trials.sh`. Đây là trạng thái xếp hàng, chưa có
 kết quả xác nhận.
 
+Bản chụp tiếp theo lúc **00:22:31 ngày 07/11** cho thấy nhánh 100 cũng
+giải được `origB11/cont`, ở **114,71 giây**, cùng chi phí 75.494. Đã tải
+về và kiểm toán độc lập đủ 6 ca trong bản chụp của nhánh này. Dữ liệu ở
+`results/sat_research/limited_core_v16_20261106/c100_first_gain/`.
+Đợi đủ hai lượt để chọn cấu hình; chưa coi phép đo một lần là kết quả xác
+nhận hoặc cải thiện trên toàn bộ dataset.
+
 ## Lịch sử trước lượt V16
 
 Các đoạn dưới ghi trạng thái tại từng thời điểm trước đó. Trạng thái mới

@@ -83,7 +83,6 @@ pub struct SolveStats {
     pub resource_order_pairs: usize,
     pub resource_order_rows: usize,
     pub resource_order_triangles: usize,
-    pub temporal_cycle_cuts: usize,
     pub core_literals: usize,
     pub max_core_size: usize,
     pub unit_weight_cores: usize,
@@ -924,8 +923,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             "resource-order experiments currently require legacy refinement");
     assert!(!settings.order_transitivity || settings.resource_orders,
             "order transitivity requires resource-order decisions");
-    assert!(!settings.temporal_cycle_cuts || settings.resource_orders,
-            "temporal cycle cuts require resource-order decisions");
     let use_objective_bound = settings.use_objective_bound
         || (settings.aglr.use_objective_bound && settings.aglr.policy != RefinementPolicy::Legacy);
 
@@ -960,14 +957,12 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_sparse_costs".to_string(), settings.sparse_costs.into());
     output_stats("maxsat_resource_orders".to_string(), settings.resource_orders.into());
     output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
-    output_stats("maxsat_temporal_cycle_cuts".to_string(), settings.temporal_cycle_cuts.into());
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
     let mut occupations: TiVec<VisitId, Occ<_>> = TiVec::new();
-    let mut temporal_visits = Vec::new();
     let mut touched_intervals = Vec::new();
     let mut conflicts: HashMap<usize, Vec<usize>> = HashMap::new();
     let mut new_time_points = Vec::new();
@@ -1006,10 +1001,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 cost_tree: if settings.sparse_costs { CostTree::new_sparse() } else { CostTree::new() },
                 delays: vec![(true.into(), earliest), (false.into(), i32::MAX)],
                 incumbent_idx: 0,
-            });
-            temporal_visits.push(super::resource_orders::TemporalVisit {
-                next: (visit_idx + 1 < train.visits.len()).then(|| visit_id.0 + 1),
-                travel_time: visit.travel_time,
             });
             n_timepoints += 1;
 
@@ -1784,7 +1775,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             .map(|(k, (_, w, _))| (*k, *w))
             .collect::<Vec<_>>();
         assumptions.sort_by(|a, b| b.1.cmp(&a.1));
-        let mut temporal_cycle_cut = None;
 
         log::info!(
             "solving it{} with {} timepoints {} conflicts",
@@ -1813,14 +1803,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     n_assumps = settings.assumption_strategy.next(n_assumps, soft_constraints.len());
                 }
                 satcoder::SatResultWithCore::Sat(model) => {
-                    if settings.temporal_cycle_cuts {
-                        if let Some(cut) = resource_orders
-                            .positive_cycle_cut(&temporal_visits, model.as_ref())
-                        {
-                            temporal_cycle_cut = Some(cut);
-                            break None;
-                        }
-                    }
                     is_sat = true;
                     stats.n_sat += 1;
                     let _p = hprof::enter("update times");
@@ -1995,13 +1977,6 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             }
         };
 
-        if let Some(cut) = temporal_cycle_cut.take() {
-            SatInstance::add_clause(&mut solver, cut);
-            stats.temporal_cycle_cuts += 1;
-            n_conflict_constraints += 1;
-            continue;
-        }
-
         //Core handling RC2
         if let Some(core) = core {
             let _p = hprof::enter("treat core");
@@ -2160,7 +2135,6 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_resource_order_pairs".to_string(), stats.resource_order_pairs.into());
     output_stats("maxsat_resource_order_rows".to_string(), stats.resource_order_rows.into());
     output_stats("maxsat_resource_order_triangles".to_string(), stats.resource_order_triangles.into());
-    output_stats("maxsat_temporal_cycle_cuts".to_string(), stats.temporal_cycle_cuts.into());
     output_stats("maxsat_core_literals".to_string(), stats.core_literals.into());
     output_stats("maxsat_core_max_size".to_string(), stats.max_core_size.into());
     output_stats("maxsat_unit_weight_cores".to_string(), stats.unit_weight_cores.into());

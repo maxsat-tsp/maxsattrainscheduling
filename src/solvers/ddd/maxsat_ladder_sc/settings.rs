@@ -106,8 +106,6 @@ pub struct MaxSatDddLadderScSettings {
     pub resource_orders: bool,
     /// Close three-way cycles only among resource-order bits already created.
     pub order_transitivity: bool,
-    /// Separate positive temporal cycles only among resource-order bits already created.
-    pub temporal_cycle_cuts: bool,
     /// Restrict original weighted cost terms by a verified feasible upper bound.
     pub use_objective_bound: bool,
     /// Fix residual soft preferences that cannot be violated within verified UB.
@@ -137,7 +135,6 @@ impl Default for MaxSatDddLadderScSettings {
             sparse_costs: false,
             resource_orders: false,
             order_transitivity: false,
-            temporal_cycle_cuts: false,
             use_objective_bound: false,
             residual_hardening: false,
             use_precedence_graph: true,

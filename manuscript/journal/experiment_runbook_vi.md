@@ -29,20 +29,24 @@ dõi hai chiều. Không chạy mỗi tên với cả ba objective; tổng là *
 Hash nguồn và hash dataset nằm trong file lựa chọn. Không sửa file này giữa
 một vòng; nếu cần nhóm khác, tạo một file có tên mới.
 
-Ví dụ một vòng chỉ thay bộ giải SAT MiniSAT bằng Glucose:
+Glucose đã chạy xong trên nhóm này: 0/4 `infsteps180`, 2/14 `cont`, không
+tăng số ca giải được so với phương án bộ ba. Kết quả đã kiểm toán và push
+ở `results/sat_research/focus_v7_20261106/`; không chạy lại lượt đó.
+
+Vòng tiếp theo giữ MiniSAT và thêm quy tắc loại lựa chọn quá đắt:
 
 ```bash
 FOCUS_MANIFEST=results/sat_research/focus_20261106/selection.json \
-BIN=./target/release/ddd CORE_VARIANT=orders-transitive-glucose \
-RUN_ID=focus-glucose-v7 bash run_maxsat_focused_experiments.sh
+BIN=./target/release/ddd CORE_VARIANT=orders-transitive-harden \
+RUN_ID=focus-harden-v8 bash run_maxsat_focused_experiments.sh
 ```
 
 Lệnh chạy tuần tự, mỗi ca 120 giây, cả vòng tối đa 6 giờ. Kết quả ở
-`results/aglr/focus-glucose-v7/`. Giữ cùng `RUN_ID`, binary, mã và file lựa
+`results/aglr/focus-harden-v8/`. Giữ cùng `RUN_ID`, binary, mã và file lựa
 chọn để tiếp tục sau gián đoạn. Dữ liệu cũ của một cấu hình được tái sử dụng
 làm đối chứng; không chạy lại chỉ để tạo bảng nhóm khó.
 
-Đọc `aglr_audit.json`, rồi `Focus-orders-transitive-glucose/focus_comparison.json`.
+Đọc `aglr_audit.json`, rồi `Focus-orders-transitive-harden/focus_comparison.json`.
 `gained`/`lost` là danh sách giải thêm/bị mất so với từng đối chứng.
 `projected_coverage` là ước tính nếu các ca chưa chạy lại vẫn giữ kết quả cũ,
 không phải coverage full đã đo. `submission_passed` luôn là false ở báo cáo
@@ -54,6 +58,16 @@ trong salvers. Kiểm thử xác nhận dấu của các literal trong UNSAT cor
 với bản đồ chi phí MaxSAT và optimum khớp vét cạn trên bài ba tàu.
 Backend mặc định của CSOnet vẫn là MiniSAT; cờ mới là
 `--maxsat-ladder-sc-backend minisat|glucose`.
+
+Ở lượt hardening, nếu trọng số còn lại của một điều kiện lớn hơn `UB-LB`,
+thêm mệnh đề đơn để điều kiện đó luôn được thỏa và bỏ nó khỏi danh sách mềm.
+Không tăng LB. Dùng dấu `>`; trường hợp bằng ngân sách vẫn được phép.
+Dùng trọng số RC2 còn lại, không dùng trọng số ban đầu. UB chỉ đến từ một
+lịch hợp lệ do solver tìm được, không từ bảng hội nghị. Nếu UB nhỏ hơn LB
+thì báo lỗi. Mặc định cờ `--maxsat-ladder-sc-residual-hardening` là false.
+Theo dõi `maxsat_hardening_scans`, `maxsat_hardened_primary`,
+`maxsat_hardened_totalizer`, `maxsat_hardening_time`, coverage và kích thước
+mô hình. Quy tắc thêm mệnh đề đơn; không tạo bộ cộng nhị phân.
 
 Các lệnh `screen`/`promote` ở các phần sau mô tả các chiến dịch đã chạy và
 phục vụ tái tạo. Khi thử ý tưởng mới, dùng quy trình nhóm khó ở trên.

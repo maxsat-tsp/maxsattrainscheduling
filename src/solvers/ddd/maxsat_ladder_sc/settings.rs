@@ -108,6 +108,8 @@ pub struct MaxSatDddLadderScSettings {
     pub order_transitivity: bool,
     /// Restrict original weighted cost terms by a verified feasible upper bound.
     pub use_objective_bound: bool,
+    /// Fix residual soft preferences that cannot be violated within verified UB.
+    pub residual_hardening: bool,
     pub use_precedence_graph: bool,
     pub use_sc_amo: bool,
     pub use_touched_clique_amo: bool,
@@ -134,6 +136,7 @@ impl Default for MaxSatDddLadderScSettings {
             resource_orders: false,
             order_transitivity: false,
             use_objective_bound: false,
+            residual_hardening: false,
             use_precedence_graph: true,
             use_eager_chain_expansion: false,
             use_sc_amo: true,

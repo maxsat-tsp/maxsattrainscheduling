@@ -28,6 +28,17 @@ def records(manifest, solved):
 
 
 class FocusTests(unittest.TestCase):
+    def test_hardening_is_an_isolated_variant_and_cannot_change_the_reference_backend(self):
+        from select_core_variant import variant_for
+        config = dict(backend="minisat", assumptions="legacy", resource_orders="true",
+                      order_transitivity="true", sparse_costs="false", objective_bound="false",
+                      residual_hardening="true")
+        self.assertEqual(variant_for(config), "orders-transitive-harden")
+        for key, value in (("backend", "glucose"), ("sparse_costs", "true"),
+                           ("objective_bound", "true"), ("order_transitivity", "false")):
+            with self.assertRaises(ValueError):
+                variant_for(dict(config, **{key: value}))
+
     def test_glucose_variant_is_explicit_and_does_not_mix_other_trials(self):
         from select_core_variant import variant_for
         config = dict(backend="glucose", assumptions="legacy", resource_orders="true",

@@ -18,6 +18,11 @@ def variant_for(row: dict) -> str:
     transitive = row.get("order_transitivity") == "true"
     bound = row.get("objective_bound") == "true"
     backend = row.get("backend", "minisat")
+    hardening = row.get("residual_hardening") == "true"
+    if hardening:
+        if backend != "minisat" or not orders or not transitive or sparse or bound or row["assumptions"] != "legacy":
+            raise ValueError("hardening trial requires transitive orders with the original MiniSAT configuration")
+        return "orders-transitive-harden"
     if backend == "glucose":
         if not transitive or not orders or sparse or bound or row["assumptions"] != "legacy":
             raise ValueError("Glucose trial requires the explicitly tested transitive-orders configuration")
@@ -55,7 +60,7 @@ def select(rows: list[dict], audit: dict) -> dict:
         if len(variants) != 1:
             raise ValueError(f"{tag}: objective rows have different variants")
         variant = variants.pop()
-        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive", "orders-bound", "orders-transitive-glucose"}:
+        if variant not in {"legacy", "full", "geometric", "sparse", "orders", "orders-sparse", "orders-transitive", "orders-bound", "orders-transitive-glucose", "orders-transitive-harden"}:
             raise ValueError(f"unsupported variant {variant}")
         par2 = sum(float(r["par2_seconds"]) for r in items)
         if not math.isfinite(par2) or par2 < 0:

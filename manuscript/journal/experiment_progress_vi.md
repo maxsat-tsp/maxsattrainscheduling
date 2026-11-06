@@ -16,7 +16,9 @@ giải được trong ít nhất một trong hai lượt này hoặc ở mốc h
 ca mới giải được và ca bị mất. Dữ liệu cũ làm đối chứng, không chạy lại.
 
 Danh sách và hash nguồn ở `results/sat_research/focus_20261106/selection.json`.
-Vòng tiếp theo chỉ đổi MiniSAT sang Glucose trong phương án bộ ba. Dùng
+Sau Glucose, vòng tiếp theo giữ MiniSAT và phương án bộ ba, chỉ thêm quy
+tắc loại lựa chọn có trọng số còn lại lớn hơn `UB-LB`. Dùng
+`CORE_VARIANT=orders-transitive-harden` với
 `run_maxsat_focused_experiments.sh`, không tự chạy full. Kết quả nhóm khó
 không được ghép với các ca dễ cũ để công bố coverage full của mã mới.
 
@@ -27,6 +29,14 @@ finsteps123 rỗng, infsteps180 đúng 4 ca, cont đúng 14 ca. Không có lư�
 kiểm tra Bash và build release trên VM; tài liệu LaTeX biên dịch không tràn
 lề. Thư mục kết quả:
 `~/projects/experiment-audit/rounds/maxsat-focus-v7-b7160db/`.
+
+Quy tắc hardening đã qua 41 kiểm thử thư viện Rust trên VM, gồm bảo toàn
+mọi phép gán trong ngân sách, điểm biên bằng ngân sách, phần trọng số còn
+lại sau xử lý core, và các bài lịch nhỏ vét cạn trên ba objective với cả
+MiniSAT/Glucose. Bài hai tàu xác nhận thực tế có điều kiện chi phí được cố
+định và optimum vẫn đúng. 41 kiểm thử Python và build release đã đạt.
+Chưa có kết quả hiệu năng của quy tắc này; dùng lại nhóm 18 cặp và các đối
+chứng đã có để thử một lần ở 120 giây.
 
 Đối chiếu lại camera-ready theo ý kiến của thầy/cô: mốc đúng là **120 giây**,
 `(72,68,60)`, tổng 200 optimum. Bộ JSON 150 giây `(72,68,58)` là lượt khác;

@@ -86,6 +86,10 @@ pub struct SolveStats {
     pub core_literals: usize,
     pub max_core_size: usize,
     pub unit_weight_cores: usize,
+    pub hardening_scans: usize,
+    pub hardened_primary: usize,
+    pub hardened_totalizer: usize,
+    pub hardening_time: Duration,
     pub n_sat: usize,
     pub n_unsat: usize,
     pub n_travel: usize,
@@ -107,6 +111,30 @@ use super::settings::{MaxSatDddLadderScSettings, RefinementPolicy};
 enum Soft<L: satcoder::Lit> {
     Primary,
     Totalizer(Totalizer<L>, usize),
+}
+
+fn apply_residual_hardening<L: satcoder::Lit>(
+    solver: &mut impl SatInstance<L>,
+    soft: &mut HashMap<Bool<L>, (Soft<L>, usize, usize)>,
+    lower: i32,
+    upper: i32,
+    stats: &mut SolveStats,
+) -> Result<(), SolverError> {
+    let started = Instant::now();
+    stats.hardening_scans += 1;
+    let fixed = super::hardening::select(
+        soft.iter().map(|(literal, (_, residual, _))| (*literal, *residual)), lower, upper,
+    ).map_err(SolverError::InvalidSolution)?;
+    for literal in fixed {
+        solver.add_clause(vec![literal]);
+        let (kind, _, _) = soft.remove(&literal).expect("selected residual preference is present");
+        match kind {
+            Soft::Primary => stats.hardened_primary += 1,
+            Soft::Totalizer(_, _) => stats.hardened_totalizer += 1,
+        }
+    }
+    stats.hardening_time += started.elapsed();
+    Ok(())
 }
 
 fn bits_needed(max_value: usize) -> usize {
@@ -930,6 +958,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_resource_orders".to_string(), settings.resource_orders.into());
     output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
+    output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
     let mut resource_visits: Vec<Vec<VisitId>> = Vec::new();
@@ -1181,7 +1210,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
                 while let Ok((ub_cost, ub_sol)) = sol_rx.try_recv() {
                     if ub_cost < total_cost as i32 {
-                        if settings.aglr.policy != RefinementPolicy::Legacy || use_objective_bound {
+                        if settings.aglr.policy != RefinementPolicy::Legacy || use_objective_bound || settings.residual_hardening {
                             return Err(SolverError::InvalidSolution(format!(
                                 "verified AGLR heuristic upper bound {} is below lower bound {}",
                                 ub_cost, total_cost
@@ -1591,7 +1620,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     panic!()
                 };
 
-                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders || use_objective_bound {
+                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders || use_objective_bound || settings.residual_hardening {
                     let validation_start = Instant::now();
                     let verified_cost = problem.verify_solution(&trains, delay_cost_type);
                     aglr_telemetry.final_validation_time += validation_start.elapsed();
@@ -1730,6 +1759,12 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 aglr_telemetry.objective_bound_terms += 1;
             }
             aglr_telemetry.objective_bound_time += encoding_start.elapsed();
+        }
+
+        if settings.residual_hardening {
+            if let Some((upper, _)) = best_heur.as_ref() {
+                apply_residual_hardening(&mut solver, &mut soft_constraints, total_cost, *upper, &mut stats)?;
+            }
         }
 
         //Solve
@@ -1975,9 +2010,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                         }
                     }
                 }
-                if binary_objective.is_some() {
+                if binary_objective.is_some() || (settings.residual_hardening && best_heur.is_some()) {
                     return Err(SolverError::InvalidSolution(
-                        "bounded model is UNSAT despite a verified feasible upper bound".to_string()
+                        "bounded or hardened model is UNSAT despite a verified feasible upper bound".to_string()
                     ));
                 }
                 return Err(SolverError::NoSolution); // UNSAT
@@ -2031,6 +2066,11 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             }
 
             total_cost += min_weight as i32;
+            if settings.residual_hardening && best_heur.as_ref().is_some_and(|(upper, _)| *upper < total_cost) {
+                return Err(SolverError::InvalidSolution(
+                    "lower bound exceeds a verified feasible cost during residual hardening".to_string()
+                ));
+            }
             last_progress_iteration = iteration;
             println!("    LB={}", total_cost);
 
@@ -2098,6 +2138,10 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_core_literals".to_string(), stats.core_literals.into());
     output_stats("maxsat_core_max_size".to_string(), stats.max_core_size.into());
     output_stats("maxsat_unit_weight_cores".to_string(), stats.unit_weight_cores.into());
+    output_stats("maxsat_hardening_scans".to_string(), stats.hardening_scans.into());
+    output_stats("maxsat_hardened_primary".to_string(), stats.hardened_primary.into());
+    output_stats("maxsat_hardened_totalizer".to_string(), stats.hardened_totalizer.into());
+    output_stats("maxsat_hardening_time".to_string(), stats.hardening_time.as_secs_f64().into());
     output_stats("maxsat_objective_bound_terms".to_string(), aglr.objective_bound_terms.into());
     output_stats("maxsat_objective_bound_updates".to_string(), aglr.objective_bound_updates.into());
     output_stats("maxsat_objective_bound_time".to_string(), aglr.objective_bound_time.as_secs_f64().into());
@@ -2544,11 +2588,13 @@ mod aglr_end_to_end_tests {
             for transitivity in [false, true] {
                 for sparse in [false, true] {
                   for use_bound in [false, true] {
+                   for hardening in [false, true] {
                     let mut settings = MaxSatDddLadderScSettings::default();
                     settings.resource_orders = true;
                     settings.order_transitivity = transitivity;
                     settings.sparse_costs = sparse;
                     settings.use_objective_bound = use_bound;
+                    settings.residual_hardening = hardening;
                     let mut telemetry = BTreeMap::new();
                     let (solution, _) = solve_with_settings(
                         &quiet_env, satcoder::solvers::minisat::Solver::new(),
@@ -2561,21 +2607,57 @@ mod aglr_end_to_end_tests {
                         assert!(telemetry["maxsat_objective_bound"].as_bool().unwrap());
                         assert!(telemetry["maxsat_objective_bound_terms"].as_u64().unwrap() > 0);
                     }
+                   }
                   }
                 }
             }
             for use_bound in [false, true] {
+              for hardening in [false, true] {
                 let mut settings = MaxSatDddLadderScSettings::default();
                 settings.resource_orders = true;
                 settings.order_transitivity = true;
                 settings.use_objective_bound = use_bound;
+                settings.residual_hardening = hardening;
                 let (solution, _) = solve_with_settings(
                     &quiet_env,
                     crate::solvers::ddd::incremental_sat::new_maxsat_glucose_solver(),
                     &problem, 30.0, objective, settings, |_, _| {},
                 ).unwrap();
                 assert_eq!(problem.verify_solution(&solution, objective), Some(optimum));
+              }
             }
+        }
+    }
+
+    #[test]
+    fn residual_hardening_actually_fixes_an_expensive_alternative_and_preserves_optimum() {
+        let problem = Problem {
+            name: "short-before-long".to_string(),
+            trains: [1, 10].into_iter().map(|travel_time| Train { visits: vec![
+                Visit { resource_id: 0, earliest: 0, aimed: Some(0), travel_time },
+            ] }).collect(),
+            conflicts: vec![(0, 0)],
+        };
+        let mut optimum = i32::MAX;
+        for a in 0..=12 {
+            for b in 0..=12 {
+                if let Some(cost) = problem.verify_solution(
+                    &vec![vec![a,a+1], vec![b,b+10]], DelayCostType::Continuous,
+                ) { optimum = optimum.min(cost); }
+            }
+        }
+        assert_eq!(optimum, 1);
+        for hardening in [false, true] {
+            let mut settings = MaxSatDddLadderScSettings::default();
+            settings.resource_orders = true;
+            settings.order_transitivity = true;
+            settings.residual_hardening = hardening;
+            let (solution, stats) = solve_with_settings(
+                &quiet_env, satcoder::solvers::minisat::Solver::new(),
+                &problem, 30.0, DelayCostType::Continuous, settings, |_, _| {},
+            ).unwrap();
+            assert_eq!(problem.verify_solution(&solution, DelayCostType::Continuous), Some(optimum));
+            if hardening { assert!(stats.hardened_primary > 0); }
         }
     }
 

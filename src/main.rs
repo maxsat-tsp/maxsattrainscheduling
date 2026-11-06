@@ -130,6 +130,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_use_objective_bound: Option<bool>,
 
+    /// Fix residual soft preferences whose weight exceeds verified UB-LB (default false).
+    #[structopt(long)]
+    maxsat_ladder_sc_residual_hardening: Option<bool>,
+
     /// SAT backend for SC/AGLR: minisat (default) or genuine native glucose.
     #[structopt(long, default_value = "minisat", possible_values = &["minisat", "glucose"])]
     maxsat_ladder_sc_backend: String,
@@ -603,6 +607,7 @@ fn main() {
         resource_orders: opt.maxsat_ladder_sc_resource_orders.unwrap_or(false),
         order_transitivity: opt.maxsat_ladder_sc_order_transitivity.unwrap_or(false),
         use_objective_bound: opt.maxsat_ladder_sc_use_objective_bound.unwrap_or(false),
+        residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),
         assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
             "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
             "full" => maxsat_ladder_sc::AssumptionStrategy::Full,

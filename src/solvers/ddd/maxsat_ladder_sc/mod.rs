@@ -19,6 +19,7 @@ mod precedence;
 mod resource_orders;
 mod sc_amo;
 mod settings;
+mod hardening;
 mod solve;
 
 pub use settings::{

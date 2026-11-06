@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.4}
+\fancyhead[R]{\small Phiên bản 5.5}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.4, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.5, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -149,21 +149,22 @@ Tổng cộng 18 cặp instance--objective. Không chạy chéo mỗi instance v
 ba objective. Việc không có file \code{finsteps123.json} trong lượt này là
 đúng, vì cấu hình đã ghi rõ danh sách rỗng cho objective đó.
 
-Ví dụ lệnh cho phép thử bộ giải SAT Glucose:
+Glucose đã được thử: giải 0/4 ca \code{infsteps180} và 2/14 ca \code{cont},
+không tăng coverage so với phương án bộ ba. Phép thử tiếp theo giữ MiniSAT
+và chỉ thêm quy tắc loại sớm lựa chọn quá đắt:
 
 \begin{verbatim}
 FOCUS_MANIFEST=results/sat_research/focus_20261106/selection.json \
-BIN=./target/release/ddd CORE_VARIANT=orders-transitive-glucose \
-RUN_ID=focus-glucose-v7 bash run_maxsat_focused_experiments.sh
+BIN=./target/release/ddd CORE_VARIANT=orders-transitive-harden \
+RUN_ID=focus-harden-v8 bash run_maxsat_focused_experiments.sh
 \end{verbatim}
 
-Lượt này dùng cùng phương án bộ ba, chỉ thay MiniSAT bằng Glucose. Không
-đổi các ràng buộc hoặc hàm mục tiêu. Các kết quả full đã có được dùng làm
+Lượt này dùng cùng phương án bộ ba và cùng hàm mục tiêu. Các kết quả full đã có được dùng làm
 đối chứng; không chạy lại chúng chỉ để lập bảng tập con. Mỗi ca mới chạy một
 lần, tối đa 120 giây, tuần tự. Script không tự chuyển sang full.
 
 Đọc \file{aglr_audit.json} trước. Sau đó đọc
-\file{Focus-orders-transitive-glucose/focus_comparison.json}: các mục
+\file{Focus-orders-transitive-harden/focus_comparison.json}: các mục
 \code{gained} và \code{lost} liệt kê ca giải thêm và ca bị mất so với từng
 lượt đối chứng. Giải thêm một ca nhưng mất một ca khác chưa làm tổng coverage
 tăng. Các trường \code{projected\_coverage} chỉ là ước tính với giả định
@@ -175,6 +176,44 @@ và không mất ca trong nhóm thử, chạy xác nhận các ca mới rồi m�
 toàn bộ 72 instance. Lượt full cuối giúp kiểm tra ý tưởng mới có làm mất
 những ca đã bỏ qua trong lúc phát triển hay không. Không ghép kết quả cũ
 của các ca dễ với kết quả mới của các ca khó thành một lượt full.
+
+\subsection{Loại sớm lựa chọn quá đắt}
+
+Gọi $L$ là cận dưới hiện tại, $U$ là chi phí của lịch hợp lệ tốt nhất mà
+solver đã tìm được. Ngân sách còn lại là $U-L$. Trong danh sách chi phí của
+RC2, điều kiện $\ell_b$ có trọng số còn lại $w_b$: nếu $\ell_b$ sai thì phải
+trả thêm $w_b$. Vì vậy có quy tắc:
+\[
+w_b>U-L\quad\Longrightarrow\quad\ell_b=\mathrm{true}.
+\]
+Thêm một mệnh đề đơn $[\ell_b]$ vào SAT, rồi bỏ hạng tử đã được cố định khỏi
+danh sách chi phí mềm. Hạng tử này luôn được thỏa nên không còn phải trả
+chi phí; không tăng $L$ khi bỏ nó.
+
+Ví dụ $L=100$, $U=105$: có thể loại lựa chọn tốn thêm 8, còn lựa chọn tốn
+thêm đúng 5 vẫn phải được phép. Điều kiện là dấu lớn hơn nghiêm ngặt, không
+phải lớn hơn hoặc bằng. Dùng trọng số \emph{còn lại}, vì một phần chi phí
+có thể đã được tính vào $L$ ở các bước RC2 trước. Nếu dùng lại trọng số ban
+đầu, solver có thể loại nhầm nghiệm tối ưu.
+
+Quét lại sau khi thêm hạng tử chi phí mới hoặc khi các cận thay đổi. Chỉ
+dùng $U$ từ lịch đã được kiểm tra đầy đủ; không lấy đáp án hội nghị làm
+đầu vào. Nếu phát hiện $U<L$, dừng và báo lỗi. Lịch tối ưu có chi phí không
+quá $U$, nên vẫn có biểu diễn SAT thỏa các mệnh đề này. Quy tắc không cần
+tạo bộ cộng nhị phân hoặc thêm mốc thời gian.
+
+Cờ là \file{--maxsat-ladder-sc-residual-hardening} \code{true}, mặc định
+tắt. Lượt thử giữ MiniSAT, phương án bộ ba và cây chi phí cũ; không bật
+giới hạn objective nhị phân. Theo dõi \code{maxsat\_hardened\_primary},
+\code{maxsat\_hardened\_totalizer}, \code{maxsat\_hardening\_time},
+coverage và số biến/mệnh đề. Số điều kiện được cố định chỉ giải thích cơ
+chế; kết luận cải thiện vẫn dựa trên các ca giải thêm và bị mất.
+
+Kiểm thử đã xét các phép gán thỏa ngân sách, điểm biên $w_b=U-L$, chi phí
+còn lại sau xử lý core và optimum vét cạn trên bài nhỏ. Một bài hai tàu
+còn kiểm tra rằng mã thật sự cố định được một lựa chọn đắt mà vẫn giữ
+optimum. Thực nghiệm tiếp tục dùng đúng 18 cặp đã khóa; không chạy full
+chỉ vì kiểm thử nhỏ đã đạt.
 
 \section{Kết quả hội nghị đã có và cách sử dụng}
 
@@ -862,3 +901,4 @@ tên biến nội bộ. Không viết rằng AGLR nhanh hơn hoặc mạnh hơn 
 đã qua cổng trên.
 
 \end{document}
+của các ca dễ với kết quả mới của các ca khó thành một lượt full.

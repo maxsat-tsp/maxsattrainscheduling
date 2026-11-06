@@ -76,8 +76,8 @@ fi
 
 run_strategy() {
     local strategy="$1" tag="${2:-Core-$1}"
-    [[ "$strategy" =~ ^(legacy|full|geometric|sparse|orders|orders-sparse|orders-transitive|orders-bound|orders-transitive-glucose)$ ]] || exit 2
-    local assumptions="$strategy" sparse_costs=false resource_orders=false order_transitivity=false objective_bound=false backend=minisat
+    [[ "$strategy" =~ ^(legacy|full|geometric|sparse|orders|orders-sparse|orders-transitive|orders-bound|orders-transitive-glucose|orders-transitive-harden)$ ]] || exit 2
+    local assumptions="$strategy" sparse_costs=false resource_orders=false order_transitivity=false objective_bound=false backend=minisat residual_hardening=false
     if [[ "$strategy" == sparse ]]; then
         assumptions=legacy
         sparse_costs=true
@@ -107,20 +107,27 @@ run_strategy() {
         order_transitivity=true
         backend=glucose
     fi
+    if [[ "$strategy" == orders-transitive-harden ]]; then
+        assumptions=legacy
+        resource_orders=true
+        order_transitivity=true
+        residual_hardening=true
+    fi
     [[ "$mode" != candidate ]] || tag=AGLR
     local dir="$root/$tag"
     mkdir -p "$dir"
     # Exact match on resume; never mix a configuration with earlier outputs.
-    python3 - "$dir/config.txt" "$tag" "$assumptions" "$cutoff" "$instances" "$BIN" "$parallelism" "$sparse_costs" "$resource_orders" "$order_transitivity" "$objective_bound" "$backend" <<'PY'
+    python3 - "$dir/config.txt" "$tag" "$assumptions" "$cutoff" "$instances" "$BIN" "$parallelism" "$sparse_costs" "$resource_orders" "$order_transitivity" "$objective_bound" "$backend" "$residual_hardening" <<'PY'
 import hashlib
 import pathlib
 import subprocess
 import sys
 path = pathlib.Path(sys.argv[1])
-tag, strategy, cutoff, instances, binary, parallelism, sparse_costs, resource_orders, order_transitivity, objective_bound, backend = sys.argv[2:]
+tag, strategy, cutoff, instances, binary, parallelism, sparse_costs, resource_orders, order_transitivity, objective_bound, backend, residual_hardening = sys.argv[2:]
 values = dict(tag=tag, kind="exact", solver="maxsat_ddd_ladder_sc", policy="legacy",
               assumptions=strategy, sparse_costs=sparse_costs, resource_orders=resource_orders,
-              order_transitivity=order_transitivity, objective_bound=objective_bound, backend=backend, timeout_seconds=cutoff,
+              order_transitivity=order_transitivity, objective_bound=objective_bound, backend=backend,
+              residual_hardening=residual_hardening, timeout_seconds=cutoff,
               instances=",".join(instances.split()), process_exit_required="true",
               git_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
               binary_sha256=hashlib.sha256(pathlib.Path(binary).read_bytes()).hexdigest(),
@@ -142,6 +149,7 @@ PY
         MAXSATDDD_ORDER_TRANSITIVITY="$order_transitivity" \
         MAXSATDDD_OBJECTIVE_BOUND="$objective_bound" \
         MAXSATDDD_BACKEND="$backend" \
+        MAXSATDDD_RESIDUAL_HARDENING="$residual_hardening" \
         JSON_OUT="$dir/$objective.json" RUN_LOG_DIR="$dir/$objective.logs" \
             bash quick_scripts/run_all_txt_instances_limited.sh
     done

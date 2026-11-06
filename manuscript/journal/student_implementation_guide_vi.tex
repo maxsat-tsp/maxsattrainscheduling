@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.6}
+\fancyhead[R]{\small Phiên bản 5.7}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.6, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.7, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -933,6 +933,54 @@ Giữ nguyên bảng 120 giây làm mốc lịch sử. Các timeout cũ không t
 kết quả 300 giây bằng cách đổi nhãn. Kết quả 31 cặp chỉ mô tả nhóm khó;
 chưa phải coverage toàn bộ dataset. Sau khi có cấu hình tốt hơn, kiểm tra
 lại toàn bộ dữ liệu trước khi đưa vào bảng chính của bài báo.
+
+\section{Thử nghiệm kế tiếp: thu gọn tập gây mâu thuẫn}
+
+Ở những ca khó đã đo, phần lớn thời gian nằm trong SAT. Một số mô hình
+đã có gần 100 nghìn biến. Thử nghiệm mới giữ cách phát hiện xung đột và
+chỉ sửa bước xử lý mâu thuẫn của RC2. Mặc định tính năng này tắt; chưa có
+kết quả hiệu năng để khẳng định tốt hơn.
+
+Gọi $F$ là các mệnh đề hiện tại và $C$ là một tập điều kiện mà SAT đã
+chứng minh không thể đồng thời thỏa. Ta thử bỏ một điều kiện $\ell$:
+\[
+ F\land\bigwedge_{q\in C\setminus\{\ell\}}q.
+\]
+Nếu SAT vẫn báo không có nghiệm, tập nhỏ hơn vẫn đủ gây mâu thuẫn và
+được dùng thay $C$. Nếu SAT tìm được nghiệm, giữ nguyên tập cũ. Mỗi tập
+chỉ được thử thêm tối đa bốn lần, và không thử mới khi đã hết timeout.
+Một lời gọi SAT đang chạy vẫn chịu giới hạn tiến trình của runner.
+
+Ưu tiên thử bỏ điều kiện có trọng số còn lại nhỏ nhất. Ví dụ, $C$ gồm
+$a,b,c$ có trọng số $5,7,1$. Nếu chỉ $a,b$ đã gây mâu thuẫn, bỏ $c$ sau
+khi SAT xác nhận. Trọng số nhỏ nhất của tập tăng từ 1 lên 5, nên RC2 có
+thể tăng cận dưới nhiều hơn trong bước đó. Bộ đếm mới cũng có ít đầu vào
+hơn. Đây là lý do để thử; các lời gọi SAT bổ sung cũng có thể làm chậm.
+
+Trong mã, cờ \file{--maxsat-ladder-sc-core-minimize-checks} mặc định bằng
+0; cấu hình thử dùng 4. Theo dõi số lời gọi thêm
+\code{maxsat\_core\_minimize\_calls}, số điều kiện bỏ được
+\code{maxsat\_core\_minimize\_removed}, số lần trọng số nhỏ nhất tăng
+\code{maxsat\_core\_minimize\_weight\_increases} và thời gian
+\code{maxsat\_core\_minimize\_time}. Thời gian này đã nằm trong thời gian
+SAT, không cộng hai trường để tính tổng.
+
+Chỉ chạy sau khi chiến dịch 300 giây hiện tại hoàn tất và được kiểm toán.
+Giữ lại nguyên kết quả 300 giây của bốn baseline, chạy lại 31 cặp cho
+phương pháp mới. Lệnh chuẩn bị sẵn là:
+\begin{verbatim}
+EXTENDED_REFERENCE=/thu/muc/ket/qua/300s \
+BIN=./target/release/ddd \
+EXPORT_BIN=./target/release/export_lp \
+CPLEX_BIN=/duong/dan/toi/cplex \
+RUN_ID=mincore300-v11 \
+  bash run_core_minimization_trial.sh
+\end{verbatim}
+Script từ chối đối chứng còn thiếu ca hoặc có lỗi. Các file baseline được
+chép nguyên byte, ghi nguồn và hash, không đổi thời gian chạy. Báo cáo ghi
+riêng số lượt đo mới và số lượt tái sử dụng. Trước khi chạy, kiểm thử thư
+viện Rust và các bài lịch nhỏ vét cạn phải đạt trên VM; không build hoặc
+chạy solver mới trong lúc chiến dịch đối chứng còn hoạt động.
 
 \section{Nội dung được phép đưa vào bài báo}
 

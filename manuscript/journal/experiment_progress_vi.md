@@ -11,6 +11,14 @@ Vì vậy chưa vượt SOTA. Dữ liệu nguyên bản và bảng cùng mẫu �
 `results/sat_research/extended_300_20261106/progress_82/`.
 Đây là bản chụp giữa chiến dịch, không phải kết quả cuối hoặc coverage full.
 
+Đã chuẩn bị thử nghiệm thu gọn core: tối đa bốn truy vấn bổ sung, ưu tiên
+bỏ điều kiện có trọng số thấp, chỉ chấp nhận sau chứng minh UNSAT mới.
+Ba unit test với MiniSAT thật và kiểm tra biên dịch thư viện/CLI/test đã đạt
+cục bộ. Bộ Python hiện có 56 test đạt. Còn kiểm thử tích hợp đầy đủ trên VM,
+sẽ thực hiện sau khi chiến dịch 300 giây kết thúc. Lượt mới chạy 31 ca của
+candidate ở 300 giây, dùng lại nguyên 124 kết quả baseline đã kiểm toán;
+không chạy lại bốn baseline. Chưa có kết quả hiệu năng của tính năng này.
+
 Theo yêu cầu ngày 06/11, vòng kế tiếp tăng timeout chung lên **300 giây**
 cho phương án bộ ba V5 và bốn đối chứng: CSOnet, MaxSAT-Journal, Big-M Gurobi,
 Big-M CPLEX. Danh sách mở rộng là hợp những ca các phương pháp chưa giải ở

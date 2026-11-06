@@ -52,6 +52,35 @@ Auditor xác minh hash từng file, kiểm tra lịch độc lập và dựng l�
 Chỉ các thống kê thời gian tính lại được chấp nhận sai khác làm tròn cỡ máy;
 chi phí, số ca tối ưu và dữ liệu đầu vào vẫn phải khớp.
 
+## Lượt kế tiếp: thu gọn core, dùng lại baseline 300 giây
+
+Tính năng `--maxsat-ladder-sc-core-minimize-checks 4` thử bỏ điều kiện có
+trọng số nhỏ trước; chỉ bỏ khi một lời gọi SAT mới chứng minh tập còn lại
+vẫn mâu thuẫn. Mặc định là 0. Giới hạn bốn lời gọi bổ sung cho mỗi core,
+ngừng thử mới khi hết timeout. Đây là thử nghiệm, chưa có số liệu hiệu năng.
+
+Khi chiến dịch năm phương pháp ở trên kết thúc, chạy kiểm thử Rust/Python
+và build release trong một worktree khác. Sau đó:
+
+```bash
+EXTENDED_REFERENCE=/home/tuyenkv/projects/core-v9/maxsattrainscheduling/results/aglr/extended300-b6a4370-20261106 \
+BIN=./target/release/ddd EXPORT_BIN=./target/release/export_lp \
+CPLEX_BIN=/home/tuyenkv/opt/ibm/ILOG/CPLEX_Studio2220/cplex/bin/x86-64_linux/cplex \
+RUN_ID=mincore300-v11 bash run_core_minimization_trial.sh
+```
+
+Script kiểm toán lại đối chứng và chỉ chạy nếu đủ 155/155 lượt, không lỗi.
+Chạy mới 31 lượt của `Orders-Transitive-Mincore`; dùng lại nguyên 124 lượt
+của bốn baseline ở cùng cutoff 300 giây. `reused_from.json` ghi nguồn,
+hash dữ liệu và manifest. Không được thay runtime hoặc chọn lượt tốt hơn.
+`measured_runs`/`reused_baseline_runs` cho biết số lượt đo mới/dùng lại.
+Mỗi vòng tối đa 6 giờ; cùng RUN_ID để tiếp tục.
+
+Các kiểm thử thuật toán đã chạy cục bộ với MiniSAT thật; kiểm tra biên dịch
+bao gồm thư viện, CLI và test. Kiểm thử tích hợp đầy đủ trên Linux/VM còn
+phải chạy sau khi chiến dịch hiện tại kết thúc. Chưa được ghi rằng toàn bộ
+kiểm thử VM của tính năng mới đã đạt hoặc rằng cấu hình mới nhanh hơn.
+
 ## Quy trình nhóm 120 giây đã chạy
 
 Từ 06/11/2026, mỗi ý tưởng mới chạy trên danh sách đã lọc theo objective.

@@ -290,6 +290,57 @@ def dependency_state(path: Path) -> dict:
                 status=dirty.decode(), diff_sha256=hashlib.sha256(git("diff", "--binary")).hexdigest())
 
 
+def reports_match(left, right, field: str = "") -> bool:
+    """Permit machine-rounding differences only in derived runtime statistics."""
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(reports_match(left[k], right[k], k) for k in left)
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(reports_match(a, b, field) for a,b in zip(left,right))
+    if field in {"par2_seconds", "median_solved_seconds", "mean_selected_growth", "paired_geomean_speedup"}:
+        if isinstance(left, (int,float)) and isinstance(right, (int,float)):
+            return math.isclose(left,right,rel_tol=1e-12,abs_tol=1e-12)
+    return left == right
+
+
+def audit_saved(root: Path) -> dict:
+    """Rebuild the report from a completed run or an immutable partial snapshot."""
+    snapshot = root/"snapshot.json"
+    if snapshot.exists():
+        metadata = json.loads(snapshot.read_text())
+        if metadata.get("schema") != "extended-timeout-snapshot-v1":
+            raise ValueError("unsupported snapshot schema")
+        for name, expected_hash in metadata["file_sha256"].items():
+            path = (root/name).resolve()
+            if not path.is_relative_to(root.resolve()) or not path.is_file() or focus.sha(path) != expected_hash:
+                raise ValueError(f"missing or changed snapshot artifact {name}")
+    plan = json.loads((root/"plan.json").read_text())
+    validate_plan(plan)
+    locked = json.loads((root/"manifest.json").read_text())
+    canonical_plan = json.dumps(plan, indent=2) + "\n"
+    if locked["plan_sha256"] != hashlib.sha256(canonical_plan.encode()).hexdigest():
+        raise ValueError("saved plan does not match the locked source manifest")
+    if locked.get("methods") != METHODS:
+        raise ValueError("saved method settings differ from this auditor")
+    original = json.loads((root/"extended_audit.json").read_text())
+    if original.get("expected_runs") != len(tasks_for(plan)):
+        raise ValueError("saved report has an incorrect planned run count")
+    records = []
+    for item in original["case_bounds"]:
+        method, objective, name = item["method"], item["objective"], item["name"]
+        if (method, objective, name) not in set(tasks_for(plan)):
+            raise ValueError("saved report contains an unplanned case")
+        records.append(assess_case(root/"cases"/method/objective/name,
+                                   method, objective, name, plan["timeout_seconds"]))
+    rebuilt = summarize(plan, records)
+    if not reports_match(rebuilt, original):
+        raise ValueError("saved report differs from the independently regenerated result")
+    if rebuilt["errors"]:
+        raise ValueError(f"saved result failed independent audit: {rebuilt['errors']}")
+    audit.write_csv(root/"extended_summary.csv", rebuilt["summary"])
+    audit.write_csv(root/"extended_comparable_summary.csv", rebuilt["comparable_summary"])
+    return rebuilt
+
+
 def run(args) -> None:
     plan = json.loads(args.plan.read_text())
     selected = validate_plan(plan)
@@ -356,6 +407,8 @@ def main():
     runner.add_argument("--timeout", type=int, default=300)
     runner.add_argument("--round-seconds", type=int, default=21600)
     runner.add_argument("--ram-kb", type=int, default=15000000)
+    saved = sub.add_parser("audit-saved")
+    saved.add_argument("results", type=Path)
     args = parser.parse_args()
     if args.action == "plan":
         if args.output.exists():
@@ -364,6 +417,9 @@ def main():
         args.output.parent.mkdir(parents=True, exist_ok=True)
         save(args.output, plan)
         print(json.dumps(plan["instances_by_objective"], indent=2))
+    elif args.action == "audit-saved":
+        report = audit_saved(args.results)
+        print(json.dumps({k:report[k] for k in ("completed_runs", "expected_runs", "complete", "errors", "common_completed_pairs")}))
     else:
         run(args)
 

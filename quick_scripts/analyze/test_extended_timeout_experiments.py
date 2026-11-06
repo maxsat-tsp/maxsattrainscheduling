@@ -2,10 +2,12 @@ import copy
 import json
 from pathlib import Path
 import tempfile
+import tarfile
 import unittest
 from unittest.mock import patch
 
 import extended_timeout_experiments as extended
+import snapshot_extended_timeout as snapshots
 
 
 def plan():
@@ -15,6 +17,58 @@ def plan():
 
 
 class ExtendedTests(unittest.TestCase):
+    def test_only_derived_runtime_rounding_is_tolerated_in_a_saved_report(self):
+        left=dict(completed_runs=82,cost=7655,reported_lb=7655,par2_seconds=117.357240881375)
+        self.assertTrue(extended.reports_match(left,dict(left,par2_seconds=117.35724088137502)))
+        for key,value in (("completed_runs",83),("cost",7655.000000001),
+                          ("reported_lb",7654.999999999),("par2_seconds",117.358)):
+            self.assertFalse(extended.reports_match(left,dict(left,**{key:value})))
+
+    def test_partial_snapshot_excludes_running_cases_and_is_independently_rebuilt(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)/"source"
+            case=root/"cases"/"MaxSAT-Journal"/"cont"/"origA2"
+            case.mkdir(parents=True)
+            extended.save(root/"plan.json",plan())
+            extended.save(root/"manifest.json",dict(methods=extended.METHODS,
+                plan_sha256=extended.focus.sha(root/"plan.json")))
+            extended.save(case/"cont.json",[dict(name="origA2",solves=[dict(
+                status="timeout",timeout_seconds=300,total_time=300,process_exit_code=0)])])
+            record=extended.assess_case(case,"MaxSAT-Journal","cont","origA2",300)
+            report=extended.summarize(plan(),[record])
+            extended.save(root/"extended_audit.json",report)
+            active=root/"cases"/"CSOnet"/"cont"/"origA2"
+            active.mkdir(parents=True)
+            (active/"active.log").write_text("still running")
+            output=Path(raw)/"snapshot.tar.gz"
+            metadata=snapshots.snapshot(root,output)
+            self.assertEqual(metadata["completed_runs"],1)
+            self.assertFalse(metadata["complete"])
+            with self.assertRaises(ValueError):
+                snapshots.snapshot(root,output)
+            dest=Path(raw)/"extracted"
+            dest.mkdir()
+            with tarfile.open(output) as archive:
+                self.assertFalse(any("CSOnet" in n for n in archive.getnames()))
+                archive.extractall(dest)
+            self.assertEqual(extended.audit_saved(dest),report)
+            (dest/"cases"/"MaxSAT-Journal"/"cont"/"origA2"/"cont.json").write_text("[]")
+            with self.assertRaises(ValueError):
+                extended.audit_saved(dest)
+
+    def test_saved_report_cannot_claim_more_completed_runs_than_the_raw_cases(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            extended.save(root/"plan.json",plan())
+            extended.save(root/"manifest.json",dict(methods=extended.METHODS,
+                plan_sha256=extended.focus.sha(root/"plan.json")))
+            report=extended.summarize(plan(),[])
+            report["completed_runs"]=10
+            report["complete"]=True
+            extended.save(root/"extended_audit.json",report)
+            with self.assertRaises(ValueError):
+                extended.audit_saved(root)
+
     def test_selection_includes_every_baseline_failure_and_does_not_import_old_timings(self):
         result = extended.build_plan(Path("results/sat_research/focus_20261106/selection.json"), Path("results"), 300)
         self.assertEqual({o:len(n) for o,n in result["instances_by_objective"].items()},

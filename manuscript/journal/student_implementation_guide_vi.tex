@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.12}
+\fancyhead[R]{\small Phiên bản 5.13}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.12, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.13, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -93,12 +93,21 @@ khi hết thời gian của instance. Lệnh, vị trí kết quả và cách ti
 trong runbook. Nếu có ca mới giải được, cần xác nhận lại và kiểm tra các
 ca cũ trước khi kết luận tốt hơn.
 
-Bản chụp đầu tiên đã có một tiến triển: ngân sách 1.000 giải được
-\code{origB11/cont} ở 153,39 giây, chi phí 75.494; phương án bộ ba cũ
-timeout ở 300 giây. Lịch và các cận đã được kiểm tra độc lập. CSOnet và
-Journal cũng đã giải được ca này, nên chưa gọi đây là thắng SOTA. Hệ thống
-đã xếp hàng bước chạy lại ba lần các ca giải thêm của cấu hình được chọn;
-chỉ bắt đầu sau khi cả hai lượt hiện tại hoàn tất và qua kiểm toán.
+Ngân sách 1.000 đã hoàn tất 15/15 ca và giải thêm hai ca:
+\code{origB11/cont} ở 153,39 giây, chi phí 75.494;
+\code{stationB12/cont} ở 34,59 giây, chi phí 16.909. Phương án bộ ba cũ
+timeout ở 300 giây trên cả hai ca. Lịch và các cận đã được tải về, kiểm
+tra độc lập. Journal cũng đã giải được hai ca này. Hệ thống đã xếp hàng
+bước chạy lại ba lần các ca giải thêm của cấu hình được chọn; chỉ bắt đầu
+sau khi cả hai lượt tham số hoàn tất và qua kiểm toán.
+
+Bước V17 đã có mã để thử tăng cận ngay trên một nhóm mâu thuẫn. Nó chỉ
+được chạy sau khi các ca giải thêm của V16 lặp lại thành công ba lần.
+Sau đó, cấu hình V16 còn phải giữ đúng kết quả của 16 cặp khó mà phương án
+cũ đã giải được. Bước này kiểm tra xem cải tiến có làm mất ca nào hay không.
+Trước khi chạy ca khó, hệ thống còn phải qua kiểm thử Rust trên VM, kiểm
+tra lịch nhỏ và kiểm tra timeout. Phần cuối tài liệu giải thích công thức
+và ví dụ. Hiện chưa có kết quả hiệu năng của V17.
 
 \textbf{CSOnet dùng RC2; mã được kiểm tra gọi MiniSAT bên trong.}
 RC2 tìm chi phí nhỏ nhất. Khi cần biết các điều kiện hiện tại có thể cùng
@@ -1085,6 +1094,70 @@ Lệnh \code{snapshot} lưu dữ liệu và hash; lệnh \code{audit} kiểm tra
 trên máy khác với bộ đối chứng gốc. Xem lệnh đầy đủ trong runbook. Báo cáo
 \code{audit\_passed=true} chỉ áp dụng cho số ca trong bản chụp; vẫn phải
 đọc \code{complete} để biết đã đủ 15 ca chưa.
+
+\section{Bước V17: tăng cận ngay trên một nhóm mâu thuẫn}
+
+RC2 thường biết rằng một nhóm điều kiện không thể cùng đúng. Do đó phải
+vi phạm ít nhất một điều kiện và trả một phần chi phí. Đôi khi có thể
+chứng minh ngay rằng phải vi phạm ít nhất hai, ba điều kiện. V17 thử tìm
+chứng minh này trước khi quay lại vòng tối ưu chính. Cơ chế tham khảo
+\href{https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.exhaust_core}{RC2 của PySAT},
+với giới hạn công việc để lời gọi thêm không chiếm hết thời gian.
+
+Gọi $F$ là các mệnh đề cứng hiện tại, $C$ là nhóm mâu thuẫn đã biết, và
+$w$ là trọng số còn lại nhỏ nhất trong nhóm. Đặt
+\[
+ R_C=\sum_{\ell\in C}[\ell\text{ bị vi phạm}].
+\]
+Ký hiệu trong ngoặc vuông bằng 1 khi điều kiện bên trong đúng, bằng 0
+khi sai. Từ core đã biết, ta có $R_C\geq1$. Đặt $b=1$; phần chi phí
+$w$ này đã được cộng vào cận dưới. Sau đó kiểm tra
+\[
+ F\land(R_C\leq b).
+\]
+Nếu SAT chứng minh công thức này vô nghiệm, mọi nghiệm của $F$ phải có
+$R_C\geq b+1$. Ta tăng $b$ thêm 1 và cộng thêm $w$ vào cận dưới. Nếu SAT
+tìm được nghiệm, hoặc hết ngân sách mà chưa kết luận, dừng thử và giữ
+mức $b$ đã chứng minh. V17 chỉ thử thêm tối đa bốn lần cho mỗi core mới.
+
+Ví dụ, ba điều kiện $a,b,c$ có cùng trọng số 2, nhưng các mệnh đề cứng
+chỉ cho phép nhiều nhất một điều kiện đúng. Core ban đầu cho biết phải
+trả ít nhất 2. Kiểm tra ``vi phạm không quá một điều kiện'' sẽ vô nghiệm,
+nên tăng cận lên 4. Kiểm tra ``vi phạm không quá hai điều kiện'' có nghiệm,
+nên dừng ở đó. Nếu một lịch vi phạm cả ba điều kiện, phần chi phí còn lại
+vẫn phải được tính thêm 2.
+
+Để cài đúng với trọng số không bằng nhau, gọi $w_\ell$ là trọng số của
+từng điều kiện. Khi đã chứng minh $R_C\geq b$, phép tách chi phí là
+\[
+ \sum_{\ell\in C}w_\ell[\ell\text{ bị vi phạm}]
+ =wb+\sum_{\ell\in C}(w_\ell-w)[\ell\text{ bị vi phạm}]
+   +w(R_C-b).
+\]
+Hạng $wb$ nằm trong cận dưới. Hai hạng còn lại vẫn được giữ trong mô hình.
+Như vậy chỉ tăng cận khi có chứng minh mới, không bỏ phần chi phí nào.
+Kiểm thử đã vét cạn các phép gán Boolean nhỏ để xác nhận đẳng thức này.
+
+Cờ mới là \file{--maxsat-ladder-sc-core-exhaust-checks}, mặc định 0;
+cấu hình thử đặt 4. Mỗi lần thử dùng lại ngân sách xung đột của cấu hình
+V16 được chọn. Lời gọi SAT chính giữ cách chạy cũ. Nếu một lời gọi thêm
+chưa có kết luận, không tăng cận. Mọi lời gọi vẫn cùng dùng timeout
+300 giây của instance.
+
+Script chọn đúng một cấu hình V16 theo coverage rồi PAR-2, sau khi cả hai
+lượt đã đủ và qua kiểm toán. V17 dùng lại cấu hình đó, chỉ bật thêm bước
+trên, và chỉ chạy các cặp mà nó còn chưa giải được. Không chạy lại
+\code{origB11/cont} nếu ca này đã được xác nhận. Danh sách và hash của hai
+lượt nguồn được khóa trong manifest để có thể kiểm tra lại lựa chọn.
+Lệnh và dịch vụ chờ được ghi trong runbook.
+
+Theo dõi số lần kiểm tra, số lần tăng được mức vi phạm, số lần chưa kết
+luận và thời gian ở các trường \file{maxsat_native_exhaust_checks},
+\file{maxsat_native_exhaust_proved_steps},
+\file{maxsat_native_exhaust_inconclusive} và
+\file{maxsat_native_exhaust_time}. Các số đo này còn được giữ khi
+instance hết giờ. Sau khi đủ ca, kiểm toán lại dữ liệu và đối chiếu chi phí
+với các đối chứng đã kiểm tra trước khi quyết định bước tiếp theo.
 
 \section{Nội dung được phép đưa vào bài báo}
 

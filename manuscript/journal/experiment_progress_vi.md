@@ -2,6 +2,45 @@
 
 ## Trạng thái mới nhất
 
+**Cấu hình V16 ngân sách 1.000 đã xong và qua kiểm toán 15/15 ca.** Giải
+thêm hai ca so với phương án bộ ba cũ: `origB11/cont` ở 153,39 giây và
+`stationB12/cont` ở **34,59 giây**. Chi phí lần lượt là 75.494 và 16.909,
+đều có lịch hợp lệ và `cost=lb=ub`; đã tải về và kiểm toán độc lập. Journal
+cũng đã giải được hai ca này. Dữ liệu cuối của cấu hình ở
+`results/sat_research/limited_core_v16_20261106/c1000_complete/`.
+
+**Nhánh ngân sách 100 cũng đã hoàn tất và qua kiểm toán độc lập 15/15.**
+Nó giải cùng hai ca, lần lượt ở 114,71 và 0,75 giây. Hai cấu hình cùng
+coverage; ngân sách 100 có PAR-2 thấp hơn nên được chọn. Dữ liệu ở
+`results/sat_research/limited_core_v16_20261106/c100_complete/`.
+
+Bước xác nhận bắt đầu lúc **01:00:41 ngày 07/11**, giờ Việt Nam: ba lần
+cho mỗi ca, tổng sáu lượt tuần tự. Thời gian `stationB12/cont` khác nhau
+nhiều giữa các lượt sàng lọc, nên cần giữ toàn bộ số đo lặp trước khi báo
+cáo thời gian chính thức. Trong mã, các điều kiện cùng trọng số chưa có
+thứ tự phụ cố định khi lấy từ HashMap; đây là một khả năng gây dao động,
+chưa phải nguyên nhân đã được cô lập.
+
+Sau khi xác nhận đạt, sẽ kiểm tra hồi quy 16 cặp khó mà phương án cũ đã
+giải được. Chưa ghép các ca chưa chạy lại để công bố coverage full.
+
+**Đã cài bước V17, đang chờ:** kiểm tra ngay trên core xem phải vi phạm ít
+nhất hai, ba điều kiện hay không để tăng cận sớm hơn. Cờ mới mặc định tắt;
+thử tối đa bốn lần có ngân sách, chỉ tăng cận khi có chứng minh UNSAT mới.
+Mã `43cae76` qua 14 kiểm thử native ở local và 85 test Python trên VM.
+Kiểm thử Rust đầy đủ, lịch nhỏ, timeout và hồi quy V16 là các cổng bắt buộc
+trước khi chạy ca khó. V17 chỉ dùng các cặp cấu hình V16 được chọn còn chưa
+giải, giữ nguyên các đối chứng đã chạy.
+
+Dịch vụ `maxsat-core-exhaust-v17.service` bắt đầu chờ lúc **00:46:37 ngày
+07/11**, giờ Việt Nam; cả vòng, gồm thời gian chờ và kiểm tra, tối đa
+khoảng 6 giờ. Script và hash ở
+`results/sat_research/core_exhaustion_v17_20261107/`. Hướng dẫn sinh viên
+đã lên bản 5.13, có công thức, ví dụ và lệnh chạy. Chưa có số liệu hiệu
+năng V17 để đưa vào bản thảo.
+
+## Chi tiết các lượt V16 và đối chứng backend
+
 **Đối chứng hai backend đã hoàn tất: 186/186 ca hợp lệ.** Lượt V14 kết
 thúc lúc 22:33:58 ngày 06/11, giờ Việt Nam. Đã lấy dữ liệu về máy local và
 kiểm toán lại độc lập; không có lỗi lịch hoặc chi phí. Giữ nguyên 174 ca

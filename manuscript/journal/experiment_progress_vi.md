@@ -15,6 +15,16 @@ dùng CaDiCaL, cùng 31 cặp và timeout 300 giây; chưa bật thu gọn core.
 Dùng lại 37 kết quả MILP đã kiểm toán, chạy mới 93 ca SAT và 25 ca MILP còn
 thiếu. Không đổi nhãn hoặc thời gian của dữ liệu MiniSAT thành CaDiCaL.
 
+Chiến dịch CaDiCaL bắt đầu lúc **17:33 ngày 06/11/2026 (giờ Việt Nam)**,
+từ commit `4a43a9c`, dịch vụ `maxsat-cadical300-v12-4a43a9c.service`.
+Trước khi chạy, 46 kiểm thử Rust, 59 kiểm thử Python, kiểm tra Bash và build
+release đều đạt. Cả năm phương pháp cùng giải đúng origA1/cont với optimum
+5526; ba phương pháp MaxSAT ghi chữ ký native `cadical-1.9.5`.
+Thư mục VM: `~/projects/cadical-v12/maxsattrainscheduling/results/aglr/cadical300-v12-4a43a9c/`.
+Tối đa ba vòng, mỗi vòng tối đa 6 giờ, chạy tuần tự và tiếp tục từ checkpoint.
+Thông tin khởi chạy ở `results/sat_research/cadical_300_20261106/launch.json`.
+Đây là trạng thái khởi chạy, chưa có kết quả để kết luận CaDiCaL tốt hơn.
+
 Bản chụp **82/155 lượt ở 300 giây** đã được lấy về và kiểm toán độc lập:
 không có lỗi lịch hoặc chi phí mâu thuẫn. Trên cùng 16 cặp cont đã hoàn tất
 đủ năm phương pháp, bộ ba V5 đạt 10/16, CSOnet 10/16, MaxSAT-Journal 10/16,
@@ -26,19 +36,15 @@ Vì vậy chưa vượt SOTA. Dữ liệu nguyên bản và bảng cùng mẫu �
 
 Đã chuẩn bị thử nghiệm thu gọn core: tối đa bốn truy vấn bổ sung, ưu tiên
 bỏ điều kiện có trọng số thấp, chỉ chấp nhận sau chứng minh UNSAT mới.
-Ba unit test với MiniSAT thật và kiểm tra biên dịch thư viện/CLI/test đã đạt
-cục bộ. Bộ Python hiện có 56 test đạt. Còn kiểm thử tích hợp đầy đủ trên VM,
-sẽ thực hiện sau khi chiến dịch 300 giây kết thúc. Lượt mới chạy 31 ca của
-candidate ở 300 giây, dùng lại nguyên 124 kết quả baseline đã kiểm toán;
-không chạy lại bốn baseline. Chưa có kết quả hiệu năng của tính năng này.
+Kiểm thử core với MiniSAT/CaDiCaL thật và bài lịch nhỏ vét cạn đã đạt trên
+VM trong bộ 46 test. Nếu thử tính năng này sau đối chứng CaDiCaL, chỉ chạy
+31 ca candidate ở 300 giây và dùng lại nguyên 124 kết quả baseline đã kiểm
+toán ở cùng backend và cutoff. Chưa có kết quả hiệu năng của tính năng này.
 
-Dịch vụ `maxsat-mincore300-v11-86cdc5f.service` đã được xếp hàng lúc
-17:15 ngày 06/11 (giờ Việt Nam). Dịch vụ chỉ chờ, không build hoặc chạy SAT
-song song với đối chứng. Khi đối chứng hoàn tất và không lỗi, nó tạo
-worktree `~/projects/core-v11/maxsattrainscheduling`, chạy kiểm thử Linux
-và build từ commit `86cdc5f`; chỉ khi tất cả đạt mới chạy candidate 300 giây.
-Nếu kiểm thử hoặc audit thất bại, dịch vụ dừng và giữ log để xử lý.
-Trạng thái lúc xếp hàng và điều kiện chạy ở
+Dịch vụ `maxsat-mincore300-v11-86cdc5f.service` từng được xếp hàng lúc
+17:15 ngày 06/11 (giờ Việt Nam), nhưng đã hủy trước khi build hoặc chạy SAT
+để chuyển sang đối chứng CaDiCaL. Không còn lượt MiniSAT tự động đang chờ.
+Trạng thái lúc xếp hàng và thông tin hủy ở
 `results/sat_research/extended_300_20261106/mincore_v11_queue.json`.
 
 Theo yêu cầu ngày 06/11, vòng kế tiếp tăng timeout chung lên **300 giây**

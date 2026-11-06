@@ -29,3 +29,11 @@ cutoff, on the same VM and with identical MILP parameters. All 93 SAT cases
 must run again with CaDiCaL; 25 remaining MILP cases also run, for 118 newly
 measured cases. The old SAT times are diagnostic, not CaDiCaL results or an
 exact reproduction of the unidentified conference binary.
+
+The new campaign started on 2026-11-06 at 10:33:20 UTC (17:33 Vietnam),
+service `maxsat-cadical300-v12-4a43a9c.service`, source `4a43a9c`.
+All 46 Rust library tests and 59 Python tests passed on the VM. All five
+methods independently verified optimum 5526 on `origA1/cont`; the three
+MaxSAT methods reported native signature `cadical-1.9.5`. See `launch.json`
+for binary hashes and the exact result directory. This receipt records the
+start of the campaign, not a completed comparison or evidence of a speedup.

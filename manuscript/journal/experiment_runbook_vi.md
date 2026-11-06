@@ -29,6 +29,12 @@ EXTENDED_REUSE_MILP_FROM=/home/tuyenkv/projects/core-v9/maxsattrainscheduling/re
 RUN_ID=cadical300-20261106 bash run_extended_timeout_experiments.sh
 ```
 
+Lượt đang chạy trên VM dùng commit `4a43a9c`, worktree
+`~/projects/cadical-v12/maxsattrainscheduling`, RUN_ID
+`cadical300-v12-4a43a9c`, dịch vụ `maxsat-cadical300-v12-4a43a9c.service`.
+Không chạy thêm lệnh trên trong khi dịch vụ này còn hoạt động. Xem log bằng
+`journalctl -u maxsat-cadical300-v12-4a43a9c.service -n 30 --no-pager`.
+
 Kích hoạt môi trường Gurobi đã cài trước khi chạy. Lệnh giới hạn một vòng
 6 giờ, chạy tuần tự, xen kẽ thứ tự phương pháp có seed cố định. Chạy lại cùng
 lệnh để tiếp tục; nguồn, binary, dependency, máy và danh sách phải khớp.
@@ -72,10 +78,10 @@ Khi chiến dịch năm phương pháp ở trên kết thúc, chạy kiểm th�
 và build release trong một worktree khác. Sau đó:
 
 ```bash
-EXTENDED_REFERENCE=/home/tuyenkv/projects/core-v9/maxsattrainscheduling/results/aglr/extended300-b6a4370-20261106 \
+EXTENDED_REFERENCE=/home/tuyenkv/projects/cadical-v12/maxsattrainscheduling/results/aglr/cadical300-v12-4a43a9c \
 BIN=./target/release/ddd EXPORT_BIN=./target/release/export_lp \
 CPLEX_BIN=/home/tuyenkv/opt/ibm/ILOG/CPLEX_Studio2220/cplex/bin/x86-64_linux/cplex \
-RUN_ID=mincore300-v11 bash run_core_minimization_trial.sh
+RUN_ID=mincore300-cadical bash run_core_minimization_trial.sh
 ```
 
 Script kiểm toán lại đối chứng và chỉ chạy nếu đủ 155/155 lượt, không lỗi.
@@ -85,10 +91,9 @@ hash dữ liệu và manifest. Không được thay runtime hoặc chọn lượ
 `measured_runs`/`reused_baseline_runs` cho biết số lượt đo mới/dùng lại.
 Mỗi vòng tối đa 6 giờ; cùng RUN_ID để tiếp tục.
 
-Các kiểm thử thuật toán đã chạy cục bộ với MiniSAT thật; kiểm tra biên dịch
-bao gồm thư viện, CLI và test. Kiểm thử tích hợp đầy đủ trên Linux/VM còn
-phải chạy sau khi chiến dịch hiện tại kết thúc. Chưa được ghi rằng toàn bộ
-kiểm thử VM của tính năng mới đã đạt hoặc rằng cấu hình mới nhanh hơn.
+Trên VM, 46 test Rust và 59 test Python đã đạt, gồm core với CaDiCaL thật
+và lịch nhỏ so với vét cạn. Ba phương pháp MaxSAT đã qua smoke test với
+chữ ký `cadical-1.9.5`. Chưa có số liệu hiệu năng của thu gọn core.
 
 ## Quy trình nhóm 120 giây đã chạy
 
@@ -116,7 +121,7 @@ Glucose đã chạy xong trên nhóm này: 0/4 `infsteps180`, 2/14 `cont`, khôn
 tăng số ca giải được so với phương án bộ ba. Kết quả đã kiểm toán và push
 ở `results/sat_research/focus_v7_20261106/`; không chạy lại lượt đó.
 
-Vòng tiếp theo giữ MiniSAT và thêm quy tắc loại lựa chọn quá đắt:
+Vòng V8 đã giữ MiniSAT và thêm quy tắc loại lựa chọn quá đắt:
 
 ```bash
 FOCUS_MANIFEST=results/sat_research/focus_20261106/selection.json \
@@ -139,8 +144,10 @@ ca mới, mới chọn một cấu hình để đánh giá đầy đủ và lậ
 Glucose trong phép thử này là bộ native RustSAT, không dùng alias tương thích
 trong salvers. Kiểm thử xác nhận dấu của các literal trong UNSAT core đúng
 với bản đồ chi phí MaxSAT và optimum khớp vét cạn trên bài ba tàu.
-Backend mặc định của CSOnet vẫn là MiniSAT; cờ mới là
-`--maxsat-ladder-sc-backend minisat|glucose`.
+Giá trị mặc định CLI vẫn là MiniSAT để giữ hành vi của mã lịch sử;
+không dùng điều này để suy ra backend binary hội nghị. Cờ chọn hiện tại là
+`--maxsat-ladder-sc-backend minisat|cadical|glucose`. Chiến dịch mới luôn
+chọn `cadical` tường minh cho cả ba phương pháp MaxSAT.
 
 Ở lượt hardening, nếu trọng số còn lại của một điều kiện lớn hơn `UB-LB`,
 thêm mệnh đề đơn để điều kiện đó luôn được thỏa và bỏ nó khỏi danh sách mềm.

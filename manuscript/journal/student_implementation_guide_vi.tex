@@ -163,8 +163,8 @@ ba objective. Việc không có file \code{finsteps123.json} trong lượt này 
 đúng, vì cấu hình đã ghi rõ danh sách rỗng cho objective đó.
 
 Glucose đã được thử: giải 0/4 ca \code{infsteps180} và 2/14 ca \code{cont},
-không tăng coverage so với phương án bộ ba. Phép thử tiếp theo giữ MiniSAT
-và chỉ thêm quy tắc loại sớm lựa chọn quá đắt:
+không tăng coverage so với phương án bộ ba. Vòng V8 sau đó đã giữ MiniSAT
+và chỉ thêm quy tắc loại sớm lựa chọn quá đắt; lệnh đã dùng là:
 
 \begin{verbatim}
 FOCUS_MANIFEST=results/sat_research/focus_20261106/selection.json \
@@ -216,7 +216,7 @@ quá $U$, nên vẫn có biểu diễn SAT thỏa các mệnh đề này. Quy t�
 tạo bộ cộng nhị phân hoặc thêm mốc thời gian.
 
 Cờ là \file{--maxsat-ladder-sc-residual-hardening} \code{true}, mặc định
-tắt. Lượt thử giữ MiniSAT, phương án bộ ba và cây chi phí cũ; không bật
+tắt. Lượt V8 đã giữ MiniSAT, phương án bộ ba và cây chi phí cũ; không bật
 giới hạn objective nhị phân. Theo dõi \code{maxsat\_hardened\_primary},
 \code{maxsat\_hardened\_totalizer}, \code{maxsat\_hardening\_time},
 coverage và số biến/mệnh đề. Số điều kiện được cố định chỉ giải thích cơ
@@ -225,8 +225,8 @@ chế; kết luận cải thiện vẫn dựa trên các ca giải thêm và b�
 Kiểm thử đã xét các phép gán thỏa ngân sách, điểm biên $w_b=U-L$, chi phí
 còn lại sau xử lý core và optimum vét cạn trên bài nhỏ. Một bài hai tàu
 còn kiểm tra rằng mã thật sự cố định được một lựa chọn đắt mà vẫn giữ
-optimum. Thực nghiệm tiếp tục dùng đúng 18 cặp đã khóa; không chạy full
-chỉ vì kiểm thử nhỏ đã đạt.
+optimum. V8 đã chạy đúng 18 cặp và chưa tăng coverage. Lượt hiện tại dùng
+CaDiCaL và 31 cặp ở 300 giây, theo phần cuối tài liệu; không chạy lại V8.
 
 \section{Kết quả hội nghị đã có và cách sử dụng}
 

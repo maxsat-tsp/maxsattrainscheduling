@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.7}
+\fancyhead[R]{\small Phiên bản 5.8}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -63,7 +63,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.7, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.8, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -71,6 +71,13 @@ Mỗi báo cáo phải ghi rõ giả định này.
 \newpage
 
 \section{Sinh viên đọc phần này trước}
+
+\textbf{Backend của lượt mới là CaDiCaL.} Cả phương pháp mới, đối chứng
+CSOnet và MaxSAT-DDD đều dùng CaDiCaL thật, cùng timeout 300 giây. Các lượt
+MiniSAT cũ được giữ làm chẩn đoán. Mã nguồn sinh viên gọi MiniSAT, còn bài
+hội nghị chỉ ghi RC2; chưa có thông tin binary để xác định backend của lượt
+đã công bố. Không tự suy ra backend SAT từ tên RC2 hoặc tên lệnh solver.
+Mỗi kết quả mới phải ghi backend và chữ ký native; auditor kiểm tra cả hai.
 
 Phương pháp AGLR đã được cài. Nhiệm vụ trước mắt của sinh viên là kiểm tra môi
 trường và chạy thí nghiệm, không phải viết lại thuật toán. Chỉ sửa mã khi kết
@@ -889,8 +896,9 @@ sót thông tin.
 
 Các vòng 120 giây gần đây chưa giải thêm ca mới. Bây giờ thử giới hạn
 $T=300$ giây cho cả năm phương pháp: bộ ba V5, CSOnet, MaxSAT của bài tạp
-chí trước, Big-M Gurobi và Big-M CPLEX. Cả năm chạy cùng 31 cặp đã khóa tại
-\file{results/sat_research/extended_300_20261106/plan.json}. Không chạy lại
+chí trước, Big-M Gurobi và Big-M CPLEX. Ba phương pháp MaxSAT dùng CaDiCaL.
+Cả năm chạy cùng 31 cặp đã khóa tại
+\file{results/sat_research/cadical_300_20261106/plan.json}. Không chạy lại
 \code{finsteps123} trong vòng này vì các đối chứng đã giải hết ở 120 giây.
 
 Sau khi kích hoạt môi trường Gurobi trên VM, chạy:
@@ -898,7 +906,7 @@ Sau khi kích hoạt môi trường Gurobi trên VM, chạy:
 BIN=./target/release/ddd \
 EXPORT_BIN=./target/release/export_lp \
 CPLEX_BIN=/duong/dan/toi/cplex \
-RUN_ID=extended-300-20261106 \
+RUN_ID=cadical300-20261106 \
   bash run_extended_timeout_experiments.sh
 \end{verbatim}
 Đường dẫn CPLEX thực tế trên VM có trong runbook. Mỗi vòng tối đa 6 giờ;
@@ -906,6 +914,8 @@ script chỉ bắt đầu một ca khi còn đủ thời gian để hoàn tất.
 lệnh để tiếp tục phần còn thiếu. Giữ nguyên mã nguồn, binary, danh sách và
 tham số. Các ca chạy tuần tự; thứ tự phương pháp được trộn với seed cố định.
 CPLEX dùng Big-M eager, 4 luồng, gap tương đối và tuyệt đối bằng 0.
+Runbook chỉ rõ cách dùng lại 37 ca MILP đã hoàn tất. Tất cả ca SAT đều
+chạy lại bằng CaDiCaL; không lấy thời gian MiniSAT làm thời gian CaDiCaL.
 
 Với ca $i$, gọi $t_i$ là thời gian hoàn tất và $q_i(T)=1$ khi lịch đã được
 kiểm tra, chi phí bằng cận dưới và cận trên, và $t_i\le T$; còn lại

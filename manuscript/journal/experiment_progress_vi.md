@@ -2,6 +2,19 @@
 
 ## Trạng thái mới nhất
 
+**Điều chỉnh backend theo yêu cầu mới:** dừng chiến dịch MiniSAT sau
+91/155 lượt hoàn tất và hủy lượt thu gọn core đang chờ. Mã nguồn sinh viên
+`c427a10` gọi MiniSAT cho MaxSAT-Default; bản hội nghị chỉ ghi RC2, chưa xác
+minh được backend của binary đã tạo bảng. Những lượt MiniSAT được giữ làm
+chẩn đoán, không gọi là tái tạo chính xác binary CSOnet.
+
+Đã bổ sung CaDiCaL thật cho SC/AGLR và MaxSAT-DDD, sửa alias `maxsat_ddd_cdc`,
+ghi chữ ký runtime và kiểm tra chữ ký trong auditor. Kế hoạch mới ở
+`results/sat_research/cadical_300_20261106/plan.json`: cả ba phương pháp MaxSAT
+dùng CaDiCaL, cùng 31 cặp và timeout 300 giây; chưa bật thu gọn core.
+Dùng lại 37 kết quả MILP đã kiểm toán, chạy mới 93 ca SAT và 25 ca MILP còn
+thiếu. Không đổi nhãn hoặc thời gian của dữ liệu MiniSAT thành CaDiCaL.
+
 Bản chụp **82/155 lượt ở 300 giây** đã được lấy về và kiểm toán độc lập:
 không có lỗi lịch hoặc chi phí mâu thuẫn. Trên cùng 16 cặp cont đã hoàn tất
 đủ năm phương pháp, bộ ba V5 đạt 10/16, CSOnet 10/16, MaxSAT-Journal 10/16,

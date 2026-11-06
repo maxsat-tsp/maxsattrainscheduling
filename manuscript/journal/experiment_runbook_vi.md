@@ -9,6 +9,12 @@ Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt ch
 
 ## Vòng hiện tại: 300 giây cho cả phương pháp mới và SOTA
 
+Backend hiện tại được chọn rõ là **CaDiCaL** cho cả ba phương pháp MaxSAT.
+Mã sinh viên cũ gọi MiniSAT; bản hội nghị ghi RC2 và chưa có provenance binary
+để xác định backend của lượt công bố. Do đó không gọi lượt MiniSAT là tái tạo
+chính xác bản chạy hội nghị. Chiến dịch MiniSAT đã dừng ở 91 lượt; lượt thu
+gọn core từng xếp hàng đã hủy. Dữ liệu được giữ làm chẩn đoán.
+
 Chưa có ca mới được giải ở 120 giây. Theo yêu cầu của thầy/cô, thử 300 giây
 cho cả phương án bộ ba V5 và CSOnet, MaxSAT-Journal, Big-M Gurobi, Big-M CPLEX.
 Danh sách mới có 31 cặp: 5 infsteps180, 26 cont, không có finsteps123. Đây là
@@ -18,7 +24,9 @@ Mỗi phương pháp chạy đúng danh sách này. Không đổi timeout của 
 ```bash
 BIN=./target/release/ddd EXPORT_BIN=./target/release/export_lp \
 CPLEX_BIN=/home/tuyenkv/opt/ibm/ILOG/CPLEX_Studio2220/cplex/bin/x86-64_linux/cplex \
-RUN_ID=extended-300-20261106 bash run_extended_timeout_experiments.sh
+EXTENDED_PLAN=results/sat_research/cadical_300_20261106/plan.json \
+EXTENDED_REUSE_MILP_FROM=/home/tuyenkv/projects/core-v9/maxsattrainscheduling/results/aglr/extended300-b6a4370-20261106 \
+RUN_ID=cadical300-20261106 bash run_extended_timeout_experiments.sh
 ```
 
 Kích hoạt môi trường Gurobi đã cài trước khi chạy. Lệnh giới hạn một vòng
@@ -38,10 +46,11 @@ lại. `gained` và `lost` so sánh các cặp đã chạy đủ cả hai phươ
 sau khi chọn được cấu hình. Nếu 300 giây chưa giúp phân biệt, xem cận và
 thời gian trước khi quyết định vòng 600 giây cho cả năm phương pháp.
 
-Chiến dịch trên VM dùng `RUN_ID=extended300-b6a4370-20261106`.
-Theo dõi bằng `journalctl -u maxsat-extended300-b6a4370.service`.
-Không đổi mã hoặc binary trong worktree `~/projects/core-v9/maxsattrainscheduling`
-khi dịch vụ này đang chạy.
+Mỗi kết quả CaDiCaL phải có `maxsat_backend=cadical` và chữ ký
+`maxsat_backend_signature` từ solver native. `maxsat_ddd_cdc` đã được sửa
+để gọi CaDiCaL thật. Lệnh mặc định cũ vẫn giữ để tái tạo mã lịch sử; chiến dịch
+mới dùng cờ backend tường minh. Toàn bộ 93 ca SAT chạy lại. Chỉ 37 ca MILP đã
+hoàn tất được dùng lại nguyên byte; 25 ca MILP còn thiếu chạy mới.
 
 Có thể lấy bản chụp các ca đã hoàn tất mà không dừng chiến dịch:
 `python3 quick_scripts/analyze/snapshot_extended_timeout.py <RUN_DIR> <archive.tar.gz>`.

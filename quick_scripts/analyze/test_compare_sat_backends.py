@@ -132,5 +132,31 @@ class BackendComparisonTests(unittest.TestCase):
             save.assert_not_called()
             csv.assert_not_called()
 
+    def test_stopped_trial_reuses_valid_receipts_and_excludes_failed_unreceipted_case(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            self.make_reference(root,"minisat")
+            _,imports=dual.load_reference(root,"minisat",plan())
+            trial=root/"trial"
+            trial.mkdir()
+            manifest=dict(plan=plan(),imports=imports)
+            extended.save(trial/"manifest.json",manifest)
+            for item in imports:
+                directory=dual.case_root(trial,dual.key(item))
+                directory.mkdir(parents=True)
+                (directory/"cont.json").write_bytes(Path(item["source"]).read_bytes())
+                extended.save(directory/"measurement.json",item)
+            failed=dual.case_root(trial,("cadical","Orders-Transitive","cont","origA2"))
+            failed.mkdir(parents=True)
+            extended.save(failed/"cont.json",[dict(name="origA2",solves=[dict(status="external_timeout",process_exit_code=124)])])
+            extended.save(trial/"failure.json",dict(error="a worker failed"))
+            dual.audit_saved(trial)
+            reference,reused=dual.load_completed_trial(trial,plan())
+            self.assertEqual(reference["independently_verified_completed"],2)
+            self.assertEqual(len(reused),2)
+            self.assertTrue(all(item["backend"]=="minisat" for item in reused))
+            self.assertTrue(all(Path(item["source"]).read_bytes()==Path(item["source_measurement"]["source"]).read_bytes() for item in reused))
+            with self.assertRaises(ValueError): dual.load_completed_trial(trial,dict(plan(),timeout_seconds=600))
+
 
 if __name__=="__main__": unittest.main()

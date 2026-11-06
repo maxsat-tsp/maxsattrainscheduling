@@ -130,6 +130,7 @@ def assess(root, task, manifest):
     if record["solve"].get("maxsat_backend", backend) != backend:
         raise ValueError("runtime SAT backend differs from its reference")
     record.update(backend=backend, method=role, measurement=receipt)
+    record["was_reused"] = expected_import is not None
     return record
 
 
@@ -182,7 +183,8 @@ def summarize(plan, records):
         runtime_note="historical sequential times and new parallel-development times retain separate provenance",
         comparison=rows, matching_binary_parallel_comparison=parallel_rows,
         progress=[dict(backend=b, completed=sum(r["backend"]==b for r in records),
-                       reused=sum(r["backend"]==b and r["measurement"]["execution_mode"]=="historical-sequential" for r in records))
+                       reused=sum(r["backend"]==b and r.get("was_reused",
+                           r["measurement"]["execution_mode"]=="historical-sequential") for r in records))
                   for b in BACKENDS],
         missing=[list(t) for t in tasks(plan) if t not in indexed])
 
@@ -197,6 +199,31 @@ def audit_saved(root, *, write=True):
         extended.audit.write_csv(root/"backend_comparison.csv", report["comparison"])
         extended.audit.write_csv(root/"backend_parallel_same_binary.csv", report["matching_binary_parallel_comparison"])
     return report
+
+
+def load_completed_trial(root, plan):
+    """Reuse valid completed receipts even if a later case stopped the trial."""
+    source=json.loads((root/"manifest.json").read_text())
+    for field in ("instances_by_objective","timeout_seconds","dataset_sha256"):
+        if source["plan"][field]!=plan[field]:
+            raise ValueError(f"completed trial differs in {field}")
+    report=audit_saved(root,write=False)
+    original_imports={key(item):item for item in source["imports"]}
+    imports=[]
+    for task in tasks(plan):
+        directory=case_root(root,task)
+        if not (directory/"measurement.json").exists():
+            continue  # A failed or interrupted result without a receipt is never reused.
+        record=assess(root,task,source)
+        metadata=record["measurement"]
+        config=original_imports[task]["definition"] if task in original_imports else definition(source["plan"],task[0],task[1])
+        if not same_definition(config,definition(plan,task[0],task[1])):
+            raise ValueError("completed trial changed the method configuration")
+        imports.append(dict(metadata,source=str((directory/f"{task[2]}.json").resolve()),
+                            definition=config,source_measurement=metadata))
+    return dict(source=str(root.resolve()),manifest_sha256=extended.focus.sha(root/"manifest.json"),
+                report_sha256=extended.focus.sha(root/"backend_comparison.json"),
+                independently_verified_completed=report["completed_runs"]),imports
 
 
 def worker(root, backend, seconds):
@@ -266,6 +293,17 @@ def initialize(args):
         reference, cases = load_reference(getattr(args,backend+"_reference"), backend, plan)
         references[backend] = reference
         imports.extend(cases)
+    completed_trial=getattr(args,"completed_trial",None)
+    if completed_trial is not None:
+        reference,cases=load_completed_trial(completed_trial,plan)
+        references["completed_trial"]=reference
+        merged={key(item):item for item in imports}
+        for item in cases:
+            old=merged.get(key(item))
+            if old is not None and old["sha256"]!=item["sha256"]:
+                raise ValueError("the two references disagree on the same completed case")
+            merged[key(item)]=item
+        imports=list(merged.values())
     manifest = dict(schema="sat-backend-parallel-v1", plan=plan, cpu_groups=groups,
         physical_core_groups={b:sorted({topology[c] for c in groups[b]}) for b in BACKENDS},
         ram_kb=args.ram_kb, binary=str(args.binary.resolve()),binary_sha256=solver["binary_sha256"],
@@ -348,6 +386,7 @@ def main():
     runner.add_argument("--solver-manifest",type=Path,required=True)
     runner.add_argument("--minisat-reference",type=Path,required=True)
     runner.add_argument("--cadical-reference",type=Path,required=True)
+    runner.add_argument("--completed-trial",type=Path)
     runner.add_argument("--minisat-cpus",default="0,1,4,5")
     runner.add_argument("--cadical-cpus",default="2,3,6,7")
     runner.add_argument("--ram-kb",type=int,default=6000000)

@@ -48,6 +48,8 @@ Baseline CPLEX corrected đã hoàn tất 216 ca ở 120 giây. Dùng các CSV t
 `results/sat_research/cplex_full_120_20261108/cplex_csv/`; auditor yêu cầu
 `valid=true` cho lịch và chỉ tính tối ưu khi `cost=lb=ub`. Một dòng
 `invalid_solution` và các dòng cận chưa khớp phải giữ nguyên, không sửa tay.
+Ca `infsteps180/trackA8` có tight rerun riêng trong `tight_fix/`, với
+integrality tolerance `1e-9` và `cost=lb=ub=146`.
 
 ## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 

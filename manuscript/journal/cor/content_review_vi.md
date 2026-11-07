@@ -44,8 +44,8 @@ V33 giảm tần suất heuristic xuống mỗi 8 vòng, telemetry hợp lệ nh
 0/13 ca mới; không dùng trong bảng chính.
 V34 thử phân cực random của MiniSAT, cũng 0/13 ca mới; chỉ giữ làm ablation.
 Baseline CPLEX corrected đã chạy đủ 216 ca: coverage chứng minh tối ưu là
-`(72,66,66)`, tổng 204; một ca invalid và 11 ca còn lại chỉ có incumbent hợp
-lệ nhưng chưa chứng minh tối ưu. Các số liệu này đã audit và được giữ riêng
+`(72,67,66)`, tổng 205; tight rerun đã sửa ca invalid ban đầu, còn 11 ca chỉ
+có incumbent hợp lệ nhưng chưa chứng minh tối ưu. Các số liệu này đã audit và được giữ riêng
 cho bảng baseline, chưa đưa vào Abstract/Results/Conclusion.
 V28 tắt đường tăng cận MiniSAT-only để hai backend thực sự dùng cùng ngân sách.
 Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh

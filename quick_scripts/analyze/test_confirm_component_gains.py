@@ -4,6 +4,14 @@ from pathlib import Path
 import confirm_component_gains as follow
 
 class FollowupTests(unittest.TestCase):
+    def test_concurrent_followup_keeps_its_diagnostic_runtime_context(self):
+        manifest=dict(schema='test',selected_gains=[],confirmation_plan=[],regression_plan=[],
+            measurement_context='paired-screen',paired_run_id='v28')
+        report=follow.report_for(manifest,[])
+        self.assertEqual(report['measurement_context'],'paired-screen')
+        self.assertEqual(report['paired_run_id'],'v28')
+        self.assertIn('serial rerun',report['runtime_scope']);self.assertFalse(report['submission_passed'])
+
     def test_incomplete_confirmations_cannot_be_masked_by_completed_regressions(self):
         manifest=dict(schema='test',selected_gains=[dict(name='new')],confirmation_plan=[{}]*3,regression_plan=[{}])
         record=dict(stage='regression',repeat=0,objective='cont',name='old',retained=True)

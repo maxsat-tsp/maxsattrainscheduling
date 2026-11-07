@@ -6,6 +6,24 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_backend_contrast_retains_all_other_settings_and_common_core_budget(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        before=copy.deepcopy(source)
+        base=cycles.candidate_config(source,'order-master-seeds')
+        self.assertEqual(cycles.experiment_config(source,'order-master-seeds'),base)
+        mini=cycles.experiment_config(source,'order-master-seeds','minisat',0)
+        cadi=cycles.experiment_config(source,'order-master-seeds','cadical',0)
+        self.assertEqual(mini,dict(base,backend='minisat',core_minimize_conflicts='0'))
+        self.assertEqual(cadi,dict(mini,backend='cadical'));self.assertEqual(source,before)
+        for backend,budget in [('typo',0),('minisat',-1),('cadical',True),('minisat',2**31),('cadical',100),('cadical',None)]:
+            with self.assertRaises(ValueError):cycles.experiment_config(source,'order-master-seeds',backend,budget)
+
+    def test_parallel_measurements_need_an_explicit_locked_pair_identity(self):
+        self.assertEqual(cycles.measurement_context('serial',None),{})
+        self.assertEqual(cycles.measurement_context('paired-screen','v28'),dict(measurement_context='paired-screen',paired_run_id='v28'))
+        for mode,run_id in [('paired-screen',None),('paired-screen',''),('serial','v28'),('typo',None)]:
+            with self.assertRaises(ValueError):cycles.measurement_context(mode,run_id)
+
     def test_initial_cost_seeds_change_one_locked_component(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         cfg=cycles.candidate_config(source,'order-master-seeds')

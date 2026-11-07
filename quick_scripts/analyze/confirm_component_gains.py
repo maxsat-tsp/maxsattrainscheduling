@@ -46,6 +46,8 @@ def run(args):
         cpu_affinity=sorted(os.sched_getaffinity(0)),repeats=3,selected_gains=gains,confirmation_plan=confirmations,regression_plan=regressions,
         script_sha256=extended.focus.sha(Path(__file__)),submission_passed=False)
     if source.get('objective_filter') is not None:manifest['objective_filter']=source['objective_filter']
+    for key in ('measurement_context','paired_run_id'):
+        if key in source:manifest[key]=source[key]
     if (root/'manifest.json').exists() and json.loads((root/'manifest.json').read_text())!=manifest:raise ValueError('followup resume would change its source or selection')
     extended.save(root/'manifest.json',manifest)
     runtime=SimpleNamespace(timeout=source['timeout_seconds'],ram_kb=source['ram_kb'],binary=args.binary,method_definitions={'Component-followup':source['definition']})
@@ -85,6 +87,9 @@ def report_for(manifest,records):
     if manifest.get('objective_filter') is not None:
         report.update(objective_filter=manifest['objective_filter'],full_reference_regression=False,
             scope='objective-filtered confirmations and regression only; excluded objectives require separate full-table evaluation')
+    if manifest.get('measurement_context')=='paired-screen':
+        report.update(measurement_context='paired-screen',paired_run_id=manifest['paired_run_id'],
+            runtime_scope='diagnostic concurrent screen or followup; a serial rerun is required for the main runtime table')
     return report
 
 def audit_saved(root,source_root,reference):
@@ -93,6 +98,8 @@ def audit_saved(root,source_root,reference):
     gains,confirmations,regressions=plan_for(source,audited,reference)
     if (root/'failure.json').exists():raise ValueError('followup retains a recorded failure')
     if manifest.get('objective_filter')!=source.get('objective_filter'):raise ValueError('followup objective scope changed')
+    for key in ('measurement_context','paired_run_id'):
+        if manifest.get(key)!=source.get(key):raise ValueError('followup measurement context changed')
     for key in ['solver_source_commit','binary_sha256','definition','timeout_seconds','ram_kb','dataset_sha256']:
         if manifest[key]!=source[key]:raise ValueError('followup configuration changed')
     for field,path in [('source_manifest_sha256',source_root/'manifest.json'),

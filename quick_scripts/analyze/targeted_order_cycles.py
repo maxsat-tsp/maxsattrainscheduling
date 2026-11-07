@@ -37,6 +37,26 @@ def candidate_config(source,component='order-cycles'):
         raise ValueError('reference already enables the component being tested')
     return dict(config,**{field:'true'})
 
+def experiment_config(source,component,backend=None,core_conflicts=None):
+    config=candidate_config(source,component)
+    if backend is not None:
+        if backend not in ('minisat','cadical'):raise ValueError('unsupported comparison backend')
+        config['backend']=backend
+    if core_conflicts is not None:
+        if type(core_conflicts) is not int or not 0<=core_conflicts<=2**31-1:raise ValueError('invalid core conflict budget')
+        config['core_minimize_conflicts']=str(core_conflicts)
+    if config.get('backend')=='cadical' and int(config.get('core_minimize_checks','0'))>0 and int(config.get('core_minimize_conflicts','0'))!=0:
+        raise ValueError('the conflict cap is MiniSAT-specific; explicitly use a common zero (unlimited) cap')
+    return config
+
+def measurement_context(mode,paired_run_id):
+    if mode not in ('serial','paired-screen'):raise ValueError('unsupported measurement context')
+    if mode=='paired-screen':
+        if not isinstance(paired_run_id,str) or not paired_run_id.strip():raise ValueError('paired screen needs a shared run ID')
+        return dict(measurement_context=mode,paired_run_id=paired_run_id)
+    if paired_run_id is not None:raise ValueError('a serial run cannot have a paired run ID')
+    return {}
+
 def schema_for(component):
     if component=='order-master-seeds':return 'targeted-order-master-seeds-v1'
     if component=='order-master-batch':return 'targeted-order-master-batch-v1'
@@ -117,12 +137,16 @@ def audit_saved(root,reference):
     source,selection,digests=load_reference(reference)
     manifest=json.loads((root/'manifest.json').read_text());component=manifest.get('component','order-cycles')
     selection=filtered_selection(selection,manifest.get('objective_filter'))
+    if measurement_context(manifest.get('measurement_context','serial'),manifest.get('paired_run_id'))!={
+        k:manifest[k] for k in ('measurement_context','paired_run_id') if k in manifest}:
+        raise ValueError('measurement context changed')
     saved=json.loads((root/report_name(component)).read_text())
     if manifest['schema']!=schema_for(component) or manifest['instances_by_objective']!=selection:
         raise ValueError('selection differs from unresolved reference pairs')
     for field,file in [('reference_manifest_sha256','manifest.json'),('reference_report_sha256','full_audit.json')]:
         if manifest[field]!=extended.focus.sha(reference/file):raise ValueError('reference changed')
-    if manifest['reference_raw_sha256']!=digests or manifest['definition']!=candidate_config(source,component):raise ValueError('method or raw references changed')
+    config=experiment_config(source,component,manifest.get('backend_override'),manifest.get('core_conflicts_override'))
+    if manifest['reference_raw_sha256']!=digests or manifest['definition']!=config:raise ValueError('method or raw references changed')
     if manifest['timeout_seconds']!=source['timeout_seconds'] or manifest['ram_kb']!=source['ram_kb']:
         raise ValueError('candidate and reference must use the same timeout and RAM')
     if manifest['dataset_sha256']!=source['dataset_sha256']:raise ValueError('dataset changed')
@@ -164,7 +188,9 @@ def run(args):
     commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=extended.REPO,text=True).strip()
     build=json.loads(args.build_manifest.read_text())
     solver_source=validate_build(build,commit,args.binary,args.reuse_build)
-    config=candidate_config(source,args.component);root=args.results.resolve();root.mkdir(parents=True,exist_ok=True)
+    context=measurement_context(args.measurement_context,args.paired_run_id)
+    config=experiment_config(source,args.component,args.backend,args.core_minimize_conflicts)
+    root=args.results.resolve();root.mkdir(parents=True,exist_ok=True)
     manifest=dict(schema=schema_for(args.component),component=args.component,runner_commit=commit,solver_source_commit=solver_source,
         definition=config,instances_by_objective=selection,timeout_seconds=source['timeout_seconds'],ram_kb=source['ram_kb'],
         binary_sha256=extended.focus.sha(args.binary),reference_manifest_sha256=extended.focus.sha(args.reference/'manifest.json'),
@@ -175,6 +201,9 @@ def run(args):
         build_manifest_sha256=extended.focus.sha(args.build_manifest),
         salvers=extended.dependency_state(extended.REPO.parent/'salvers'),
         ipamir=extended.dependency_state(extended.REPO.parent/'ipamir-rs'),submission_passed=False)
+    manifest.update(context)
+    if args.backend is not None:manifest['backend_override']=args.backend
+    if args.core_minimize_conflicts is not None:manifest['core_conflicts_override']=args.core_minimize_conflicts
     if args.objectives is not None:
         manifest['objective_filter']=[o for o in selection if o in args.objectives]
     if (root/'manifest.json').exists() and json.loads((root/'manifest.json').read_text())!=manifest:
@@ -205,6 +234,11 @@ def main():
     parser.add_argument('--reuse-build',action='store_true',help='reuse the hashed binary while retaining its own source commit')
     parser.add_argument('--objectives',nargs='+',choices=extended.audit.OBJECTIVES,
         help='screen only these objectives; excluded pairs remain unresolved and cannot count as gains')
+    parser.add_argument('--backend',choices=['minisat','cadical'],help='change only the SAT backend in the locked method')
+    parser.add_argument('--core-minimize-conflicts',type=int,
+        help='zero means unlimited; needed for a common budget with the CaDiCaL adapter')
+    parser.add_argument('--measurement-context',choices=['serial','paired-screen'],default='serial')
+    parser.add_argument('--paired-run-id',help='shared ID of two concurrent backend screens; their timings remain diagnostic')
     args=parser.parse_args()
     if args.action=='audit':print(json.dumps(audit_saved(args.results,args.reference),indent=2));return
     if args.binary is None or args.build_manifest is None or not 0<args.round_seconds<=21600:

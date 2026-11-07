@@ -1904,7 +1904,14 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             .iter()
             .map(|(k, (_, w, _))| (*k, *w))
             .collect::<Vec<_>>();
-        assumptions.sort_by(|a, b| b.1.cmp(&a.1));
+        // HashMap iteration order is deliberately unspecified.  Keeping only
+        // the weight in the comparator therefore changed the SAT branching
+        // order between runs, even when the input and binary were identical.
+        // Break equal-weight ties by the literal value so a run is
+        // reproducible without changing the RC2 objective or its proof.
+        assumptions.sort_by(|a, b| {
+            b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
+        });
 
         log::info!(
             "solving it{} with {} timepoints {} conflicts",

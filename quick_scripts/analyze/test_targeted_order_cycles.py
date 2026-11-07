@@ -6,6 +6,25 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_full_path_contrast_changes_only_assumption_scheduling_against_v20(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        v20=cycles.candidate_config(source,'order-paths')
+        v21=cycles.candidate_config(source,'order-paths-full')
+        self.assertEqual(v21,dict(v20,assumptions='full'))
+        self.assertEqual(cycles.schema_for('order-paths-full'),'targeted-order-paths-full-v1')
+        self.assertEqual(cycles.report_name('order-paths-full'),'order_paths_full_audit.json')
+
+    def test_reused_binary_keeps_its_actual_source_and_requires_the_recorded_hash(self):
+        with tempfile.TemporaryDirectory() as raw:
+            binary=Path(raw)/'ddd';binary.write_bytes(b'frozen binary')
+            build=dict(git_commit='solver-source',binary_sha256=extended.focus.sha(binary))
+            with self.assertRaisesRegex(ValueError,'reuse-build'):
+                cycles.validate_build(build,'new-runner',binary)
+            self.assertEqual(cycles.validate_build(build,'new-runner',binary,True),'solver-source')
+            binary.write_bytes(b'different binary')
+            with self.assertRaisesRegex(ValueError,'differs'):
+                cycles.validate_build(build,'new-runner',binary,True)
+
     def test_whole_path_trial_changes_only_one_flag_and_checks_its_execution(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         config=cycles.candidate_config(source,'order-paths')

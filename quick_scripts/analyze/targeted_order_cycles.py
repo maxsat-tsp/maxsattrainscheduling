@@ -8,10 +8,20 @@ import extended_timeout_experiments as extended
 
 TAG='Order-Cycles'
 
+def validate_build(build,commit,binary,reuse=False):
+    if build['binary_sha256']!=extended.focus.sha(binary):
+        raise ValueError('binary differs from its recorded build')
+    if build['git_commit']!=commit and not reuse:
+        raise ValueError('use --reuse-build to retain a separately recorded solver source')
+    return build['git_commit']
+
 def candidate_config(source,component='order-cycles'):
     config=source['definition']
     if config.get('solver')!='maxsat_ddd_ladder_sc' or config.get('resource_orders')!='true':
         raise ValueError('cycle cuts require the existing resource-order candidate')
+    if component=='order-paths-full':
+        if config.get('assumptions')!='legacy':raise ValueError('full-assumption contrast requires the legacy assumption reference')
+        return dict(candidate_config(source,'order-paths'),assumptions='full')
     field={'order-cycles':'order_cycle_cuts','initial-cost':'extract_initial_cost','order-paths':'order_path_cuts'}.get(component)
     if field is None:raise ValueError('unsupported single-component experiment')
     if config.get(field,'false')!='false':
@@ -19,13 +29,13 @@ def candidate_config(source,component='order-cycles'):
     return dict(config,**{field:'true'})
 
 def schema_for(component):
-    return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1','order-paths':'targeted-order-paths-v1'}[component]
+    return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1','order-paths':'targeted-order-paths-v1','order-paths-full':'targeted-order-paths-full-v1'}[component]
 
 def report_name(component):
-    return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json','order-paths':'order_paths_audit.json'}[component]
+    return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json','order-paths':'order_paths_audit.json','order-paths-full':'order_paths_full_audit.json'}[component]
 
 def tag_for(component):
-    return {'order-cycles':TAG,'initial-cost':'Initial-Cost','order-paths':'Order-Paths'}[component]
+    return {'order-cycles':TAG,'initial-cost':'Initial-Cost','order-paths':'Order-Paths','order-paths-full':'Order-Paths-Full'}[component]
 
 def load_reference(root):
     manifest=json.loads((root/'manifest.json').read_text());saved=json.loads((root/'full_audit.json').read_text())
@@ -103,10 +113,9 @@ def run(args):
         raise ValueError('commit the experiment code first')
     commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=extended.REPO,text=True).strip()
     build=json.loads(args.build_manifest.read_text())
-    if build['git_commit']!=commit or build['binary_sha256']!=extended.focus.sha(args.binary):
-        raise ValueError('build evidence does not match the current source and binary')
+    solver_source=validate_build(build,commit,args.binary,args.reuse_build)
     config=candidate_config(source,args.component);root=args.results.resolve();root.mkdir(parents=True,exist_ok=True)
-    manifest=dict(schema=schema_for(args.component),component=args.component,runner_commit=commit,solver_source_commit=commit,
+    manifest=dict(schema=schema_for(args.component),component=args.component,runner_commit=commit,solver_source_commit=solver_source,
         definition=config,instances_by_objective=selection,timeout_seconds=source['timeout_seconds'],ram_kb=source['ram_kb'],
         binary_sha256=extended.focus.sha(args.binary),reference_manifest_sha256=extended.focus.sha(args.reference/'manifest.json'),
         reference_report_sha256=extended.focus.sha(args.reference/'full_audit.json'),reference_raw_sha256=digests,
@@ -140,7 +149,8 @@ def main():
     parser.add_argument('--reference',type=Path,required=True);parser.add_argument('--results',type=Path,required=True)
     parser.add_argument('--binary',type=Path);parser.add_argument('--round-seconds',type=int,default=21600)
     parser.add_argument('--build-manifest',type=Path)
-    parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths'],default='order-cycles')
+    parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths','order-paths-full'],default='order-cycles')
+    parser.add_argument('--reuse-build',action='store_true',help='reuse the hashed binary while retaining its own source commit')
     args=parser.parse_args()
     if args.action=='audit':print(json.dumps(audit_saved(args.results,args.reference),indent=2));return
     if args.binary is None or args.build_manifest is None or not 0<args.round_seconds<=21600:

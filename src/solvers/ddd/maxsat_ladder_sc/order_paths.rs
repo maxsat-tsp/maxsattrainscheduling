@@ -97,6 +97,59 @@ pub(super) fn cost_threshold(
     Ok(left as i32)
 }
 
+/// Prove single-order cost paths before the first SAT call. Only hard route
+/// earliest times are used; no time or orientation from a SAT model is assumed.
+pub(super) fn seed_paths<L: Lit>(
+    topology: &Topology,
+    orders: impl IntoIterator<Item = (usize, usize, Bool<L>)>,
+    increases_cost: impl Fn(usize, i32, i32) -> bool,
+) -> Result<Vec<Cut<L>>, String> {
+    let Analysis::Feasible(base) = analyse::<L>(topology, topology.edges())? else {
+        return Err("fixed routes have a positive cycle".into());
+    };
+    let mut cuts = Vec::new();
+    for (first, second, guard) in orders {
+        if first >= base.times.len() || second >= base.times.len() || first == second {
+            return Err("invalid initial resource order".into());
+        }
+        if guard.constant() == Some(false) {
+            continue;
+        }
+        let edge = topology.ordered(first, second, guard);
+        let mut bound = base.times[edge.from]
+            .checked_add(edge.weight)
+            .ok_or_else(|| "initial order time overflow".to_string())?;
+        let mut visit = second;
+        for step in 0..=base.times.len() {
+            if step == base.times.len() {
+                return Err("fixed route contains a cycle".into());
+            }
+            if bound <= base.times[visit] {
+                break;
+            }
+            if increases_cost(visit, bound, base.times[visit]) {
+                cuts.push(Cut::Path {
+                    visit,
+                    time: bound,
+                    prefix: if guard.constant() == Some(true) {
+                        Vec::new()
+                    } else {
+                        vec![!guard]
+                    },
+                });
+            }
+            let Some(next) = topology.next[visit] else {
+                break;
+            };
+            bound = bound
+                .checked_add(topology.travel[visit])
+                .ok_or_else(|| "initial route time overflow".to_string())?;
+            visit = next;
+        }
+    }
+    Ok(cuts)
+}
+
 impl<L: Lit> Schedule<L> {
     pub fn violated(
         &self,
@@ -428,6 +481,69 @@ mod tests {
             7
         );
         assert!(cost_threshold(1, 0, |_| 0).is_err());
+    }
+
+    #[test]
+    fn single_order_seeds_use_hard_routes_and_preserve_every_small_schedule() {
+        let a = g(1);
+        let topology = Topology {
+            next: vec![Some(1), None, Some(3), None],
+            travel: vec![2, 1, 3, 2],
+            earliest: vec![5, 0, 0, 0],
+        };
+        // Actual exit at node 1 is at least 7. A before B therefore puts the
+        // cost-bearing end of B at 10, with only a as its guard.
+        let cuts = seed_paths(&topology, [(0, 2, a)], |v, _, _| v == 3).unwrap();
+        assert_eq!(
+            cuts,
+            vec![Cut::Path {
+                visit: 3,
+                time: 10,
+                prefix: vec![!a]
+            }]
+        );
+        for active in [false, true] {
+            for t0 in 5..=10 {
+                for t1 in t0 + 2..=13 {
+                    for t2 in 0..=13 {
+                        for t3 in t2 + 3..=16 {
+                            if active && t1 > t2 {
+                                continue;
+                            }
+                            assert!(!active || t3 >= 10);
+                        }
+                    }
+                }
+            }
+        }
+        // The final visit has positive occupation time, not a fictitious
+        // zero-length departure; its guarded lower bound is 8, then 11.
+        assert_eq!(
+            seed_paths(&topology, [(1, 2, a)], |v, _, _| v == 3).unwrap(),
+            vec![Cut::Path {
+                visit: 3,
+                time: 11,
+                prefix: vec![!a]
+            }]
+        );
+        assert!(seed_paths(&topology, [(2, 0, a)], |_, _, _| true)
+            .unwrap()
+            .is_empty());
+        assert!(seed_paths(&topology, [(0, 2, a)], |_, _, _| false)
+            .unwrap()
+            .is_empty());
+        assert!(
+            seed_paths::<Lit>(&topology, [(0, 2, false.into())], |_, _, _| true)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(seed_paths(&topology, [(0, 4, a)], |_, _, _| true).is_err());
+        let overflow = t(vec![i32::MAX, 0]);
+        let overflow = Topology {
+            travel: vec![1, 0],
+            ..overflow
+        };
+        assert!(seed_paths(&overflow, [(0, 1, a)], |_, _, _| true).is_err());
     }
 
     #[test]

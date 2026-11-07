@@ -146,6 +146,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_order_master_batch_cuts: Option<bool>,
 
+    /// Seed cost implications of single resource orders (default false).
+    #[structopt(long)]
+    maxsat_ladder_sc_order_master_seed_costs: Option<bool>,
+
     /// Charge unavoidable earliest-time costs before RC2 (default false).
     #[structopt(long)]
     maxsat_ladder_sc_extract_initial_cost: Option<bool>,
@@ -709,6 +713,7 @@ fn main() {
         order_master: opt.maxsat_ladder_sc_order_master.unwrap_or(false),
         order_master_cost_levels: opt.maxsat_ladder_sc_order_master_cost_levels.unwrap_or(false),
         order_master_batch_cuts: opt.maxsat_ladder_sc_order_master_batch_cuts.unwrap_or(false),
+        order_master_seed_costs: opt.maxsat_ladder_sc_order_master_seed_costs.unwrap_or(false),
         extract_initial_cost: opt.maxsat_ladder_sc_extract_initial_cost.unwrap_or(false),
         use_objective_bound: opt.maxsat_ladder_sc_use_objective_bound.unwrap_or(false),
         residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),

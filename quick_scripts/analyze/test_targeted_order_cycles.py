@@ -6,6 +6,23 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_initial_cost_seeds_change_one_locked_component(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        cfg=cycles.candidate_config(source,'order-master-seeds')
+        self.assertEqual(cfg,dict(cycles.candidate_config(source,'order-master-batch'),order_master_seed_costs='true'))
+        self.assertEqual(cycles.report_name('order-master-seeds'),'order_master_seeds_audit.json')
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw);args=SimpleNamespace(binary=root/'ddd',timeout=300,ram_kb=6000000,method_definitions={'test':cfg})
+            with patch.object(extended,'execute') as execute:
+                extended.run_case('test','infsteps180','origA1',args,root)
+                self.assertEqual(execute.call_args.args[4]['MAXSATDDD_ORDER_MASTER_SEED_COSTS'],'true')
+            solve=dict(status='timeout',total_time=300,timeout_seconds=300,process_exit_code=0)
+            solve.update({'maxsat_'+k:v for k,v in cfg.items() if k not in ('solver','kind')})
+            extended.save(root/'infsteps180.json',[dict(name='origA1',solves=[solve])])
+            self.assertFalse(extended.assess_case(root,'test','infsteps180','origA1',300,cfg)['errors'])
+            solve['maxsat_order_master_seed_costs']=False;extended.save(root/'infsteps180.json',[dict(name='origA1',solves=[solve])])
+            self.assertIn('maxsat_order_master_seed_costs differs from the locked configuration',extended.assess_case(root,'test','infsteps180','origA1',300,cfg)['errors'])
+
     def test_batched_master_changes_only_the_number_of_cuts_per_model(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         cfg=cycles.candidate_config(source,'order-master-batch')

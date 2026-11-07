@@ -116,6 +116,8 @@ pub struct MaxSatDddLadderScSettings {
     pub order_master_cost_levels: bool,
     /// Learn all violated objective paths from each feasible master model.
     pub order_master_batch_cuts: bool,
+    /// Seed guarded cost lower bounds implied by a single resource order.
+    pub order_master_seed_costs: bool,
     /// Charge unavoidable earliest-time costs directly; encode only residuals.
     pub extract_initial_cost: bool,
     /// Restrict original weighted cost terms by a verified feasible upper bound.
@@ -158,6 +160,7 @@ impl Default for MaxSatDddLadderScSettings {
             order_master: false,
             order_master_cost_levels: false,
             order_master_batch_cuts: false,
+            order_master_seed_costs: false,
             extract_initial_cost: false,
             use_objective_bound: false,
             residual_hardening: false,

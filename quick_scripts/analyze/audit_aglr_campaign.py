@@ -188,6 +188,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append("maxsat_order_master_cost_levels differs from the locked configuration")
             if "order_master_batch_cuts" in config and str(solve.get("maxsat_order_master_batch_cuts")).lower() != config["order_master_batch_cuts"].lower():
                 errors.append("maxsat_order_master_batch_cuts differs from the locked configuration")
+            if "order_master_seed_costs" in config and str(solve.get("maxsat_order_master_seed_costs")).lower() != config["order_master_seed_costs"].lower():
+                errors.append("maxsat_order_master_seed_costs differs from the locked configuration")
             if "extract_initial_cost" in config and str(solve.get("maxsat_extract_initial_cost")).lower() != config["extract_initial_cost"].lower():
                 errors.append("maxsat_extract_initial_cost differs from the locked configuration")
             if "objective_bound" in config and str(solve.get("maxsat_objective_bound")).lower() != config["objective_bound"].lower():

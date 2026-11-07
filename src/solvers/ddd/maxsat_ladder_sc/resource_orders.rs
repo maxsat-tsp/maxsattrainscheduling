@@ -52,6 +52,13 @@ impl<L: Lit> ResourceOrders<L> {
         super::order_paths::analyse(topology,self.path_edges(topology,value))
     }
 
+    pub fn seed_paths(&self,topology:&super::order_paths::Topology,increases_cost:impl Fn(usize,i32,i32)->bool)
+        ->Result<Vec<super::order_paths::Cut<L>>,String>{
+        let mut pairs=self.bits.iter().collect::<Vec<_>>();pairs.sort_unstable_by_key(|(key,_)|**key);
+        let orders=pairs.into_iter().flat_map(|(&(a,b),&bit)|[(a as usize,b as usize,bit),(b as usize,a as usize,!bit)]);
+        super::order_paths::seed_paths(topology,orders,increases_cost)
+    }
+
     pub fn ensure_pair(&mut self,solver:&mut impl SatInstance<L>,first:u32,second:u32)->bool{
         assert_ne!(first,second);
         let key=if first<second{(first,second)}else{(second,first)};

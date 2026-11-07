@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.21}
+\fancyhead[R]{\small Phiên bản 5.22}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -67,7 +67,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.21, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.22, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -118,9 +118,10 @@ chưa chạy ca khó. V25 đã chạy đủ bốn ca \code{infsteps180} còn thi
 lượt chạy là đã giải được.
 
 V26 đã cài cách thêm cùng lúc các ràng buộc chi phí còn thiếu từ một
-lịch. Bản này đã qua 78 test Rust và 111 test Python trên VM; hai bài
+lịch. Lượt 13 ca đã hoàn tất, đều timeout hợp lệ, chưa giải thêm. Bản này đã qua 78 test Rust và 111 test Python trên VM; hai bài
 thử bậc thang giải đúng ở 5,48 và 7,82 giây. Bài liên tục vẫn timeout
-ở 30 giây, chưa có kết quả mới trên ca khó. Mỗi ca khó giữ 300 giây và 6.000.000 KB; mỗi vòng tối đa 6 giờ.
+ở 30 giây. V27 đã qua 79 test Rust và 113 test Python trên VM, ba bài thử đều có
+đúng optimum. Hiện đang chạy bốn ca bậc thang còn thiếu. V28 sau đó đối chiếu MiniSAT/CaDiCaL trên cùng binary. Mỗi ca khó giữ 300 giây và 6.000.000 KB; mỗi vòng tối đa 6 giờ.
 V27 là hướng dự phòng, chỉ được mở nếu V26 không có ca mới sau kiểm toán.
 Không sửa binary đang chạy. Lệnh ở runbook.
 
@@ -1631,6 +1632,45 @@ dương, chi phí không tăng thì không thêm mốc, tràn số và đúng op
 với cả MiniSAT/CaDiCaL. Kiểm thử native phải đạt trước ca khó. V27 có
 source/binary riêng; không thay tệp đang chạy V26. Lượt chỉ gồm một
 objective vẫn chưa đủ để báo coverage full.
+
+\section{V28: so MiniSAT và CaDiCaL trên cùng một binary}
+
+V28 chỉ mở sau khi V27 hoàn tất và được kiểm toán. Hai backend dùng
+cùng binary V27, cùng bốn ca \code{infsteps180}, cùng tham số phương
+pháp, 300 giây và 6.000.000 KB cho mỗi ca. Chỉ backend SAT khác nhau.
+Mỗi backend có thư mục raw và manifest riêng; không đổi nhãn dữ liệu V27.
+
+Có một điểm cần thống nhất trước: giới hạn 100 xung đột cho mỗi kiểm tra
+phụ đang chỉ được adapter MiniSAT thực hiện. CaDiCaL hiện không thực
+hiện giới hạn này. V28 đặt \file{--core-minimize-conflicts 0} cho cả hai,
+nghĩa là bỏ giới hạn riêng đó. Mỗi nhóm mâu thuẫn vẫn chỉ có tối đa bốn
+kiểm tra thu gọn và bốn kiểm tra tăng cận; toàn bộ instance vẫn bị chặn
+ở 300 giây. Vì vậy:
+\begin{itemize}
+\item V27 MiniSAT/100 so với V28 MiniSAT/0 cho biết tác dụng của giới hạn;
+\item V28 MiniSAT/0 so với V28 CaDiCaL/0 cho biết tác dụng của backend.
+\end{itemize}
+Không quy mọi khác biệt giữa V27 và CaDiCaL cho backend khi hai lượt
+còn khác giới hạn kiểm tra phụ.
+
+Hai lượt sàng lọc chạy song song trên hai nhóm lõi vật lý riêng. MiniSAT
+nhận CPU 0,1,4,5; CaDiCaL nhận 2,3,6,7. Không build khi đang đo. Manifest
+phải có \file{measurement_context=paired-screen} và cùng
+\file{paired_run_id}. Thời gian sàng lọc và xác nhận có thể chịu ảnh hưởng
+của chạy song song, nên được giữ là số chẩn đoán. Muốn đưa vào bảng thời
+gian chính phải chạy lại tuần tự các phép đo cần thiết.
+
+Script \file{compare_targeted_backends.py} tự kiểm toán lại cả hai lượt,
+kiểm tra cùng binary, dữ liệu, timeout, tham số, nhóm CPU không trùng
+và chi phí tối ưu của các ca cùng giải được. Chọn theo số ca chứng minh
+tối ưu trước, sau đó PAR-2. Nếu một lượt còn thiếu ca, không tuyên bố bên
+thắng hoặc coi ca chưa chạy là ca bị mất. Nếu cả hai đều chỉ timeout,
+kết quả là hòa, không tạo ra số tăng tốc.
+
+Nếu có ca mới, vẫn cần ba lần xác nhận và hồi quy 68 ca bậc thang đã
+giải. Lượt này chưa thay thế bảng full V17. Công thức của phương pháp
+không đổi khi đổi backend; bản ghi và bộ kiểm tra giúp xác nhận hai
+bộ giải đang thực sự giải cùng một mô hình.
 
 \section{Nội dung được phép đưa vào bài báo}
 

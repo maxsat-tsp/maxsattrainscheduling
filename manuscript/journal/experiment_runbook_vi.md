@@ -588,7 +588,7 @@ Mã `d8e2509`, cờ `--maxsat-ladder-sc-order-master-cost-levels true`, mặc
 ở thời điểm đầu tiên có cùng chi phí với L, chặn dưới bởi earliest. Ví dụ
 aimed=0, `infsteps180`: L=200 và L=280 đều dùng mốc 181. Với chi phí liên
 tục dương, mốc vẫn là L. Giữ RC2 và lịch gửi `legacy` của V22 để đối chứng
-đúng một thay đổi. Công thức và ví dụ ở hướng dẫn sinh viên 5.21.
+đúng một thay đổi. Công thức và ví dụ ở hướng dẫn sinh viên 5.22.
 
 Native đã qua **77 test Rust và 107 test Python**. Mốc đại diện được kiểm
 tra trên mọi thời điểm nhỏ của ba dạng chi phí, earliest nằm trong bậc,
@@ -756,7 +756,7 @@ Mã `c1b046f`, mặc định `order_master_seed_costs=false`. Bật bằng
 V26. Mỗi hướng của một cặp có điều kiện chi phí được chứng minh từ cận
 cứng trên tuyến và thời điểm rời thật; không biến chúng thành thứ tự
 bắt buộc. Mốc chuẩn hóa và CostTree giữ nguyên. Công thức, ví dụ và
-kiểm thử bắt buộc nằm trong hướng dẫn sinh viên 5.21.
+kiểm thử bắt buộc nằm trong hướng dẫn sinh viên 5.22.
 
 V27 được xếp sau V26. `decide_vm_round.py` kiểm toán lại đủ 13 raw V26
 và 216 raw V17; chỉ mở V27 nếu V26 hoàn tất, không lỗi và không có gain.
@@ -785,6 +785,56 @@ taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
 Manifest và `order_master_seeds_audit.json` giữ phạm vi objective và binary
 riêng. Chưa cộng các ca mới của một lượt thử vào bảng full V17 khi chưa
 khóa cách chọn cấu hình và kiểm toán các objective còn lại.
+
+## V28: đối chứng backend cùng binary và cùng ngân sách kiểm tra
+
+Runner `9f32564`, cùng binary V27 (solver source `c1b046f`). Hai dịch vụ
+`maxsat-master-v28-minisat` và `maxsat-master-v28-cadical` chờ V27 hoàn tất,
+kiểm toán đủ bốn ca rồi mới kiểm tra binary/hash và chạy thêm các bài thử
+thật. Không build lại Rust. Nếu V27 lỗi hoặc thiếu dữ liệu, chưa mở V28.
+
+Hai backend cùng `core_minimize_checks=4`, `core_exhaust_checks=4` và
+`core_minimize_conflicts=0`. Giá trị 0 bỏ giới hạn xung đột riêng trong
+mỗi truy vấn phụ; deadline toàn instance vẫn là 300 giây. Giới hạn 100
+của V27 chỉ được adapter MiniSAT thực hiện, nên không giả định rằng
+CaDiCaL/100 và MiniSAT/100 có cùng giới hạn thực tế.
+
+```bash
+# Từ worktree ~/projects/master-backends-v28/maxsattrainscheduling,
+# sau khi preflight và validation đúng backend đã đạt.
+backend=minisat  # lượt còn lại: cadical
+python3 quick_scripts/analyze/targeted_order_cycles.py run \
+ --component order-master-seeds --objectives infsteps180 \
+ --backend "$backend" --core-minimize-conflicts 0 \
+ --measurement-context paired-screen --paired-run-id master-backends-v28 \
+ --reuse-build \
+ --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+ --binary /home/tuyenkv/projects/master-seeds-v27/maxsattrainscheduling/target/release/ddd \
+ --build-manifest /home/tuyenkv/projects/master-seeds-v27/maxsattrainscheduling/results/aglr/master-seeds-v27-build/manifest.json \
+ --results "results/aglr/master-backends-v28-$backend-unresolved300" --round-seconds 7200
+```
+
+Controller pin MiniSAT vào 0,1,4,5 và CaDiCaL vào 2,3,6,7. VM xác nhận
+core/socket bằng `lscpu`: nhóm đầu dùng lõi vật lý 0,1; nhóm sau dùng 2,3.
+Cùng 6.000.000 KB mỗi backend; tối đa 6 giờ mỗi service, gồm thời gian chờ.
+Các phép đo song song và followup mang `paired-screen`, chưa dùng làm
+runtime chính. V27 MiniSAT/100 vẫn giữ riêng để đối chứng thay giới hạn.
+
+Bộ so sánh ở mã `296199d` kiểm toán lại raw trước khi xếp hạng:
+
+```bash
+python3 quick_scripts/analyze/compare_targeted_backends.py \
+ --reference results/aglr/core-e4-full216-complete-local \
+ --minisat results/aglr/v28-minisat-local \
+ --cadical results/aglr/v28-cadical-local \
+ --output results/aglr/v28-backend-comparison.json
+```
+
+Lệnh trên dùng snapshot đã tải về và giải nén đúng thư mục. Chỉ thêm
+`--allow-partial` khi chủ động xem tiến độ; báo cáo chưa đủ không có bên
+thắng hoặc danh sách ca bị mất. Mỗi lượt có gain sẽ tự xác nhận ba lần,
+sau đó hồi quy 68 ca infsteps180 đã giải. Kết quả cần được khóa theo
+objective và kiểm toán bảng đầy đủ trước mọi kết luận submission.
 
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 

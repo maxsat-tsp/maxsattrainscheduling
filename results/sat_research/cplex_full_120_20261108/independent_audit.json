@@ -1,0 +1,45 @@
+{
+  "schema": "cplex-full-audit-v1",
+  "audit_passed": true,
+  "complete": true,
+  "expected_runs": 216,
+  "completed_runs": 216,
+  "errors": [],
+  "summary": {
+    "finsteps123": {
+      "instances": 72,
+      "valid_schedules": 72,
+      "proven_optimal": 72,
+      "invalid": 0,
+      "timeout_or_inconclusive": 0
+    },
+    "infsteps180": {
+      "instances": 72,
+      "valid_schedules": 71,
+      "proven_optimal": 66,
+      "invalid": 1,
+      "timeout_or_inconclusive": 5
+    },
+    "cont": {
+      "instances": 72,
+      "valid_schedules": 72,
+      "proven_optimal": 66,
+      "invalid": 0,
+      "timeout_or_inconclusive": 6
+    }
+  },
+  "coverage": {
+    "finsteps123": 72,
+    "infsteps180": 66,
+    "cont": 66
+  },
+  "total_proven": 204,
+  "invalid_cases": [
+    {
+      "objective": "infsteps180",
+      "name": "trackA8",
+      "error": "CPLEX schedule validation failed: ['resource T13 overlaps at train/visit (22, 11) and (20, 29)']"
+    }
+  ],
+  "scope": "Corrected Big-M CPLEX 120-second baseline; parallel timings are diagnostic."
+}

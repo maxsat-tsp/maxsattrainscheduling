@@ -70,6 +70,7 @@ MAXSATDDD_SPARSE_COSTS="${MAXSATDDD_SPARSE_COSTS:-}"
 MAXSATDDD_RESOURCE_ORDERS="${MAXSATDDD_RESOURCE_ORDERS:-}"
 MAXSATDDD_ORDER_TRANSITIVITY="${MAXSATDDD_ORDER_TRANSITIVITY:-}"
 MAXSATDDD_ORDER_CYCLE_CUTS="${MAXSATDDD_ORDER_CYCLE_CUTS:-}"
+MAXSATDDD_EXTRACT_INITIAL_COST="${MAXSATDDD_EXTRACT_INITIAL_COST:-}"
 MAXSATDDD_OBJECTIVE_BOUND="${MAXSATDDD_OBJECTIVE_BOUND:-}"
 MAXSATDDD_BACKEND="${MAXSATDDD_BACKEND:-}"
 MAXSATDDD_RESIDUAL_HARDENING="${MAXSATDDD_RESIDUAL_HARDENING:-}"
@@ -288,6 +289,7 @@ run_fingerprint="$(python3 - \
   "${MAXSATDDD_RESOURCE_ORDERS:-default}" \
   "${MAXSATDDD_ORDER_TRANSITIVITY:-default}" \
   "${MAXSATDDD_ORDER_CYCLE_CUTS:-default}" \
+  "${MAXSATDDD_EXTRACT_INITIAL_COST:-default}" \
   "${MAXSATDDD_OBJECTIVE_BOUND:-default}" \
   "${MAXSATDDD_BACKEND:-default}" \
   "${MAXSATDDD_RESIDUAL_HARDENING:-default}" \
@@ -374,6 +376,7 @@ else
     printf 'maxsatddd_resource_orders=%s\n' "${MAXSATDDD_RESOURCE_ORDERS:-default}"
     printf 'maxsatddd_order_transitivity=%s\n' "${MAXSATDDD_ORDER_TRANSITIVITY:-default}"
     printf 'maxsatddd_order_cycle_cuts=%s\n' "${MAXSATDDD_ORDER_CYCLE_CUTS:-default}"
+    printf 'maxsatddd_extract_initial_cost=%s\n' "${MAXSATDDD_EXTRACT_INITIAL_COST:-default}"
     printf 'maxsatddd_objective_bound=%s\n' "${MAXSATDDD_OBJECTIVE_BOUND:-default}"
     printf 'maxsatddd_backend=%s\n' "${MAXSATDDD_BACKEND:-default}"
     printf 'maxsatddd_residual_hardening=%s\n' "${MAXSATDDD_RESIDUAL_HARDENING:-default}"
@@ -457,6 +460,9 @@ run_one() {
   fi
   if [[ -n "$MAXSATDDD_ORDER_CYCLE_CUTS" ]]; then
     extra_args+=(--maxsat-ladder-sc-order-cycle-cuts "$MAXSATDDD_ORDER_CYCLE_CUTS")
+  fi
+  if [[ -n "$MAXSATDDD_EXTRACT_INITIAL_COST" ]]; then
+    extra_args+=(--maxsat-ladder-sc-extract-initial-cost "$MAXSATDDD_EXTRACT_INITIAL_COST")
   fi
   if [[ -n "$MAXSATDDD_OBJECTIVE_BOUND" ]]; then
     extra_args+=(--maxsat-ladder-sc-use-objective-bound "$MAXSATDDD_OBJECTIVE_BOUND")

@@ -972,6 +972,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_resource_orders".to_string(), settings.resource_orders.into());
     output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
     output_stats("maxsat_order_cycle_cuts".to_string(), settings.order_cycle_cuts.into());
+    output_stats("maxsat_extract_initial_cost".to_string(), settings.extract_initial_cost.into());
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
     output_stats("maxsat_core_minimize_checks".to_string(), settings.core_minimize_checks.into());
@@ -1056,7 +1057,19 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let mut iteration = 1;
     let mut is_sat = true;
 
-    let mut total_cost = 0;
+    // Every feasible entry is >= its propagated earliest time. Separate that
+    // unavoidable constant from all future CostTree increments, exactly once.
+    // An empty vector preserves the published encoding when the flag is off.
+    let initial_costs=if settings.extract_initial_cost {
+        visits.iter_enumerated().map(|(id,&(train,index))|
+            problem.trains[train].visit_delay_cost(delay_cost_type,index,occupations[id].delays[0].1)
+        ).collect::<Vec<_>>()
+    } else {Vec::new()};
+    let initial_cost_offset=i32::try_from(initial_costs.iter().try_fold(0usize,|sum,&cost|sum.checked_add(cost))
+        .ok_or_else(||SolverError::InvalidSolution("initial objective cost overflow".into()))?)
+        .map_err(|_|SolverError::InvalidSolution("initial objective cost exceeds i32".into()))?;
+    output_stats("maxsat_initial_cost_offset".to_string(),initial_cost_offset.into());
+    let mut total_cost = initial_cost_offset;
     let mut soft_constraints = HashMap::new();
     let mut debug_actions = Vec::new();
 
@@ -1177,7 +1190,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         let upper = best_heur.as_ref().ok_or_else(|| SolverError::InvalidSolution(
             "objective bound requires a verified initial feasible schedule".to_string()
         ))?.0;
-        Some(BinaryObjective::new(&mut solver, upper.try_into().map_err(|_| {
+        let residual_upper=upper.checked_sub(initial_cost_offset).filter(|v|*v>=0)
+            .ok_or_else(||SolverError::InvalidSolution("verified upper bound is below initial cost".into()))?;
+        Some(BinaryObjective::new(&mut solver, residual_upper.try_into().map_err(|_| {
             SolverError::InvalidSolution("negative objective upper bound".to_string())
         })?))
     } else {
@@ -1648,7 +1663,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     panic!()
                 };
 
-                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders || use_objective_bound || settings.residual_hardening || settings.core_minimize_checks > 0 {
+                if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders || use_objective_bound || settings.residual_hardening || settings.core_minimize_checks > 0 || settings.extract_initial_cost {
                     let validation_start = Instant::now();
                     let verified_cost = problem.verify_solution(&trains, delay_cost_type);
                     aglr_telemetry.final_validation_time += validation_start.elapsed();
@@ -1730,7 +1745,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             let (train_idx, visit_idx) = visits[visit];
 
             let new_timepoint_cost =
-                problem.trains[train_idx].visit_delay_cost(delay_cost_type, visit_idx, new_t);
+                problem.trains[train_idx].visit_delay_cost(delay_cost_type, visit_idx, new_t)
+                    .saturating_sub(initial_costs.get(usize::from(visit)).copied().unwrap_or(0));
 
             if new_timepoint_cost > 0 {
                 const USE_COST_TREE: bool = true;
@@ -1778,7 +1794,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         if let Some(objective) = binary_objective.as_mut() {
             let encoding_start = Instant::now();
             if let Some((upper, _)) = best_heur.as_ref() {
-                if objective.tighten(&mut solver, *upper as usize) {
+                let residual_upper=upper.checked_sub(initial_cost_offset).filter(|v|*v>=0)
+                    .ok_or_else(||SolverError::InvalidSolution("verified upper bound is below initial cost".into()))?;
+                if objective.tighten(&mut solver, residual_upper as usize) {
                     aglr_telemetry.objective_bound_updates += 1;
                 }
             }
@@ -2811,6 +2829,68 @@ mod aglr_end_to_end_tests {
             ).unwrap();
             assert_eq!(problem.verify_solution(&solution, DelayCostType::Continuous), Some(optimum));
             if hardening { assert!(stats.hardened_primary > 0); }
+        }
+    }
+
+    #[test]
+    fn extracting_initial_cost_fixes_a_feasible_positive_cost_initial_schedule() {
+        let problem=Problem{name:"feasible-initial-positive-cost".into(),
+            trains:[vec![1,2],vec![2,1]].into_iter().map(|route|Train{
+                visits:route.into_iter().enumerate().map(|(i,resource_id)|Visit{
+                    resource_id,earliest:(2*i) as i32,aimed:Some(0),travel_time:2,
+                }).chain(std::iter::once(Visit{resource_id:0,earliest:4,aimed:None,travel_time:0})).collect(),
+            }).collect(),conflicts:vec![(1,1),(2,2)]};
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180] {
+            let expected=problem.verify_solution(&vec![vec![0,2,4,4];2],objective).unwrap();
+            assert!(expected>0);
+            for bound in [false,true] {
+                let mut settings=MaxSatDddLadderScSettings::default();
+                settings.resource_orders=true;settings.extract_initial_cost=true;settings.use_objective_bound=bound;
+                let mut telemetry=BTreeMap::new();
+                let (solution,_)=solve_with_settings(&quiet_env,
+                    crate::solvers::util::minisat_deadline::Solver::new(30.0),
+                    &problem,30.0,objective,settings,|k,v|{telemetry.insert(k,v);}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(expected));
+                assert_eq!(telemetry["maxsat_initial_cost_offset"].as_i64(),Some(expected as i64));
+                assert_eq!(telemetry["lb"].as_i64(),Some(expected as i64));
+                assert_eq!(telemetry["ub"].as_i64(),Some(expected as i64));
+            }
+        }
+    }
+
+    #[test]
+    fn initial_cost_residuals_preserve_exhaustive_optima_and_verified_bounds() {
+        let problem=Problem{name:"initial-offset-residual-choices".into(),
+            trains:(1..=3).map(|aimed|Train{visits:vec![
+                Visit{resource_id:1,earliest:5,aimed:Some(aimed),travel_time:2},
+                Visit{resource_id:0,earliest:7,aimed:None,travel_time:0},
+            ]}).collect(),conflicts:vec![(1,1)]};
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180] {
+            let mut optimum=i32::MAX;
+            for a in 5..=9 {for b in 5..=9 {for c in 5..=9 {
+                if let Some(cost)=problem.verify_solution(&vec![vec![a,a+2,a+2],vec![b,b+2,b+2],vec![c,c+2,c+2]],objective) {
+                    optimum=optimum.min(cost);
+                }
+            }}}
+            assert_ne!(optimum,i32::MAX);
+            for offset in [false,true] {for bound in [false,true] {for sparse in [false,true] {for hardening in [false,true] {
+                let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;
+                settings.order_transitivity=true;settings.order_cycle_cuts=true;
+                settings.extract_initial_cost=offset;settings.use_objective_bound=bound;
+                settings.sparse_costs=sparse;settings.residual_hardening=hardening;
+                settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
+                let (solution,_)=solve_with_settings(&quiet_env,
+                    crate::solvers::util::minisat_deadline::Solver::new(30.0),
+                    &problem,30.0,objective,settings,|_,_|{}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+                // Independent SAT backend, without MiniSAT-only exhaustion.
+                if offset && !hardening {
+                    settings.core_minimize_checks=0;settings.core_minimize_conflicts=0;settings.core_exhaust_checks=0;
+                    let (solution,_)=solve_with_settings(&quiet_env,satcoder::solvers::cadical::Solver::new(),
+                        &problem,30.0,objective,settings,|_,_|{}).unwrap();
+                    assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+                }
+            }}}}
         }
     }
 

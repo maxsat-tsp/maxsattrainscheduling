@@ -6,6 +6,29 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_initial_cost_changes_one_component_without_enabling_cycles(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        config=cycles.candidate_config(source,'initial-cost')
+        self.assertEqual(config,dict(source['definition'],extract_initial_cost='true'))
+        self.assertNotIn('order_cycle_cuts',config)
+        self.assertEqual(cycles.schema_for('initial-cost'),'targeted-initial-cost-v1')
+        self.assertEqual(cycles.report_name('initial-cost'),'initial_cost_audit.json')
+        with self.assertRaises(ValueError):cycles.candidate_config(source,'unsupported')
+
+    def test_initial_cost_flag_is_forwarded_and_audited(self):
+        config=dict(extended.METHODS['Orders-Transitive'],extract_initial_cost='true')
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw);args=SimpleNamespace(binary=root/'ddd',timeout=300,ram_kb=6000000,method_definitions={'test':config})
+            with patch.object(extended,'execute') as execute:
+                extended.run_case('test','cont','origA1',args,root)
+                self.assertEqual(execute.call_args.args[4]['MAXSATDDD_EXTRACT_INITIAL_COST'],'true')
+            solve=dict(status='timeout',total_time=300,timeout_seconds=300,process_exit_code=0)
+            solve.update({'maxsat_'+k:v for k,v in config.items() if k not in ('solver','kind')})
+            extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertFalse(extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
+            solve['maxsat_extract_initial_cost']=False;extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertIn('maxsat_extract_initial_cost differs from the locked configuration',extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
+
     def test_only_the_cycle_component_changes(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         before=copy.deepcopy(source);config=cycles.candidate_config(source)

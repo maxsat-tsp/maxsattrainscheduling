@@ -8,13 +8,24 @@ import extended_timeout_experiments as extended
 
 TAG='Order-Cycles'
 
-def candidate_config(source):
+def candidate_config(source,component='order-cycles'):
     config=source['definition']
     if config.get('solver')!='maxsat_ddd_ladder_sc' or config.get('resource_orders')!='true':
         raise ValueError('cycle cuts require the existing resource-order candidate')
-    if config.get('order_cycle_cuts','false')!='false':
+    field={'order-cycles':'order_cycle_cuts','initial-cost':'extract_initial_cost'}.get(component)
+    if field is None:raise ValueError('unsupported single-component experiment')
+    if config.get(field,'false')!='false':
         raise ValueError('reference already enables the component being tested')
-    return dict(config,order_cycle_cuts='true')
+    return dict(config,**{field:'true'})
+
+def schema_for(component):
+    return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1'}[component]
+
+def report_name(component):
+    return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json'}[component]
+
+def tag_for(component):
+    return TAG if component=='order-cycles' else 'Initial-Cost'
 
 def load_reference(root):
     manifest=json.loads((root/'manifest.json').read_text());saved=json.loads((root/'full_audit.json').read_text())
@@ -46,12 +57,13 @@ def load_reference(root):
 
 def audit_saved(root,reference):
     source,selection,digests=load_reference(reference)
-    manifest=json.loads((root/'manifest.json').read_text());saved=json.loads((root/'order_cycles_audit.json').read_text())
-    if manifest['schema']!='targeted-order-cycles-v1' or manifest['instances_by_objective']!=selection:
+    manifest=json.loads((root/'manifest.json').read_text());component=manifest.get('component','order-cycles')
+    saved=json.loads((root/report_name(component)).read_text())
+    if manifest['schema']!=schema_for(component) or manifest['instances_by_objective']!=selection:
         raise ValueError('selection differs from unresolved reference pairs')
     for field,file in [('reference_manifest_sha256','manifest.json'),('reference_report_sha256','full_audit.json')]:
         if manifest[field]!=extended.focus.sha(reference/file):raise ValueError('reference changed')
-    if manifest['reference_raw_sha256']!=digests or manifest['definition']!=candidate_config(source):raise ValueError('method or raw references changed')
+    if manifest['reference_raw_sha256']!=digests or manifest['definition']!=candidate_config(source,component):raise ValueError('method or raw references changed')
     if manifest['timeout_seconds']!=source['timeout_seconds'] or manifest['ram_kb']!=source['ram_kb']:
         raise ValueError('candidate and reference must use the same timeout and RAM')
     if manifest['dataset_sha256']!=source['dataset_sha256']:raise ValueError('dataset changed')
@@ -70,15 +82,15 @@ def audit_saved(root,reference):
             instance_timeout_seconds=str(manifest['timeout_seconds']),ram_limit_kb=str(manifest['ram_kb']))
         locked.update({'maxsatddd_'+k:v for k,v in manifest['definition'].items() if k not in ('solver','kind')})
         if any(provenance.get(k)!=v for k,v in locked.items()):raise ValueError('case provenance changed')
-        record=extended.assess_case(case,TAG,objective,name,manifest['timeout_seconds'],manifest['definition'])
+        record=extended.assess_case(case,tag_for(component),objective,name,manifest['timeout_seconds'],manifest['definition'])
         if record['errors'] or record['status'] in extended.audit.FATAL_STATUSES:raise ValueError(str(record['errors']))
         records.append(record)
-    rebuilt=report_for(records,expected,manifest['timeout_seconds'])
+    rebuilt=report_for(records,expected,manifest['timeout_seconds'],component)
     if not extended.reports_match(rebuilt,saved):raise ValueError('trial report differs from independently checked results')
     return dict(rebuilt,audit_passed=True)
 
-def report_for(records,expected,timeout):
-    return dict(schema='targeted-order-cycles-v1',expected_runs=len(expected),completed_runs=len(records),
+def report_for(records,expected,timeout,component='order-cycles'):
+    return dict(schema=schema_for(component),expected_runs=len(expected),completed_runs=len(records),
         complete=len(records)==len(expected),errors=[],submission_passed=False,
         scope='unresolved pairs only; previously solved candidate pairs require regression before a full-coverage claim',
         newly_solved=[dict(objective=r['objective'],name=r['name'],cost=r['solve']['cost'],seconds=r['time']) for r in records if r['proven']],
@@ -93,8 +105,8 @@ def run(args):
     build=json.loads(args.build_manifest.read_text())
     if build['git_commit']!=commit or build['binary_sha256']!=extended.focus.sha(args.binary):
         raise ValueError('build evidence does not match the current source and binary')
-    config=candidate_config(source);root=args.results.resolve();root.mkdir(parents=True,exist_ok=True)
-    manifest=dict(schema='targeted-order-cycles-v1',runner_commit=commit,solver_source_commit=commit,
+    config=candidate_config(source,args.component);root=args.results.resolve();root.mkdir(parents=True,exist_ok=True)
+    manifest=dict(schema=schema_for(args.component),component=args.component,runner_commit=commit,solver_source_commit=commit,
         definition=config,instances_by_objective=selection,timeout_seconds=source['timeout_seconds'],ram_kb=source['ram_kb'],
         binary_sha256=extended.focus.sha(args.binary),reference_manifest_sha256=extended.focus.sha(args.reference/'manifest.json'),
         reference_report_sha256=extended.focus.sha(args.reference/'full_audit.json'),reference_raw_sha256=digests,
@@ -109,17 +121,18 @@ def run(args):
     extended.save(root/'manifest.json',manifest)
     (root/'build_manifest.json').write_bytes(args.build_manifest.read_bytes())
     expected=[(o,n) for o,names in selection.items() for n in names];records=[]
-    runtime=SimpleNamespace(timeout=manifest['timeout_seconds'],ram_kb=manifest['ram_kb'],binary=args.binary,method_definitions={TAG:config})
+    tag=tag_for(args.component)
+    runtime=SimpleNamespace(timeout=manifest['timeout_seconds'],ram_kb=manifest['ram_kb'],binary=args.binary,method_definitions={tag:config})
     deadline=time.monotonic()+args.round_seconds
     for objective,name in expected:
         case=root/'cases'/objective/name
         if not (case/f'{objective}.json').exists():
             if deadline-time.monotonic()<runtime.timeout+90:break
-            print(f'Order cycles: {objective}/{name}',flush=True);extended.run_case(TAG,objective,name,runtime,case)
-        result=extended.assess_case(case,TAG,objective,name,runtime.timeout,config)
+            print(f'{tag}: {objective}/{name}',flush=True);extended.run_case(tag,objective,name,runtime,case)
+        result=extended.assess_case(case,tag,objective,name,runtime.timeout,config)
         if result['errors'] or result['status'] in extended.audit.FATAL_STATUSES:raise ValueError(str(result['errors']))
-        records.append(result);report=report_for(records,expected,runtime.timeout)
-        extended.save(root/'order_cycles_audit.json',report);extended.audit.write_csv(root/'summary.csv',report['summary'])
+        records.append(result);report=report_for(records,expected,runtime.timeout,args.component)
+        extended.save(root/report_name(args.component),report);extended.audit.write_csv(root/'summary.csv',report['summary'])
     print(json.dumps(audit_saved(root,args.reference),indent=2))
 
 def main():
@@ -127,6 +140,7 @@ def main():
     parser.add_argument('--reference',type=Path,required=True);parser.add_argument('--results',type=Path,required=True)
     parser.add_argument('--binary',type=Path);parser.add_argument('--round-seconds',type=int,default=21600)
     parser.add_argument('--build-manifest',type=Path)
+    parser.add_argument('--component',choices=['order-cycles','initial-cost'],default='order-cycles')
     args=parser.parse_args()
     if args.action=='audit':print(json.dumps(audit_saved(args.results,args.reference),indent=2));return
     if args.binary is None or args.build_manifest is None or not 0<args.round_seconds<=21600:

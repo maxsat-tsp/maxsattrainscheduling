@@ -6,6 +6,11 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_full_master_levels_changes_only_the_assumption_schedule(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        self.assertEqual(cycles.candidate_config(source,'order-master-levels-full'),dict(cycles.candidate_config(source,'order-master-levels'),assumptions='full'))
+        self.assertEqual(cycles.report_name('order-master-levels-full'),'order_master_levels_full_audit.json')
+
     def test_master_cost_levels_changes_one_flag_against_the_master(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         master=cycles.candidate_config(source,'order-master');cfg=cycles.candidate_config(source,'order-master-levels')

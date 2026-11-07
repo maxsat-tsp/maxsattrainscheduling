@@ -24,6 +24,12 @@ cặp đều timeout hợp lệ, không tăng coverage; kết quả kiểm toán
 hơn cho cùng cấu hình. Nếu thử tiếp, phải thay một thành phần thuật toán,
 ghi test và telemetry trước khi chạy; không khởi động CaDiCaL.
 
+V29 đã thử verified objective bound cùng transitivity của V17 và không giải
+thêm ca nào. V30 đã cố định tie-break của các giả định RC2 cùng trọng số để
+loại phụ thuộc vào thứ tự `HashMap`; smoke test tái lập được, nhưng hard set
+vẫn 0/13. Hai archive nằm trong `results/sat_research/`; V30 giữ trong mã
+nguồn vì giúp các lượt sau tái lập, còn V29 chỉ là ablation thất bại.
+
 ## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 
 **Đã kiểm toán đủ 186/186 ca**, kết thúc lúc 22:33:58 ngày 06/11/2026,

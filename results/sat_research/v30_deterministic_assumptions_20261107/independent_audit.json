@@ -1,0 +1,201 @@
+{
+  "schema": "targeted-v1",
+  "audit_passed": true,
+  "complete": true,
+  "expected_runs": 13,
+  "completed_runs": 13,
+  "errors": [],
+  "proven_optimal": 0,
+  "newly_solved": [],
+  "coverage_before": {
+    "finsteps123": 72,
+    "infsteps180": 68,
+    "cont": 63
+  },
+  "coverage_after": {
+    "finsteps123": 72,
+    "infsteps180": 68,
+    "cont": 63
+  },
+  "total_coverage_before": 203,
+  "total_coverage_after": 203,
+  "submission_passed": false,
+  "scope": "Only 13 unresolved V17 pairs; no full-dataset claim.",
+  "manifest": {
+    "schema": "v30-deterministic-assumptions-v1",
+    "timeout_seconds": 300,
+    "backend": "minisat",
+    "source_commit": "f1f848ee543c359c5bcbd211379402b819299b1e",
+    "binary_sha256": "7cd9f9a57570df6de5b3f00a8cdeeb5876c4bbfc01dcf14a108c2a7e94842180",
+    "started_utc": "2026-11-07T16:15:07Z",
+    "workers": 4,
+    "instances": [
+      [
+        "infsteps180/trackA11",
+        "cont/origA8",
+        "cont/trackA8",
+        "cont/trackA11"
+      ],
+      [
+        "infsteps180/trackA12",
+        "cont/trackA12",
+        "cont/stationA1"
+      ],
+      [
+        "infsteps180/stationA11",
+        "cont/stationA2",
+        "cont/stationA8"
+      ],
+      [
+        "infsteps180/stationA12",
+        "cont/stationA11",
+        "cont/stationA12"
+      ]
+    ]
+  },
+  "case_rows": [
+    {
+      "objective": "cont",
+      "name": "origA8",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 8373,
+      "sat_time": 299.863213995,
+      "num_vars": 59309,
+      "num_clauses": 229227,
+      "path": "w1/logs-cont/instances/origA8.json"
+    },
+    {
+      "objective": "cont",
+      "name": "stationA1",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 6682,
+      "sat_time": 299.867981208,
+      "num_vars": 58803,
+      "num_clauses": 219641,
+      "path": "w2/logs-cont/instances/stationA1.json"
+    },
+    {
+      "objective": "cont",
+      "name": "stationA11",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 55282,
+      "sat_time": 299.656259271,
+      "num_vars": 69183,
+      "num_clauses": 184045,
+      "path": "w4/logs-cont/instances/stationA11.json"
+    },
+    {
+      "objective": "cont",
+      "name": "stationA12",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 35328,
+      "sat_time": 299.725126423,
+      "num_vars": 79995,
+      "num_clauses": 246276,
+      "path": "w4/logs-cont/instances/stationA12.json"
+    },
+    {
+      "objective": "cont",
+      "name": "stationA2",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 14082,
+      "sat_time": 299.821660688,
+      "num_vars": 76782,
+      "num_clauses": 290299,
+      "path": "w3/logs-cont/instances/stationA2.json"
+    },
+    {
+      "objective": "cont",
+      "name": "stationA8",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 33080,
+      "sat_time": 299.742585653,
+      "num_vars": 79480,
+      "num_clauses": 253313,
+      "path": "w3/logs-cont/instances/stationA8.json"
+    },
+    {
+      "objective": "cont",
+      "name": "trackA11",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 36453,
+      "sat_time": 299.712015497,
+      "num_vars": 97576,
+      "num_clauses": 309251,
+      "path": "w1/logs-cont/instances/trackA11.json"
+    },
+    {
+      "objective": "cont",
+      "name": "trackA12",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 42638,
+      "sat_time": 299.683462557,
+      "num_vars": 84331,
+      "num_clauses": 235954,
+      "path": "w2/logs-cont/instances/trackA12.json"
+    },
+    {
+      "objective": "cont",
+      "name": "trackA8",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 20525,
+      "sat_time": 299.776306023,
+      "num_vars": 97511,
+      "num_clauses": 365124,
+      "path": "w1/logs-cont/instances/trackA8.json"
+    },
+    {
+      "objective": "infsteps180",
+      "name": "stationA11",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 1425,
+      "sat_time": 299.881680847,
+      "num_vars": 26537,
+      "num_clauses": 80804,
+      "path": "w3/logs-infsteps180/instances/stationA11.json"
+    },
+    {
+      "objective": "infsteps180",
+      "name": "stationA12",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 1238,
+      "sat_time": 299.884488206,
+      "num_vars": 27174,
+      "num_clauses": 82377,
+      "path": "w4/logs-infsteps180/instances/stationA12.json"
+    },
+    {
+      "objective": "infsteps180",
+      "name": "trackA11",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 1518,
+      "sat_time": 299.842215038,
+      "num_vars": 31803,
+      "num_clauses": 98014,
+      "path": "w1/logs-infsteps180/instances/trackA11.json"
+    },
+    {
+      "objective": "infsteps180",
+      "name": "trackA12",
+      "status": "timeout",
+      "timeout_seconds": 300.0,
+      "sat_calls": 1393,
+      "sat_time": 299.853323109,
+      "num_vars": 30445,
+      "num_clauses": 92909,
+      "path": "w2/logs-infsteps180/instances/trackA12.json"
+    }
+  ]
+}

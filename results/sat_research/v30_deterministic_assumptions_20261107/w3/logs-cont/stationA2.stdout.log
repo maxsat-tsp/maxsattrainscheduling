@@ -1,0 +1,919 @@
+Opt { debug: false, solvers: ["maxsat_ddd_ladder_sc"], xml_instances: false, txt_instances: true, instance_name_filter: Some("stationA2"), instance_name_exact: true, verify_instances: false, objective: Some("cont"), other_objective: None, json_output: Some("/home/tuyenkv/projects/maxsattrainscheduling/results/aglr/v30-deterministic300-minisat/w3/logs-cont/instances/stationA2.json"), timeout_seconds: Some(300.0), satddd_use_precedence_graph: None, satddd_prealloc_cost_thresholds: None, satddd_seed_precedence_from_earliest: None, satddd_seed_resource_conflicts: None, satddd_use_sc_amo: None, maxsat_ladder_sc_use_eager_chain_expansion: None, maxsat_ladder_sc_use_precedence_graph: None, maxsat_ladder_sc_use_sc_amo: None, maxsat_ladder_sc_use_touched_clique_amo: None, maxsat_ladder_sc_seed_from_earliest: None, maxsat_ladder_sc_prealloc_cost_thresholds: None, maxsat_ladder_sc_assumptions: Some("legacy"), maxsat_ladder_sc_sparse_costs: None, maxsat_ladder_sc_resource_orders: Some(true), maxsat_ladder_sc_order_transitivity: Some(true), maxsat_ladder_sc_order_cycle_cuts: None, maxsat_ladder_sc_order_path_cuts: None, maxsat_ladder_sc_order_master: None, maxsat_ladder_sc_order_master_cost_levels: None, maxsat_ladder_sc_order_master_batch_cuts: None, maxsat_ladder_sc_order_master_seed_costs: None, maxsat_ladder_sc_extract_initial_cost: None, maxsat_ladder_sc_use_objective_bound: None, maxsat_ladder_sc_residual_hardening: None, maxsat_ladder_sc_core_minimize_checks: Some(4), maxsat_ladder_sc_core_minimize_conflicts: Some(100), maxsat_ladder_sc_core_exhaust_checks: Some(4), maxsat_ladder_sc_backend: "minisat", aglr_policy: None, aglr_min_growth: None, aglr_fraction: None, aglr_max_wait: None, aglr_rescue_progress: None, aglr_heuristic_period: None, aglr_heuristic_min_gap: None, aglr_use_objective_bound: None, aglr_filter_duplicates: None, satddd_objective_encoding: None, maxsat_rc2_bound_mode: None, maxsat_rc2_refinement_budget: None, maxsat_rc2_max_wait_iterations: None, maxsat_rc2_full_scan: None, maxsat_rc2_validate_before_return: None }
+Using solver timeout 300 seconds
+Using solvers [MaxSatDddLadderSc]
+Using delay cost type Continuous
+MaxsatRc2 settings JournalSettings { bound_mode: Off, refinement_budget: None, max_wait_iterations: 5, full_scan: true, validate_before_return: true }
+MaxSatDddLadderSc settings MaxSatDddLadderScSettings { assumption_strategy: Legacy, sparse_costs: false, resource_orders: true, order_transitivity: true, order_cycle_cuts: false, order_path_cuts: false, order_master: false, order_master_cost_levels: false, order_master_batch_cuts: false, order_master_seed_costs: false, extract_initial_cost: false, use_objective_bound: false, residual_hardening: false, core_minimize_checks: 4, core_minimize_conflicts: 100, core_exhaust_checks: 4, use_precedence_graph: true, use_sc_amo: true, use_touched_clique_amo: true, use_eager_chain_expansion: false, seed_sc_from_earliest: false, prealloc_cost_thresholds: false, aglr: AglrSettings { policy: Legacy, min_growth: 32, fraction: 0.5, max_wait: 5, rescue_progress: BoundOrHeuristic, heuristic_period: 1, heuristic_min_gap: 0, use_objective_bound: false, filter_duplicates: false } }
+MaxSatDddLadderAglr settings MaxSatDddLadderScSettings { assumption_strategy: Legacy, sparse_costs: false, resource_orders: true, order_transitivity: true, order_cycle_cuts: false, order_path_cuts: false, order_master: false, order_master_cost_levels: false, order_master_batch_cuts: false, order_master_seed_costs: false, extract_initial_cost: false, use_objective_bound: false, residual_hardening: false, core_minimize_checks: 4, core_minimize_conflicts: 100, core_exhaust_checks: 4, use_precedence_graph: true, use_sc_amo: true, use_touched_clique_amo: true, use_eager_chain_expansion: false, seed_sc_from_earliest: false, prealloc_cost_thresholds: false, aglr: AglrSettings { policy: Adaptive, min_growth: 32, fraction: 0.5, max_wait: 5, rescue_progress: BoundOrHeuristic, heuristic_period: 1, heuristic_min_gap: 0, use_objective_bound: false, filter_duplicates: false } }
+SatDdd objective encoding Scpb
+SatDdd settings SatDddSettings { use_precedence_graph: true, prealloc_cost_thresholds: false, seed_precedence_from_earliest: false, seed_resource_conflicts: false, use_sc_amo: true }
+Reading instances/original/InstanceA1.txt
+Reading instances/original/InstanceA2.txt
+Reading instances/original/InstanceA3.txt
+Reading instances/original/InstanceA4.txt
+Reading instances/original/InstanceA5.txt
+Reading instances/original/InstanceA6.txt
+Reading instances/original/InstanceA7.txt
+Reading instances/original/InstanceA8.txt
+Reading instances/original/InstanceA9.txt
+Reading instances/original/InstanceA10.txt
+Reading instances/original/InstanceA11.txt
+Reading instances/original/InstanceA12.txt
+Reading instances/original/InstanceB1.txt
+Reading instances/original/InstanceB2.txt
+Reading instances/original/InstanceB3.txt
+Reading instances/original/InstanceB4.txt
+Reading instances/original/InstanceB5.txt
+Reading instances/original/InstanceB6.txt
+Reading instances/original/InstanceB7.txt
+Reading instances/original/InstanceB8.txt
+Reading instances/original/InstanceB9.txt
+Reading instances/original/InstanceB10.txt
+Reading instances/original/InstanceB11.txt
+Reading instances/original/InstanceB12.txt
+Reading instances/addtracktime/InstanceA1.txt
+Reading instances/addtracktime/InstanceA2.txt
+Reading instances/addtracktime/InstanceA3.txt
+Reading instances/addtracktime/InstanceA4.txt
+Reading instances/addtracktime/InstanceA5.txt
+Reading instances/addtracktime/InstanceA6.txt
+Reading instances/addtracktime/InstanceA7.txt
+Reading instances/addtracktime/InstanceA8.txt
+Reading instances/addtracktime/InstanceA9.txt
+Reading instances/addtracktime/InstanceA10.txt
+Reading instances/addtracktime/InstanceA11.txt
+Reading instances/addtracktime/InstanceA12.txt
+Reading instances/addtracktime/InstanceB1.txt
+Reading instances/addtracktime/InstanceB2.txt
+Reading instances/addtracktime/InstanceB3.txt
+Reading instances/addtracktime/InstanceB4.txt
+Reading instances/addtracktime/InstanceB5.txt
+Reading instances/addtracktime/InstanceB6.txt
+Reading instances/addtracktime/InstanceB7.txt
+Reading instances/addtracktime/InstanceB8.txt
+Reading instances/addtracktime/InstanceB9.txt
+Reading instances/addtracktime/InstanceB10.txt
+Reading instances/addtracktime/InstanceB11.txt
+Reading instances/addtracktime/InstanceB12.txt
+Reading instances/addstationtime/InstanceA1.txt
+Reading instances/addstationtime/InstanceA2.txt
+trains 25 tracks 33 avgtracks 19.00 trackpairs 3735 delays 0 avgdelay0
+25 & 33 & 19.00 & 3735 & 0 & 0 \\
+Starting solver MaxSatDddLadderSc
+Solution verified. Cost 19651
+Finishing with cost 9974
+    LB=1316
+    LB=2152
+    LB=2643
+    LB=3123
+    LB=3543
+    LB=3959
+    LB=4164
+    LB=4330
+    LB=4494
+    LB=4665
+    LB=4695
+    LB=4725
+    LB=4766
+    LB=4854
+    LB=4925
+    LB=4959
+    LB=5199
+    LB=5289
+    LB=5329
+    LB=5500
+    LB=5570
+    LB=5611
+    LB=5711
+    LB=5741
+    LB=5831
+    LB=5871
+    LB=5901
+    LB=5956
+    LB=5979
+    LB=6059
+    LB=6076
+    LB=6136
+    LB=6159
+    LB=6170
+    LB=6171
+    LB=6172
+Solution verified. Cost 9974
+HEUR.FEAS. 9974
+    LB=6173
+Finishing with cost 7896
+    LB=6192
+    LB=6193
+    LB=6283
+    LB=6336
+    LB=6389
+    LB=6419
+    LB=6449
+    LB=6469
+    LB=6476
+    LB=6477
+    LB=6666
+    LB=6765
+    LB=6797
+    LB=6850
+    LB=6853
+    LB=6873
+Solution verified. Cost 16243
+HEUR.FEAS. 16243
+Finishing with cost 9115
+    LB=6874
+    LB=6875
+    LB=6876
+    LB=6877
+    LB=6937
+    LB=6960
+    LB=6980
+    LB=6997
+    LB=7033
+    LB=7063
+    LB=7093
+    LB=7097
+Solution verified. Cost 16739
+HEUR.FEAS. 16739
+Finishing with cost 9798
+    LB=7118
+    LB=7139
+    LB=7156
+    LB=7165
+    LB=7174
+    LB=7176
+    LB=7187
+    LB=7197
+    LB=7201
+    LB=7205
+    LB=7212
+Solution verified. Cost 16146
+HEUR.FEAS. 16146
+Finishing with cost 8862
+    LB=7216
+    LB=7219
+    LB=7221
+    LB=7222
+    LB=7223
+    LB=7224
+    LB=7225
+    LB=7226
+Solution verified. Cost 15035
+HEUR.FEAS. 15035
+Finishing with cost 10528
+    LB=7231
+    LB=7236
+    LB=7237
+    LB=7313
+    LB=7320
+    LB=7333
+    LB=7340
+    LB=7346
+    LB=7350
+Solution verified. Cost 17455
+HEUR.FEAS. 17455
+Finishing with cost 7917
+    LB=7353
+    LB=7355
+    LB=7356
+    LB=7357
+    LB=7358
+    LB=7359
+    LB=7360
+Solution verified. Cost 13897
+HEUR.FEAS. 13897
+Finishing with cost 8735
+    LB=7389
+    LB=7416
+    LB=7439
+    LB=7449
+    LB=7468
+    LB=7481
+    LB=7490
+    LB=7497
+Solution verified. Cost 14715
+HEUR.FEAS. 14715
+Finishing with cost 9092
+    LB=7503
+    LB=7508
+    LB=7512
+    LB=7516
+    LB=7520
+    LB=7524
+    LB=7528
+Solution verified. Cost 14911
+HEUR.FEAS. 14911
+Finishing with cost 8963
+    LB=7531
+    LB=7534
+    LB=7537
+    LB=7539
+    LB=7541
+    LB=7542
+    LB=7544
+Solution verified. Cost 14782
+HEUR.FEAS. 14782
+    LB=7545
+    LB=7546
+    LB=7547
+    LB=7548
+    LB=7549
+    LB=7550
+    LB=7551
+    LB=7552
+    LB=7553
+    LB=7554
+Finishing with cost 11034
+    LB=7569
+    LB=7581
+    LB=7588
+    LB=7595
+    LB=7598
+    LB=7601
+Solution verified. Cost 19046
+HEUR.FEAS. 19046
+Finishing with cost 10482
+    LB=7604
+    LB=7607
+    EXHAUST LB=7610 STEPS=1
+    LB=7614
+    LB=7617
+Solution verified. Cost 18494
+HEUR.FEAS. 18494
+    LB=7620
+    LB=7623
+    LB=7625
+    LB=7627
+    LB=7629
+    EXHAUST LB=7631 STEPS=1
+    LB=7634
+    LB=7637
+    LB=7639
+    LB=7641
+    LB=7643
+    LB=7645
+    LB=7647
+    LB=7649
+    LB=7651
+    LB=7652
+    LB=7653
+    LB=7654
+    LB=7655
+    LB=7660
+    LB=7661
+    LB=7662
+    LB=7663
+    LB=7664
+    LB=7667
+    LB=7670
+    LB=7673
+    LB=7675
+    LB=7676
+    LB=7677
+    LB=7679
+    LB=7681
+    LB=7682
+    LB=7683
+    LB=7684
+    LB=7685
+    LB=7686
+    LB=7687
+    LB=7688
+    LB=7689
+    LB=7690
+    LB=7691
+    LB=7692
+    LB=7695
+    LB=7696
+    LB=7697
+    LB=7698
+    LB=7699
+    LB=7700
+    LB=7701
+    LB=7702
+    LB=7703
+    LB=7704
+    LB=7705
+    LB=7706
+    LB=7707
+    LB=7708
+    LB=7709
+    LB=7710
+    LB=7711
+    LB=7712
+    LB=7713
+    LB=7714
+    LB=7715
+    LB=7716
+    LB=7717
+    LB=7718
+    LB=7719
+    LB=7720
+Finishing with cost 9609
+    LB=7721
+Solution verified. Cost 15449
+HEUR.FEAS. 15449
+Finishing with cost 9231
+    LB=7722
+    LB=7723
+Solution verified. Cost 15071
+HEUR.FEAS. 15071
+    LB=7724
+    LB=7725
+    LB=7726
+    LB=7727
+    LB=7728
+    LB=7729
+    LB=7730
+    LB=7731
+    LB=7732
+    LB=7733
+    LB=7734
+    LB=7735
+    LB=7736
+    LB=7737
+    LB=7738
+    LB=7739
+    LB=7740
+    LB=7741
+    LB=7742
+    LB=7743
+    LB=7744
+    LB=7745
+    LB=7746
+    LB=7747
+    LB=7748
+    LB=7749
+    LB=7750
+    LB=7751
+    LB=7752
+    LB=7753
+    LB=7754
+    LB=7755
+Finishing with cost 9939
+Solution verified. Cost 16134
+HEUR.FEAS. 16134
+Finishing with cost 10137
+Solution verified. Cost 16332
+HEUR.FEAS. 16332
+    LB=7756
+    LB=7757
+Finishing with cost 9838
+Solution verified. Cost 13932
+HEUR.FEAS. 13932
+Finishing with cost 9705
+    LB=7758
+Solution verified. Cost 13799
+HEUR.FEAS. 13799
+    LB=7759
+    LB=7760
+    LB=7761
+    LB=7762
+    LB=7763
+    LB=7764
+    LB=7765
+    LB=7766
+    LB=7767
+    LB=7768
+    LB=7769
+    LB=7770
+    LB=7771
+    LB=7772
+    LB=7773
+    LB=7774
+    LB=7775
+    LB=7776
+    LB=7777
+    LB=7778
+    LB=7779
+    LB=7780
+    LB=7781
+    LB=7782
+    LB=7783
+    EXHAUST LB=7784 STEPS=1
+    LB=7785
+    LB=7786
+    LB=7787
+    LB=7788
+    LB=7789
+    LB=7790
+    LB=7791
+    LB=7792
+    EXHAUST LB=7793 STEPS=1
+    LB=7794
+    EXHAUST LB=7795 STEPS=1
+    LB=7796
+    LB=7797
+    LB=7798
+    LB=7799
+    LB=7800
+    LB=7801
+    LB=7802
+    LB=7803
+    LB=7804
+    LB=7805
+    LB=7806
+    EXHAUST LB=7807 STEPS=1
+    LB=7808
+    LB=7809
+    LB=7810
+    LB=7811
+    LB=7812
+    LB=7813
+    LB=7814
+    LB=7815
+    LB=7816
+    LB=7817
+    LB=7818
+    LB=7819
+    LB=7820
+    LB=7821
+    LB=7822
+    LB=7823
+    EXHAUST LB=7824 STEPS=1
+    LB=7825
+    LB=7826
+    LB=7827
+    LB=7828
+    LB=7829
+    EXHAUST LB=7830 STEPS=1
+    LB=7831
+    LB=7832
+    LB=7833
+    LB=7834
+    LB=7835
+    LB=7836
+    LB=7837
+    LB=7838
+    LB=7839
+    LB=7840
+    LB=7841
+    LB=7842
+    LB=7843
+    LB=7844
+    LB=7845
+    LB=7846
+    LB=7847
+    LB=7848
+    LB=7849
+    LB=7850
+    LB=7851
+    LB=7852
+    LB=7853
+    LB=7854
+    LB=7855
+    LB=7856
+    LB=7857
+    LB=7858
+    LB=7859
+    LB=7860
+    LB=7861
+    LB=7862
+    LB=7863
+    LB=7864
+    LB=7865
+    LB=7866
+    LB=7867
+    LB=7868
+    LB=7869
+    LB=7870
+    LB=7871
+    LB=7872
+    LB=7873
+    LB=7874
+    LB=7875
+    LB=7876
+    LB=7877
+    LB=7878
+    LB=7879
+    LB=7880
+    LB=7881
+    LB=7882
+    LB=7883
+    LB=7884
+    LB=7885
+    LB=7886
+    LB=7887
+    LB=7888
+    LB=7889
+    LB=7890
+    LB=7891
+    LB=7892
+    LB=7893
+    LB=7894
+    LB=7895
+    LB=7896
+    LB=7897
+    LB=7898
+    LB=7899
+    LB=7900
+    LB=7901
+    EXHAUST LB=7902 STEPS=1
+    LB=7903
+    LB=7904
+    LB=7905
+    LB=7906
+    LB=7907
+    LB=7908
+    LB=7909
+    LB=7910
+    LB=7911
+    LB=7912
+    LB=7913
+    LB=7914
+    LB=7915
+    LB=7916
+    LB=7917
+    LB=7918
+    LB=7919
+Finishing with cost 10864
+Solution verified. Cost 14208
+HEUR.FEAS. 14208
+Finishing with cost 10581
+Solution verified. Cost 13925
+HEUR.FEAS. 13925
+    LB=7920
+    LB=7921
+    LB=7922
+    LB=7923
+    LB=7924
+    LB=7925
+    LB=7926
+    LB=7927
+    LB=7928
+    LB=7929
+    LB=7930
+    LB=7931
+    LB=7932
+    LB=7933
+    LB=7934
+    LB=7935
+Finishing with cost 11115
+Solution verified. Cost 15405
+HEUR.FEAS. 15405
+Finishing with cost 10926
+Solution verified. Cost 15216
+HEUR.FEAS. 15216
+    LB=7936
+    LB=7937
+    LB=7938
+    LB=7939
+    LB=7940
+    LB=7941
+    LB=7942
+    LB=7943
+    LB=7944
+    LB=7945
+    LB=7946
+    LB=7947
+    LB=7948
+    LB=7949
+    LB=7950
+    LB=7951
+    LB=7952
+    LB=7953
+    LB=7954
+    LB=7955
+    LB=7956
+    LB=7957
+    LB=7958
+    LB=7959
+    LB=7960
+    LB=7961
+    LB=7962
+    LB=7963
+    LB=7964
+    LB=7965
+Finishing with cost 10157
+Solution verified. Cost 13611
+HEUR.FEAS. 13611
+Finishing with cost 10118
+Solution verified. Cost 13572
+HEUR.FEAS. 13572
+    LB=7966
+    LB=7967
+    LB=7968
+    LB=7969
+    LB=7970
+    LB=7971
+    LB=7972
+    LB=7973
+    LB=7974
+    LB=7975
+    LB=7976
+    LB=7977
+    LB=7978
+    LB=7979
+    LB=7980
+    LB=7981
+    LB=7982
+    LB=7983
+    LB=7984
+    LB=7985
+    LB=7986
+    LB=7987
+    LB=7988
+    LB=7989
+    LB=7990
+    LB=7991
+    LB=7992
+    LB=7993
+    LB=7994
+    LB=7995
+    LB=7996
+    LB=7997
+    LB=7998
+    LB=7999
+    LB=8000
+    LB=8001
+    LB=8002
+    LB=8003
+    LB=8004
+    LB=8005
+    LB=8006
+    LB=8007
+    LB=8008
+    LB=8009
+    LB=8010
+    LB=8011
+    LB=8012
+    LB=8013
+    LB=8014
+    LB=8015
+    LB=8016
+    LB=8017
+    LB=8018
+    LB=8019
+    LB=8020
+    LB=8021
+    LB=8022
+    LB=8023
+    LB=8024
+    LB=8025
+    LB=8026
+    LB=8027
+    LB=8028
+    LB=8029
+    LB=8030
+    LB=8031
+    LB=8032
+    LB=8033
+    LB=8034
+    LB=8035
+    LB=8036
+    LB=8037
+    LB=8038
+    LB=8039
+    LB=8040
+    LB=8041
+    LB=8042
+    LB=8043
+    LB=8044
+    LB=8045
+    LB=8046
+Finishing with cost 10058
+Solution verified. Cost 12399
+HEUR.FEAS. 12399
+Finishing with cost 9823
+Solution verified. Cost 12164
+HEUR.FEAS. 12164
+    LB=8047
+    LB=8048
+    LB=8049
+    LB=8050
+    LB=8051
+    LB=8052
+    LB=8053
+    LB=8054
+    LB=8055
+    LB=8056
+Finishing with cost 10368
+Solution verified. Cost 13899
+HEUR.FEAS. 13899
+Finishing with cost 10720
+Solution verified. Cost 14251
+HEUR.FEAS. 14251
+    LB=8057
+    LB=8058
+    LB=8059
+    LB=8060
+    LB=8061
+    LB=8062
+    LB=8063
+    LB=8064
+    LB=8065
+    LB=8066
+Finishing with cost 10860
+Solution verified. Cost 13910
+HEUR.FEAS. 13910
+Finishing with cost 11087
+Solution verified. Cost 14137
+HEUR.FEAS. 14137
+Finishing with cost 10135
+Solution verified. Cost 13251
+HEUR.FEAS. 13251
+Finishing with cost 10386
+Solution verified. Cost 13502
+HEUR.FEAS. 13502
+    LB=8095
+    LB=8096
+    LB=8097
+    LB=8098
+    LB=8099
+    LB=8100
+    LB=8101
+    LB=8102
+    LB=8103
+    LB=8104
+    LB=8105
+    LB=8106
+    LB=8107
+    LB=8108
+    LB=8109
+    LB=8110
+    LB=8111
+    LB=8112
+    LB=8113
+    LB=8114
+    LB=8115
+    LB=8116
+    LB=8117
+    LB=8118
+    LB=8119
+    LB=8120
+    LB=8121
+    LB=8122
+    LB=8123
+    LB=8124
+    LB=8125
+    LB=8126
+    LB=8127
+    LB=8128
+    LB=8129
+    LB=8130
+    LB=8131
+    LB=8132
+    LB=8133
+    LB=8134
+    LB=8135
+    LB=8136
+    LB=8137
+    LB=8138
+    LB=8139
+    LB=8140
+    LB=8141
+    LB=8142
+    LB=8143
+    LB=8144
+    LB=8145
+    LB=8146
+    LB=8147
+    LB=8148
+    LB=8149
+    LB=8150
+    LB=8151
+    LB=8152
+    LB=8153
+    LB=8154
+    LB=8155
+    LB=8156
+    LB=8157
+    LB=8158
+    LB=8159
+    LB=8160
+    LB=8161
+    LB=8162
+    LB=8163
+    LB=8164
+    LB=8165
+    LB=8166
+    LB=8167
+    LB=8168
+    LB=8169
+    LB=8170
+    LB=8171
+    LB=8172
+    LB=8173
+    LB=8174
+    LB=8175
+Finishing with cost 10270
+Solution verified. Cost 13949
+HEUR.FEAS. 13949
+Finishing with cost 10572
+Solution verified. Cost 14251
+HEUR.FEAS. 14251
+    LB=8176
+    LB=8177
+    LB=8178
+    LB=8179
+    LB=8180
+    LB=8181
+    LB=8182
+    LB=8183
+    LB=8184
+    LB=8185
+    LB=8186
+    LB=8187
+    LB=8188
+    LB=8189
+    LB=8190
+    LB=8191
+    LB=8192
+    LB=8193
+    LB=8194
+    LB=8195
+    LB=8196
+    LB=8197
+    LB=8198
+    LB=8199
+    LB=8200
+    LB=8201
+    LB=8202
+    LB=8203
+    LB=8204
+    LB=8205
+    LB=8206
+    LB=8207
+    LB=8208
+    LB=8209
+    LB=8210
+    LB=8211
+    LB=8212
+    LB=8213
+    LB=8214
+    LB=8215
+    LB=8216
+    LB=8217
+    LB=8218
+    LB=8219
+    LB=8220
+    LB=8221
+    LB=8222
+    LB=8223
+    LB=8224
+    LB=8225
+    LB=8226
+    LB=8227
+    LB=8228
+    LB=8229
+    LB=8230
+    LB=8231
+    LB=8232
+    LB=8233
+    LB=8234
+    LB=8235
+    LB=8236
+    LB=8237
+    LB=8238
+    LB=8239
+    LB=8240
+    LB=8241
+    LB=8242
+    LB=8243
+    LB=8244
+    LB=8245
+    LB=8246
+    LB=8247
+    LB=8248
+    LB=8249
+    LB=8250
+    LB=8251
+    LB=8252
+    LB=8253
+    LB=8254
+    LB=8255
+    LB=8256
+    LB=8257
+    LB=8258
+    LB=8259
+    LB=8260
+    LB=8261
+    LB=8262
+    LB=8263
+    LB=8264
+    LB=8265
+Reading instances/addstationtime/InstanceA3.txt
+Reading instances/addstationtime/InstanceA4.txt
+Reading instances/addstationtime/InstanceA5.txt
+Reading instances/addstationtime/InstanceA6.txt
+Reading instances/addstationtime/InstanceA7.txt
+Reading instances/addstationtime/InstanceA8.txt
+Reading instances/addstationtime/InstanceA9.txt
+Reading instances/addstationtime/InstanceA10.txt
+Reading instances/addstationtime/InstanceA11.txt
+Reading instances/addstationtime/InstanceA12.txt
+Reading instances/addstationtime/InstanceB1.txt
+Reading instances/addstationtime/InstanceB2.txt
+Reading instances/addstationtime/InstanceB3.txt
+Reading instances/addstationtime/InstanceB4.txt
+Reading instances/addstationtime/InstanceB5.txt
+Reading instances/addstationtime/InstanceB6.txt
+Reading instances/addstationtime/InstanceB7.txt
+Reading instances/addstationtime/InstanceB8.txt
+Reading instances/addstationtime/InstanceB9.txt
+Reading instances/addstationtime/InstanceB10.txt
+Reading instances/addstationtime/InstanceB11.txt
+Reading instances/addstationtime/InstanceB12.txt
+ stationA2 Continuous MaxSatDddLadderSc  9999       9999
+
+Wrote to file "/home/tuyenkv/projects/maxsattrainscheduling/results/aglr/v30-deterministic300-minisat/w3/logs-cont/instances/stationA2.json"

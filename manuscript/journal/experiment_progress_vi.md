@@ -21,6 +21,14 @@ telemetry ghi thời gian MiniSAT gần 600 giây ở mọi ca. Vì vậy không
 lượt tăng cutoff cho cùng cấu hình; vòng kế tiếp phải thay đúng một thành
 phần mã đã kiểm thử, vẫn dùng MiniSAT. CaDiCaL không được khởi động lại.
 
+**V29 và V30 cũng không tăng coverage.** V29 bật verified objective bound
+cùng transitivity của V17; 13/13 ca khó ở 300 giây đều timeout hợp lệ. V30
+cố định thứ tự các mệnh đề RC2 có cùng trọng số theo literal; hai smoke test
+cho kết quả giống hệt nhau, nhưng 13/13 ca khó vẫn timeout. Raw và audit của
+hai vòng nằm trong `v29_objective_bound_20261107/` và
+`v30_deterministic_assumptions_20261107/`. V30 được giữ vì tính tái lập,
+không được xem là tăng hiệu năng.
+
 ## Trạng thái mới nhất
 
 **V17 đã chạy đủ toàn bộ dữ liệu và qua kiểm tra độc lập:**

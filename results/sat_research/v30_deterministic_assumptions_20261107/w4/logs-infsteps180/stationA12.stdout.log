@@ -1,0 +1,833 @@
+Opt { debug: false, solvers: ["maxsat_ddd_ladder_sc"], xml_instances: false, txt_instances: true, instance_name_filter: Some("stationA12"), instance_name_exact: true, verify_instances: false, objective: Some("infsteps180"), other_objective: None, json_output: Some("/home/tuyenkv/projects/maxsattrainscheduling/results/aglr/v30-deterministic300-minisat/w4/logs-infsteps180/instances/stationA12.json"), timeout_seconds: Some(300.0), satddd_use_precedence_graph: None, satddd_prealloc_cost_thresholds: None, satddd_seed_precedence_from_earliest: None, satddd_seed_resource_conflicts: None, satddd_use_sc_amo: None, maxsat_ladder_sc_use_eager_chain_expansion: None, maxsat_ladder_sc_use_precedence_graph: None, maxsat_ladder_sc_use_sc_amo: None, maxsat_ladder_sc_use_touched_clique_amo: None, maxsat_ladder_sc_seed_from_earliest: None, maxsat_ladder_sc_prealloc_cost_thresholds: None, maxsat_ladder_sc_assumptions: Some("legacy"), maxsat_ladder_sc_sparse_costs: None, maxsat_ladder_sc_resource_orders: Some(true), maxsat_ladder_sc_order_transitivity: Some(true), maxsat_ladder_sc_order_cycle_cuts: None, maxsat_ladder_sc_order_path_cuts: None, maxsat_ladder_sc_order_master: None, maxsat_ladder_sc_order_master_cost_levels: None, maxsat_ladder_sc_order_master_batch_cuts: None, maxsat_ladder_sc_order_master_seed_costs: None, maxsat_ladder_sc_extract_initial_cost: None, maxsat_ladder_sc_use_objective_bound: None, maxsat_ladder_sc_residual_hardening: None, maxsat_ladder_sc_core_minimize_checks: Some(4), maxsat_ladder_sc_core_minimize_conflicts: Some(100), maxsat_ladder_sc_core_exhaust_checks: Some(4), maxsat_ladder_sc_backend: "minisat", aglr_policy: None, aglr_min_growth: None, aglr_fraction: None, aglr_max_wait: None, aglr_rescue_progress: None, aglr_heuristic_period: None, aglr_heuristic_min_gap: None, aglr_use_objective_bound: None, aglr_filter_duplicates: None, satddd_objective_encoding: None, maxsat_rc2_bound_mode: None, maxsat_rc2_refinement_budget: None, maxsat_rc2_max_wait_iterations: None, maxsat_rc2_full_scan: None, maxsat_rc2_validate_before_return: None }
+Using solver timeout 300 seconds
+Using solvers [MaxSatDddLadderSc]
+Using delay cost type InfiniteSteps180
+MaxsatRc2 settings JournalSettings { bound_mode: Off, refinement_budget: None, max_wait_iterations: 5, full_scan: true, validate_before_return: true }
+MaxSatDddLadderSc settings MaxSatDddLadderScSettings { assumption_strategy: Legacy, sparse_costs: false, resource_orders: true, order_transitivity: true, order_cycle_cuts: false, order_path_cuts: false, order_master: false, order_master_cost_levels: false, order_master_batch_cuts: false, order_master_seed_costs: false, extract_initial_cost: false, use_objective_bound: false, residual_hardening: false, core_minimize_checks: 4, core_minimize_conflicts: 100, core_exhaust_checks: 4, use_precedence_graph: true, use_sc_amo: true, use_touched_clique_amo: true, use_eager_chain_expansion: false, seed_sc_from_earliest: false, prealloc_cost_thresholds: false, aglr: AglrSettings { policy: Legacy, min_growth: 32, fraction: 0.5, max_wait: 5, rescue_progress: BoundOrHeuristic, heuristic_period: 1, heuristic_min_gap: 0, use_objective_bound: false, filter_duplicates: false } }
+MaxSatDddLadderAglr settings MaxSatDddLadderScSettings { assumption_strategy: Legacy, sparse_costs: false, resource_orders: true, order_transitivity: true, order_cycle_cuts: false, order_path_cuts: false, order_master: false, order_master_cost_levels: false, order_master_batch_cuts: false, order_master_seed_costs: false, extract_initial_cost: false, use_objective_bound: false, residual_hardening: false, core_minimize_checks: 4, core_minimize_conflicts: 100, core_exhaust_checks: 4, use_precedence_graph: true, use_sc_amo: true, use_touched_clique_amo: true, use_eager_chain_expansion: false, seed_sc_from_earliest: false, prealloc_cost_thresholds: false, aglr: AglrSettings { policy: Adaptive, min_growth: 32, fraction: 0.5, max_wait: 5, rescue_progress: BoundOrHeuristic, heuristic_period: 1, heuristic_min_gap: 0, use_objective_bound: false, filter_duplicates: false } }
+SatDdd objective encoding Scpb
+SatDdd settings SatDddSettings { use_precedence_graph: true, prealloc_cost_thresholds: false, seed_precedence_from_earliest: false, seed_resource_conflicts: false, use_sc_amo: true }
+Reading instances/original/InstanceA1.txt
+Reading instances/original/InstanceA2.txt
+Reading instances/original/InstanceA3.txt
+Reading instances/original/InstanceA4.txt
+Reading instances/original/InstanceA5.txt
+Reading instances/original/InstanceA6.txt
+Reading instances/original/InstanceA7.txt
+Reading instances/original/InstanceA8.txt
+Reading instances/original/InstanceA9.txt
+Reading instances/original/InstanceA10.txt
+Reading instances/original/InstanceA11.txt
+Reading instances/original/InstanceA12.txt
+Reading instances/original/InstanceB1.txt
+Reading instances/original/InstanceB2.txt
+Reading instances/original/InstanceB3.txt
+Reading instances/original/InstanceB4.txt
+Reading instances/original/InstanceB5.txt
+Reading instances/original/InstanceB6.txt
+Reading instances/original/InstanceB7.txt
+Reading instances/original/InstanceB8.txt
+Reading instances/original/InstanceB9.txt
+Reading instances/original/InstanceB10.txt
+Reading instances/original/InstanceB11.txt
+Reading instances/original/InstanceB12.txt
+Reading instances/addtracktime/InstanceA1.txt
+Reading instances/addtracktime/InstanceA2.txt
+Reading instances/addtracktime/InstanceA3.txt
+Reading instances/addtracktime/InstanceA4.txt
+Reading instances/addtracktime/InstanceA5.txt
+Reading instances/addtracktime/InstanceA6.txt
+Reading instances/addtracktime/InstanceA7.txt
+Reading instances/addtracktime/InstanceA8.txt
+Reading instances/addtracktime/InstanceA9.txt
+Reading instances/addtracktime/InstanceA10.txt
+Reading instances/addtracktime/InstanceA11.txt
+Reading instances/addtracktime/InstanceA12.txt
+Reading instances/addtracktime/InstanceB1.txt
+Reading instances/addtracktime/InstanceB2.txt
+Reading instances/addtracktime/InstanceB3.txt
+Reading instances/addtracktime/InstanceB4.txt
+Reading instances/addtracktime/InstanceB5.txt
+Reading instances/addtracktime/InstanceB6.txt
+Reading instances/addtracktime/InstanceB7.txt
+Reading instances/addtracktime/InstanceB8.txt
+Reading instances/addtracktime/InstanceB9.txt
+Reading instances/addtracktime/InstanceB10.txt
+Reading instances/addtracktime/InstanceB11.txt
+Reading instances/addtracktime/InstanceB12.txt
+Reading instances/addstationtime/InstanceA1.txt
+Reading instances/addstationtime/InstanceA2.txt
+Reading instances/addstationtime/InstanceA3.txt
+Reading instances/addstationtime/InstanceA4.txt
+Reading instances/addstationtime/InstanceA5.txt
+Reading instances/addstationtime/InstanceA6.txt
+Reading instances/addstationtime/InstanceA7.txt
+Reading instances/addstationtime/InstanceA8.txt
+Reading instances/addstationtime/InstanceA9.txt
+Reading instances/addstationtime/InstanceA10.txt
+Reading instances/addstationtime/InstanceA11.txt
+Reading instances/addstationtime/InstanceA12.txt
+trains 28 tracks 33 avgtracks 21.71 trackpairs 6393 delays 0 avgdelay0
+28 & 33 & 21.71 & 6393 & 0 & 0 \\
+Starting solver MaxSatDddLadderSc
+Solution verified. Cost 562
+    LB=1
+    LB=2
+    LB=3
+    LB=4
+    LB=5
+    LB=6
+    LB=7
+    LB=8
+    LB=9
+    LB=10
+    LB=11
+    LB=12
+    LB=13
+Finishing with cost 160
+    LB=14
+    LB=15
+    LB=16
+    LB=17
+    LB=18
+    LB=19
+    LB=20
+    LB=21
+    LB=22
+    LB=23
+    LB=24
+    LB=25
+    LB=26
+    LB=27
+    LB=28
+    LB=29
+    LB=30
+    LB=31
+    LB=32
+    LB=33
+    LB=34
+    LB=35
+    LB=36
+    LB=37
+    LB=38
+    LB=39
+    LB=40
+    LB=41
+    LB=42
+    LB=43
+    LB=44
+    LB=45
+    LB=46
+Solution verified. Cost 160
+HEUR.FEAS. 160
+    LB=47
+Finishing with cost 146
+    LB=48
+    LB=49
+    LB=50
+    LB=51
+    LB=52
+    LB=53
+Solution verified. Cost 290
+HEUR.FEAS. 290
+Finishing with cost 154
+    LB=54
+    LB=55
+Solution verified. Cost 266
+HEUR.FEAS. 266
+Finishing with cost 122
+    LB=56
+    LB=57
+Solution verified. Cost 213
+HEUR.FEAS. 213
+Finishing with cost 175
+    LB=58
+    LB=59
+Solution verified. Cost 269
+HEUR.FEAS. 269
+Finishing with cost 123
+    LB=60
+    LB=61
+Solution verified. Cost 236
+HEUR.FEAS. 236
+Finishing with cost 147
+    LB=62
+Solution verified. Cost 224
+HEUR.FEAS. 224
+Finishing with cost 107
+Solution verified. Cost 221
+HEUR.FEAS. 221
+Finishing with cost 165
+    LB=63
+Solution verified. Cost 279
+HEUR.FEAS. 279
+Finishing with cost 145
+    LB=64
+Solution verified. Cost 240
+HEUR.FEAS. 240
+Finishing with cost 188
+    LB=65
+Solution verified. Cost 283
+HEUR.FEAS. 283
+Finishing with cost 140
+    LB=66
+Solution verified. Cost 226
+HEUR.FEAS. 226
+Finishing with cost 183
+Solution verified. Cost 269
+HEUR.FEAS. 269
+Finishing with cost 157
+    LB=67
+Solution verified. Cost 234
+HEUR.FEAS. 234
+Finishing with cost 175
+    LB=68
+Solution verified. Cost 252
+HEUR.FEAS. 252
+Finishing with cost 163
+    LB=69
+Solution verified. Cost 257
+HEUR.FEAS. 257
+Finishing with cost 172
+Solution verified. Cost 266
+HEUR.FEAS. 266
+Finishing with cost 138
+Solution verified. Cost 197
+HEUR.FEAS. 197
+    LB=70
+Finishing with cost 176
+Solution verified. Cost 235
+HEUR.FEAS. 235
+    LB=71
+    LB=72
+Finishing with cost 152
+Solution verified. Cost 236
+HEUR.FEAS. 236
+Finishing with cost 132
+Solution verified. Cost 199
+HEUR.FEAS. 199
+Finishing with cost 134
+Solution verified. Cost 201
+HEUR.FEAS. 201
+Finishing with cost 161
+    LB=73
+Solution verified. Cost 238
+HEUR.FEAS. 238
+Finishing with cost 174
+Solution verified. Cost 251
+HEUR.FEAS. 251
+Finishing with cost 165
+    LB=74
+Solution verified. Cost 239
+HEUR.FEAS. 239
+Finishing with cost 166
+Solution verified. Cost 240
+HEUR.FEAS. 240
+    LB=75
+Finishing with cost 150
+Solution verified. Cost 213
+HEUR.FEAS. 213
+Finishing with cost 149
+    LB=76
+Solution verified. Cost 215
+HEUR.FEAS. 215
+Finishing with cost 197
+Solution verified. Cost 263
+HEUR.FEAS. 263
+Finishing with cost 152
+Solution verified. Cost 231
+HEUR.FEAS. 231
+Finishing with cost 182
+Solution verified. Cost 261
+HEUR.FEAS. 261
+    LB=77
+Finishing with cost 166
+Solution verified. Cost 243
+HEUR.FEAS. 243
+Finishing with cost 167
+Solution verified. Cost 244
+HEUR.FEAS. 244
+    LB=78
+Finishing with cost 136
+Solution verified. Cost 231
+HEUR.FEAS. 231
+Finishing with cost 174
+    LB=79
+Solution verified. Cost 269
+HEUR.FEAS. 269
+    LB=80
+Finishing with cost 156
+Solution verified. Cost 236
+HEUR.FEAS. 236
+Finishing with cost 170
+Solution verified. Cost 250
+HEUR.FEAS. 250
+Finishing with cost 161
+Solution verified. Cost 217
+HEUR.FEAS. 217
+Finishing with cost 171
+Solution verified. Cost 227
+HEUR.FEAS. 227
+    LB=81
+Finishing with cost 150
+Solution verified. Cost 226
+HEUR.FEAS. 226
+Finishing with cost 138
+Solution verified. Cost 216
+HEUR.FEAS. 216
+Finishing with cost 154
+Solution verified. Cost 232
+HEUR.FEAS. 232
+    LB=82
+Finishing with cost 126
+Solution verified. Cost 207
+HEUR.FEAS. 207
+Finishing with cost 136
+Solution verified. Cost 217
+HEUR.FEAS. 217
+    LB=83
+Finishing with cost 166
+Solution verified. Cost 255
+HEUR.FEAS. 255
+Finishing with cost 167
+Solution verified. Cost 243
+HEUR.FEAS. 243
+Finishing with cost 184
+Solution verified. Cost 260
+HEUR.FEAS. 260
+Finishing with cost 164
+Solution verified. Cost 222
+HEUR.FEAS. 222
+Finishing with cost 168
+    LB=84
+Solution verified. Cost 226
+HEUR.FEAS. 226
+Finishing with cost 148
+Solution verified. Cost 198
+HEUR.FEAS. 198
+Finishing with cost 133
+Solution verified. Cost 212
+HEUR.FEAS. 212
+Finishing with cost 131
+Solution verified. Cost 210
+HEUR.FEAS. 210
+    LB=85
+Finishing with cost 150
+Solution verified. Cost 217
+HEUR.FEAS. 217
+Finishing with cost 165
+Solution verified. Cost 220
+HEUR.FEAS. 220
+Finishing with cost 179
+Solution verified. Cost 234
+HEUR.FEAS. 234
+Finishing with cost 130
+Solution verified. Cost 189
+HEUR.FEAS. 189
+Finishing with cost 128
+Solution verified. Cost 187
+HEUR.FEAS. 187
+Finishing with cost 136
+Solution verified. Cost 197
+HEUR.FEAS. 197
+Finishing with cost 136
+Solution verified. Cost 207
+HEUR.FEAS. 207
+Finishing with cost 142
+Solution verified. Cost 213
+HEUR.FEAS. 213
+    LB=86
+Finishing with cost 157
+Solution verified. Cost 189
+HEUR.FEAS. 189
+Finishing with cost 205
+Solution verified. Cost 237
+HEUR.FEAS. 237
+    LB=87
+Finishing with cost 130
+Solution verified. Cost 217
+HEUR.FEAS. 217
+Finishing with cost 123
+Solution verified. Cost 210
+HEUR.FEAS. 210
+Finishing with cost 161
+Solution verified. Cost 242
+HEUR.FEAS. 242
+Finishing with cost 173
+Solution verified. Cost 254
+HEUR.FEAS. 254
+    LB=88
+Finishing with cost 168
+Solution verified. Cost 221
+HEUR.FEAS. 221
+Finishing with cost 225
+Solution verified. Cost 278
+HEUR.FEAS. 278
+Finishing with cost 156
+Solution verified. Cost 213
+HEUR.FEAS. 213
+Finishing with cost 191
+Solution verified. Cost 248
+HEUR.FEAS. 248
+    LB=89
+Finishing with cost 185
+Solution verified. Cost 253
+HEUR.FEAS. 253
+Finishing with cost 171
+Solution verified. Cost 252
+HEUR.FEAS. 252
+Finishing with cost 189
+    LB=90
+Solution verified. Cost 270
+HEUR.FEAS. 270
+Finishing with cost 138
+Solution verified. Cost 200
+HEUR.FEAS. 200
+Finishing with cost 123
+Solution verified. Cost 185
+HEUR.FEAS. 185
+Finishing with cost 172
+Solution verified. Cost 228
+HEUR.FEAS. 228
+Finishing with cost 190
+Solution verified. Cost 246
+HEUR.FEAS. 246
+Finishing with cost 145
+Solution verified. Cost 223
+HEUR.FEAS. 223
+Finishing with cost 216
+Solution verified. Cost 294
+HEUR.FEAS. 294
+    LB=91
+Finishing with cost 149
+Solution verified. Cost 205
+HEUR.FEAS. 205
+Finishing with cost 180
+Solution verified. Cost 236
+HEUR.FEAS. 236
+    LB=92
+Finishing with cost 187
+Solution verified. Cost 239
+HEUR.FEAS. 239
+Finishing with cost 239
+Solution verified. Cost 291
+HEUR.FEAS. 291
+Finishing with cost 150
+Solution verified. Cost 208
+HEUR.FEAS. 208
+Finishing with cost 148
+    LB=93
+Solution verified. Cost 206
+HEUR.FEAS. 206
+Finishing with cost 144
+Solution verified. Cost 194
+HEUR.FEAS. 194
+Finishing with cost 190
+Solution verified. Cost 240
+HEUR.FEAS. 240
+Finishing with cost 196
+Solution verified. Cost 246
+HEUR.FEAS. 246
+Finishing with cost 146
+Solution verified. Cost 212
+HEUR.FEAS. 212
+Finishing with cost 135
+Solution verified. Cost 201
+HEUR.FEAS. 201
+    LB=94
+Finishing with cost 124
+Solution verified. Cost 184
+HEUR.FEAS. 184
+Finishing with cost 120
+Solution verified. Cost 185
+HEUR.FEAS. 185
+Finishing with cost 113
+Solution verified. Cost 178
+HEUR.FEAS. 178
+    LB=95
+Finishing with cost 113
+Solution verified. Cost 192
+HEUR.FEAS. 192
+Finishing with cost 111
+Solution verified. Cost 190
+HEUR.FEAS. 190
+Finishing with cost 161
+Solution verified. Cost 222
+HEUR.FEAS. 222
+Finishing with cost 188
+Solution verified. Cost 249
+HEUR.FEAS. 249
+Finishing with cost 187
+Solution verified. Cost 234
+HEUR.FEAS. 234
+Finishing with cost 214
+Solution verified. Cost 261
+HEUR.FEAS. 261
+    LB=96
+Finishing with cost 158
+Solution verified. Cost 204
+HEUR.FEAS. 204
+Finishing with cost 167
+Solution verified. Cost 224
+HEUR.FEAS. 224
+Finishing with cost 167
+Solution verified. Cost 224
+HEUR.FEAS. 224
+Finishing with cost 134
+Solution verified. Cost 178
+HEUR.FEAS. 178
+Finishing with cost 167
+Solution verified. Cost 211
+HEUR.FEAS. 211
+Finishing with cost 169
+Solution verified. Cost 235
+HEUR.FEAS. 235
+Finishing with cost 134
+Solution verified. Cost 200
+HEUR.FEAS. 200
+    LB=97
+Finishing with cost 158
+Solution verified. Cost 196
+HEUR.FEAS. 196
+Finishing with cost 174
+Solution verified. Cost 212
+HEUR.FEAS. 212
+Finishing with cost 162
+Solution verified. Cost 203
+HEUR.FEAS. 203
+Finishing with cost 214
+Solution verified. Cost 255
+HEUR.FEAS. 255
+Finishing with cost 130
+Solution verified. Cost 180
+HEUR.FEAS. 180
+Finishing with cost 139
+Solution verified. Cost 189
+HEUR.FEAS. 189
+    LB=98
+Finishing with cost 156
+Solution verified. Cost 216
+HEUR.FEAS. 216
+Finishing with cost 168
+Solution verified. Cost 228
+HEUR.FEAS. 228
+Finishing with cost 162
+Solution verified. Cost 229
+HEUR.FEAS. 229
+Finishing with cost 154
+Solution verified. Cost 221
+HEUR.FEAS. 221
+    LB=99
+Finishing with cost 152
+Solution verified. Cost 223
+HEUR.FEAS. 223
+Finishing with cost 252
+Solution verified. Cost 323
+HEUR.FEAS. 323
+Finishing with cost 160
+Solution verified. Cost 230
+HEUR.FEAS. 230
+Finishing with cost 195
+Solution verified. Cost 265
+HEUR.FEAS. 265
+Finishing with cost 181
+Solution verified. Cost 219
+HEUR.FEAS. 219
+Finishing with cost 212
+Solution verified. Cost 250
+HEUR.FEAS. 250
+    LB=100
+Finishing with cost 154
+Solution verified. Cost 197
+HEUR.FEAS. 197
+Finishing with cost 188
+Solution verified. Cost 231
+HEUR.FEAS. 231
+Finishing with cost 169
+Solution verified. Cost 214
+HEUR.FEAS. 214
+Finishing with cost 166
+Solution verified. Cost 214
+HEUR.FEAS. 214
+Finishing with cost 164
+Solution verified. Cost 212
+HEUR.FEAS. 212
+Finishing with cost 152
+Solution verified. Cost 182
+HEUR.FEAS. 182
+Finishing with cost 154
+Solution verified. Cost 188
+HEUR.FEAS. 188
+Finishing with cost 156
+Solution verified. Cost 207
+HEUR.FEAS. 207
+Finishing with cost 182
+Solution verified. Cost 233
+HEUR.FEAS. 233
+    LB=101
+Finishing with cost 161
+Solution verified. Cost 198
+HEUR.FEAS. 198
+Finishing with cost 173
+Solution verified. Cost 210
+HEUR.FEAS. 210
+Finishing with cost 156
+Solution verified. Cost 193
+HEUR.FEAS. 193
+Finishing with cost 153
+Solution verified. Cost 195
+HEUR.FEAS. 195
+Finishing with cost 184
+Solution verified. Cost 226
+HEUR.FEAS. 226
+    LB=102
+Finishing with cost 179
+Solution verified. Cost 224
+HEUR.FEAS. 224
+Finishing with cost 162
+Solution verified. Cost 207
+HEUR.FEAS. 207
+Finishing with cost 185
+Solution verified. Cost 232
+HEUR.FEAS. 232
+Finishing with cost 196
+Solution verified. Cost 243
+HEUR.FEAS. 243
+Finishing with cost 163
+Solution verified. Cost 233
+HEUR.FEAS. 233
+Finishing with cost 160
+Solution verified. Cost 230
+HEUR.FEAS. 230
+    LB=103
+Finishing with cost 162
+Solution verified. Cost 201
+HEUR.FEAS. 201
+Finishing with cost 193
+Solution verified. Cost 232
+HEUR.FEAS. 232
+Finishing with cost 161
+Solution verified. Cost 196
+HEUR.FEAS. 196
+Finishing with cost 169
+Solution verified. Cost 204
+HEUR.FEAS. 204
+Finishing with cost 160
+Solution verified. Cost 200
+HEUR.FEAS. 200
+Finishing with cost 191
+Solution verified. Cost 231
+HEUR.FEAS. 231
+    LB=104
+Finishing with cost 145
+Solution verified. Cost 179
+HEUR.FEAS. 179
+Finishing with cost 170
+Solution verified. Cost 204
+HEUR.FEAS. 204
+Finishing with cost 167
+Solution verified. Cost 207
+HEUR.FEAS. 207
+Finishing with cost 164
+Solution verified. Cost 206
+HEUR.FEAS. 206
+Finishing with cost 183
+Solution verified. Cost 225
+HEUR.FEAS. 225
+Finishing with cost 173
+Solution verified. Cost 214
+HEUR.FEAS. 214
+Finishing with cost 181
+Solution verified. Cost 222
+HEUR.FEAS. 222
+Finishing with cost 160
+Solution verified. Cost 211
+HEUR.FEAS. 211
+Finishing with cost 175
+Solution verified. Cost 226
+HEUR.FEAS. 226
+Finishing with cost 189
+Solution verified. Cost 219
+HEUR.FEAS. 219
+Finishing with cost 186
+Solution verified. Cost 216
+HEUR.FEAS. 216
+    LB=105
+Finishing with cost 192
+Solution verified. Cost 224
+HEUR.FEAS. 224
+Finishing with cost 230
+Solution verified. Cost 262
+HEUR.FEAS. 262
+Finishing with cost 172
+Solution verified. Cost 222
+HEUR.FEAS. 222
+Finishing with cost 179
+Solution verified. Cost 229
+HEUR.FEAS. 229
+Finishing with cost 146
+Solution verified. Cost 181
+HEUR.FEAS. 181
+Finishing with cost 172
+Solution verified. Cost 207
+HEUR.FEAS. 207
+Finishing with cost 148
+Solution verified. Cost 172
+HEUR.FEAS. 172
+Finishing with cost 129
+Solution verified. Cost 154
+HEUR.FEAS. 154
+Finishing with cost 141
+Solution verified. Cost 166
+HEUR.FEAS. 166
+Finishing with cost 181
+Solution verified. Cost 229
+HEUR.FEAS. 229
+Finishing with cost 178
+Solution verified. Cost 226
+HEUR.FEAS. 226
+    LB=106
+Finishing with cost 142
+Solution verified. Cost 178
+HEUR.FEAS. 178
+Finishing with cost 181
+Solution verified. Cost 217
+HEUR.FEAS. 217
+Finishing with cost 163
+Solution verified. Cost 203
+HEUR.FEAS. 203
+Finishing with cost 164
+Solution verified. Cost 204
+HEUR.FEAS. 204
+Finishing with cost 174
+Solution verified. Cost 206
+HEUR.FEAS. 206
+Finishing with cost 263
+Solution verified. Cost 295
+HEUR.FEAS. 295
+Finishing with cost 157
+Solution verified. Cost 200
+HEUR.FEAS. 200
+Finishing with cost 182
+Solution verified. Cost 225
+HEUR.FEAS. 225
+Finishing with cost 171
+Solution verified. Cost 208
+HEUR.FEAS. 208
+Finishing with cost 203
+Solution verified. Cost 240
+HEUR.FEAS. 240
+    LB=107
+Finishing with cost 162
+Solution verified. Cost 219
+HEUR.FEAS. 219
+Finishing with cost 157
+Solution verified. Cost 214
+HEUR.FEAS. 214
+Finishing with cost 135
+Solution verified. Cost 171
+HEUR.FEAS. 171
+Finishing with cost 132
+Solution verified. Cost 168
+HEUR.FEAS. 168
+Finishing with cost 182
+Solution verified. Cost 221
+HEUR.FEAS. 221
+Finishing with cost 197
+Solution verified. Cost 236
+HEUR.FEAS. 236
+    LB=108
+Finishing with cost 196
+Solution verified. Cost 251
+HEUR.FEAS. 251
+Finishing with cost 205
+Solution verified. Cost 260
+HEUR.FEAS. 260
+Finishing with cost 146
+Solution verified. Cost 170
+HEUR.FEAS. 170
+Finishing with cost 174
+Solution verified. Cost 198
+HEUR.FEAS. 198
+Finishing with cost 142
+Solution verified. Cost 176
+HEUR.FEAS. 176
+Finishing with cost 145
+Solution verified. Cost 179
+HEUR.FEAS. 179
+Finishing with cost 164
+Solution verified. Cost 187
+HEUR.FEAS. 187
+Finishing with cost 174
+Solution verified. Cost 197
+HEUR.FEAS. 197
+Finishing with cost 160
+Solution verified. Cost 211
+HEUR.FEAS. 211
+Finishing with cost 169
+Solution verified. Cost 220
+HEUR.FEAS. 220
+Finishing with cost 173
+Solution verified. Cost 198
+HEUR.FEAS. 198
+Finishing with cost 158
+Solution verified. Cost 183
+HEUR.FEAS. 183
+Finishing with cost 175
+Solution verified. Cost 208
+HEUR.FEAS. 208
+Finishing with cost 205
+Solution verified. Cost 238
+HEUR.FEAS. 238
+Finishing with cost 184
+Solution verified. Cost 218
+HEUR.FEAS. 218
+Finishing with cost 214
+Solution verified. Cost 248
+HEUR.FEAS. 248
+    LB=109
+Finishing with cost 165
+Solution verified. Cost 201
+HEUR.FEAS. 201
+Finishing with cost 196
+Solution verified. Cost 232
+HEUR.FEAS. 232
+Finishing with cost 168
+Solution verified. Cost 198
+HEUR.FEAS. 198
+Finishing with cost 181
+Solution verified. Cost 211
+HEUR.FEAS. 211
+Finishing with cost 173
+Solution verified. Cost 224
+HEUR.FEAS. 224
+Finishing with cost 176
+Solution verified. Cost 227
+HEUR.FEAS. 227
+Finishing with cost 136
+Solution verified. Cost 164
+HEUR.FEAS. 164
+Finishing with cost 137
+Solution verified. Cost 165
+HEUR.FEAS. 165
+Finishing with cost 194
+Solution verified. Cost 225
+HEUR.FEAS. 225
+Finishing with cost 185
+Solution verified. Cost 216
+HEUR.FEAS. 216
+Reading instances/addstationtime/InstanceB1.txt
+Reading instances/addstationtime/InstanceB2.txt
+Reading instances/addstationtime/InstanceB3.txt
+Reading instances/addstationtime/InstanceB4.txt
+Reading instances/addstationtime/InstanceB5.txt
+Reading instances/addstationtime/InstanceB6.txt
+Reading instances/addstationtime/InstanceB7.txt
+Reading instances/addstationtime/InstanceB8.txt
+Reading instances/addstationtime/InstanceB9.txt
+Reading instances/addstationtime/InstanceB10.txt
+Reading instances/addstationtime/InstanceB11.txt
+Reading instances/addstationtime/InstanceB12.txt
+stationA12 InfiniteSteps180 MaxSatDddLadderSc  9999       9999
+
+Wrote to file "/home/tuyenkv/projects/maxsattrainscheduling/results/aglr/v30-deterministic300-minisat/w4/logs-infsteps180/instances/stationA12.json"

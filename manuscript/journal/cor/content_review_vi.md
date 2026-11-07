@@ -34,6 +34,10 @@ Vòng kéo dài V17 lên 600 giây trên 13 ca chưa giải cũng đã hoàn t�
 MiniSAT: 13/13 timeout hợp lệ, không có ca mới. Coverage giữ ở 203/216;
 không dùng vòng này để thay số liệu trong bản thảo. Bản ghi và kiểm toán ở
 `results/sat_research/v17_extended600_20261107/`.
+V29 (objective bound + transitivity) và V30 (tie-break xác định cho RC2) cũng
+đã chạy đủ 13 ca khó bằng MiniSAT ở 300 giây nhưng đều 0/13 ca mới. Chúng
+chỉ là ablation và bằng chứng tái lập, chưa được đưa vào Abstract, Results
+hay Conclusion.
 V28 tắt đường tăng cận MiniSAT-only để hai backend thực sự dùng cùng ngân sách.
 Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh
 chạy nằm trong `../experiment_progress_vi.md`, `../experiment_runbook_vi.md`

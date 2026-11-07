@@ -1338,6 +1338,34 @@ chuỗi 10.000 đỉnh, mệnh đề đúng với lịch nhỏ vét cạn và ch
 khi bật/tắt truyền cận trên cả MiniSAT/CaDiCaL. Các kiểm thử native,
 smoke và timeout đã đạt; V20 đang thử trên 13 ca khó.
 
+\section{V21: đối chứng cách gửi điều kiện chi phí}
+
+Ca khó đầu tiên của V20 vẫn timeout và gọi SAT nhiều hơn hẳn V17.
+Sau mỗi mốc mới, cách cũ lại bắt đầu với 20 điều kiện chi phí rồi tăng dần.
+V21 giữ nguyên binary và toàn bộ cơ chế đường đi, chỉ gửi tất cả điều kiện
+chi phí trong mỗi lần SAT. Hai cách đều chỉ nhận model sau khi đã xét đủ
+điều kiện, nên vẫn cần so chi phí và nghiệm tối ưu như nhau.
+
+Tham số đổi từ \file{--maxsat-ladder-sc-assumptions legacy} sang
+\file{--maxsat-ladder-sc-assumptions full}. Từ ``full'' ở đây chỉ cách gửi
+điều kiện, không có nghĩa chạy toàn bộ dataset: V21 vẫn chỉ thử 13 ca.
+Đọc \file{maxsat_partial_sat_calls}; khi dùng cách mới, số này phải bằng 0.
+Theo dõi thêm tổng lời gọi SAT, thời gian SAT, số mệnh đề đường đi và số ca
+chứng minh tối ưu để biết đổi cách gửi có giúp hay không.
+
+V21 đã qua 99 test Python, smoke chi phí 5526 ở hai cách gửi và kiểm tra
+timeout trên VM. Dùng lại binary V20 đã qua 73 test Rust; không build lại
+chỉ để đổi tham số CLI. Runner mới ghi riêng commit của solver và commit
+của script, kèm cùng hash binary. Lệnh dùng
+\file{--component order-paths-full --reuse-build}; báo cáo là
+\file{order_paths_full_audit.json}. Xem lệnh đầy đủ trong runbook.
+
+V20 và V21 chạy trên hai nhóm lõi vật lý riêng, cùng timeout 300 giây và
+6.000.000 KB RAM. Số đo thời gian trong sàng lọc song song dùng chẩn đoán.
+Nếu có ca mới, xác nhận và kiểm tra các ca cũ, rồi chạy full tuần tự trước
+khi dùng bảng thời gian chính. Mốc tốt nhất đã kiểm tra vẫn là 203/216;
+chưa có kết quả đủ 13 ca của V20/V21 khi khởi chạy.
+
 \section{Nội dung được phép đưa vào bài báo}
 
 Methods có thể mô tả AGLR ngay vì công thức đã khớp với mã. Các số RC2+B+R cũ

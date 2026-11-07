@@ -60,6 +60,24 @@ Việt Nam; đo ca khó từ 11:40:00. Chỉ chạy 13 ca chưa giải, 300 giâ
 Dữ liệu ở worktree `~/projects/order-paths-v20/maxsattrainscheduling`,
 thư mục `results/aglr/order-paths-v20-unresolved300/`.
 
+**V21 đối chứng cách gửi điều kiện, cùng binary với V20.** Ca đầu của
+V20 (`trackA11/infsteps180`) timeout, có 40.606 lời gọi SAT, 4.155 lần
+kiểm tra đồ thị và 4.081 mệnh đề đường đi. V17 dùng 1.542 lời gọi SAT
+trên ca này. Tìm đường chỉ tốn 1,61 giây. Vì số lời gọi tăng mạnh, V21
+đổi đúng một tham số: gửi toàn bộ điều kiện chi phí từ đầu thay cho tăng
+mỗi lần 20 điều kiện. Không sửa thuật toán hoặc build lại binary.
+
+Mã runner `4b4d80f`, solver vẫn `8898caf` và cùng hash binary V20.
+99 test Python trên VM, smoke cost 5526 ở cả hai cách gửi và timeout
+native đều đạt. Smoke mới có 0 lời gọi SAT với một phần điều kiện, đúng
+cấu hình; kết quả này chưa phải cải thiện coverage. Dịch vụ
+`maxsat-order-paths-full-v21.service` bắt đầu **11:50:15 ngày 07/11**, đo
+ca khó từ 11:50:20. CPU `2,3,6,7` tách nhóm vật lý với V20; mỗi ca cùng
+300 giây và 6.000.000 KB RAM, mỗi vòng tối đa 6 giờ. Chỉ sàng lọc 13 ca
+chưa giải. Timings khi hai lượt chạy cùng lúc dùng chẩn đoán; lượt full
+cho bài báo vẫn chạy tuần tự. Dữ liệu khởi chạy ở
+`results/sat_research/order_paths_full_v21_20261107/`.
+
 **`trackB12/cont` của V17 đã xác nhận thành công 3/3 lần.** Mọi lịch đều
 hợp lệ và có cost=LB=UB=15.182. Thời gian 10,65; 4,64; 11,86 giây, median
 10,65 giây. Đã tải về và kiểm toán lại độc lập. Đây là ca giải thêm so với

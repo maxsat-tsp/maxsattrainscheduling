@@ -1,0 +1,28 @@
+{
+  "service": "maxsat-order-paths-full-v21.service",
+  "started_at_utc": "2026-11-07T04:50:15Z",
+  "runner_commit": "4b4d80f",
+  "solver_source_commit": "8898cafab7e1c648616faaf6c6231f86a00ba8c2",
+  "binary_sha256": "b888e424572ad22cfa145a8f57381eab9354e81a2dcd13b059bb8564535bf340",
+  "worktree": "/home/tuyenkv/projects/order-paths-full-v21/maxsattrainscheduling",
+  "component": "order-paths-full",
+  "only_difference_from_v20": {
+    "assumptions": "full"
+  },
+  "expected_runs": 13,
+  "timeout_seconds": 300,
+  "ram_kb": 6000000,
+  "cpu_affinity": [
+    2,
+    3,
+    6,
+    7
+  ],
+  "maximum_round_seconds": 21600,
+  "parallel_with": "maxsat-order-paths-v20.service on physical CPU group 0,1,4,5",
+  "runtime_scope": "diagnostic screening; final full-dataset timings must be serial",
+  "submission_passed": false,
+  "validation_passed": true,
+  "python_tests_passed": 99,
+  "first_measurement_at_utc": "2026-11-07T04:50:20Z"
+}

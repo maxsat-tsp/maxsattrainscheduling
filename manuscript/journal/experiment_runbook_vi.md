@@ -433,6 +433,59 @@ và số mệnh đề. Có ca mới thì xác nhận ba lần và kiểm tra cá
 giải trước khi thay coverage full. Khởi chạy và đạt test chưa phải kết quả
 hiệu năng V20.
 
+## V21: cùng binary V20, gửi toàn bộ điều kiện chi phí
+
+Trên ca đầu, V20 cần 40.606 lời gọi SAT so với 1.542 của V17, nhưng tìm
+đường chỉ tốn 1,61 giây. V21 đổi đúng lịch gửi điều kiện: `legacy` thành
+`full`. Cơ chế đường đi, RC2, ngân sách core và binary giữ nguyên. Đây là
+phép thử trên tải công việc mới của V20; kết quả thử lịch gửi trên cách
+mã hóa cũ vẫn được giữ và chưa chứng minh cách gửi nào luôn tốt hơn.
+
+Solver source `8898caf`, runner `4b4d80f`. Tái sử dụng binary có hash
+`b888e424572ad22cfa145a8f57381eab9354e81a2dcd13b059bb8564535bf340`.
+Tham số `--reuse-build` giữ commit solver thật thay vì gán commit của
+script mới cho binary cũ. Native V20 đã qua 73 test Rust; runner V21 qua
+99 test Python trên VM. Smoke hai cách gửi đều có cost=LB=UB=5526; cách
+`full` có `maxsat_partial_sat_calls=0`. Timeout probe đạt trước sàng lọc.
+
+Dịch vụ `maxsat-order-paths-full-v21.service` bắt đầu **11:50:15 ngày
+07/11**, đo từ 11:50:20, giờ Việt Nam. Worktree riêng
+`~/projects/order-paths-full-v21/maxsattrainscheduling`. Chỉ 13 ca chưa
+giải, 300 giây và 6.000.000 KB mỗi ca, nhóm lõi vật lý `2,3,6,7` tách
+nhóm V20. Mỗi lượt tối đa 6 giờ. Thời gian sàng lọc song song chỉ dùng
+chẩn đoán; full cho bảng chính vẫn chạy tuần tự.
+
+```bash
+systemctl status maxsat-order-paths-full-v21.service --no-pager
+journalctl -u maxsat-order-paths-full-v21.service -n 30 --no-pager
+```
+
+Khi dịch vụ đã dừng, lệnh tái tạo/tiếp tục là:
+
+```bash
+taskset -c 2,3,6,7 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component order-paths-full --reuse-build \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary /home/tuyenkv/projects/order-paths-v20/maxsattrainscheduling/target/release/ddd \
+  --build-manifest /home/tuyenkv/projects/order-paths-v20/maxsattrainscheduling/results/aglr/order-paths-v20-build/manifest.json \
+  --results results/aglr/order-paths-full-v21-unresolved300 --round-seconds 21000
+python3 quick_scripts/analyze/targeted_order_cycles.py audit \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/order-paths-full-v21-unresolved300
+```
+
+Đọc `order_paths_full_audit.json`. Không ghép ca tốt nhất của V20 và V21
+để báo coverage của một solver. Chọn cấu hình sau khi đủ ca và qua audit;
+có ca mới thì xác nhận ba lần và hồi quy trước khi thay mốc 203/216.
+
+Có thể chụp các ca đã xong mà không dừng lượt chạy bằng
+`results/sat_research/order_paths_v20_20261107/snapshot_trial.py`, truyền
+thư mục RUN và đường dẫn archive mới. Script chỉ lấy số ca đã ghi hoàn
+tất, kèm manifest và hash từng file. Sau khi giải nén vào thư mục mới,
+lệnh `audit` ở trên kiểm tra cả hash bản chụp và nội dung kết quả. Bản
+chụp V20 đầu tiên có 2/13 ca và đã qua kiểm toán độc lập trong `progress_2/`;
+hai ca đều timeout, không phải kết quả cuối của V20.
+
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 
 **Đã xác nhận CSOnet dùng RC2, với MiniSAT trong mã được kiểm tra.** RC2 xử

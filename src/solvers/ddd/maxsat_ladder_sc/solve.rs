@@ -2818,9 +2818,13 @@ mod aglr_end_to_end_tests {
     fn temporal_cycle_cuts_match_exhaustive_two_route_optima() {
         let problem=Problem{
             name:"crossing-routes-order-cycles".into(),
-            trains:[vec![0,1],vec![1,0]].into_iter().map(|route|Train{
-                visits:route.into_iter().map(|resource_id|Visit{
-                    resource_id,earliest:0,aimed:Some(0),travel_time:2,
+            // No unavoidable initial cost: the published path does not account
+            // for a constant delay introduced by preprocessing an aimed=0
+            // successor. Stagger the routes so resource refinement is needed.
+            trains:[vec![0,1],vec![1,0]].into_iter().enumerate().map(|(train,route)|Train{
+                visits:route.into_iter().enumerate().map(|(index,resource_id)|Visit{
+                    resource_id,earliest:(2*index+train) as i32,
+                    aimed:Some((2*index+train) as i32),travel_time:2,
                 }).collect(),
             }).collect(),conflicts:vec![(0,0),(1,1)],
         };

@@ -588,7 +588,7 @@ Mã `d8e2509`, cờ `--maxsat-ladder-sc-order-master-cost-levels true`, mặc
 ở thời điểm đầu tiên có cùng chi phí với L, chặn dưới bởi earliest. Ví dụ
 aimed=0, `infsteps180`: L=200 và L=280 đều dùng mốc 181. Với chi phí liên
 tục dương, mốc vẫn là L. Giữ RC2 và lịch gửi `legacy` của V22 để đối chứng
-đúng một thay đổi. Công thức và ví dụ ở hướng dẫn sinh viên 5.20.
+đúng một thay đổi. Công thức và ví dụ ở hướng dẫn sinh viên 5.21.
 
 Native đã qua **77 test Rust và 107 test Python**. Mốc đại diện được kiểm
 tra trên mọi thời điểm nhỏ của ba dạng chi phí, earliest nằm trong bậc,
@@ -743,6 +743,44 @@ báo submission PASS. Theo dõi số lời gọi SAT, mệnh đề đường đi
 thời gian SAT/đồ thị và `maxsat_order_master_max_batch`. Nếu có gain,
 controller tự xác nhận ba lần rồi hồi quy 203 ca; đủ dữ liệu mới lập
 bảng full. Không cộng thời gian các lần chạy khác nhau.
+
+## V27 dự phòng: đưa điều kiện chi phí theo một thứ tự vào từ đầu
+
+Mã `c1b046f`, mặc định `order_master_seed_costs=false`. Bật bằng
+`--maxsat-ladder-sc-order-master-seed-costs true` hoặc
+`MAXSATDDD_ORDER_MASTER_SEED_COSTS=true`. Chỉ thêm một thành phần trên
+V26. Mỗi hướng của một cặp có điều kiện chi phí được chứng minh từ cận
+cứng trên tuyến và thời điểm rời thật; không biến chúng thành thứ tự
+bắt buộc. Mốc chuẩn hóa và CostTree giữ nguyên. Công thức, ví dụ và
+kiểm thử bắt buộc nằm trong hướng dẫn sinh viên 5.21.
+
+V27 được xếp sau V26. `decide_vm_round.py` kiểm toán lại đủ 13 raw V26
+và 216 raw V17; chỉ mở V27 nếu V26 hoàn tất, không lỗi và không có gain.
+Nếu V26 có gain, ghi quyết định bỏ qua V27 và kết thúc service bình thường;
+ưu tiên xác nhận/hồi quy V26. Nếu V26 lỗi hoặc chưa đủ dữ liệu, không mở
+V27. Không chạy đo hoặc build cạnh tranh với V26.
+
+Local V27 đạt 37 test nhân SAT, 113 test Python, Rust typecheck và Bash
+syntax; native chưa được coi là đạt khi service còn chờ. V27 chạy riêng
+bốn ca infsteps180 ở 300 giây, 6.000.000 KB, CPU 0,1,4,5. Cả service tối
+đa 6 giờ kể cả thời gian chờ. Nếu có gain thì ba lần xác nhận và hồi quy
+68 ca cùng objective, chưa báo full-reference hoặc submission PASS.
+
+```bash
+systemctl status maxsat-master-seeds-v27.service --no-pager
+journalctl -u maxsat-master-seeds-v27.service -n 20 --no-pager
+# Chỉ chạy thủ công sau khi đã qua quyết định mở lượt và test native.
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component order-master-seeds --objectives infsteps180 \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary ./target/release/ddd \
+  --build-manifest results/aglr/master-seeds-v27-build/manifest.json \
+  --results results/aglr/master-seeds-v27-unresolved300 --round-seconds 7200
+```
+
+Manifest và `order_master_seeds_audit.json` giữ phạm vi objective và binary
+riêng. Chưa cộng các ca mới của một lượt thử vào bảng full V17 khi chưa
+khóa cách chọn cấu hình và kiểm toán các objective còn lại.
 
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 

@@ -112,6 +112,14 @@ thật như một kết quả hiệu năng; các lịch tối ưu trả về v�
 chi phí đã biết, và ít nhất một bài thử phải chứng minh đúng optimum.
 Điều kiện mới được ghi rõ, các lượt V22--V24 đã dừng vẫn giữ nguyên.
 
+**V27 dự phòng đã cài, chưa có kết quả native/hiệu năng.** Mã `c1b046f`
+báo ngay chi phí tối thiểu suy ra từ từng lựa chọn thứ tự, chỉ dùng thời
+gian cứng trên tuyến. Local đạt 37 test nhân SAT, 113 Python và typecheck.
+Chỉ chạy nếu V26 đã kiểm toán đủ 13 ca mà vẫn không tăng coverage. Nếu
+V26 có gain thì bỏ qua V27 và ưu tiên xác nhận/hồi quy. Giữ source/binary
+riêng và chỉ sàng lọc bốn ca infsteps180. Quyết định mở lượt phải được
+lưu; công thức và lệnh ở hướng dẫn sinh viên 5.21 và runbook.
+
 **`trackB12/cont` của V17 đã xác nhận thành công 3/3 lần.** Mọi lịch đều
 hợp lệ và có cost=LB=UB=15.182. Thời gian 10,65; 4,64; 11,86 giây, median
 10,65 giây. Đã tải về và kiểm toán lại độc lập. Đây là ca giải thêm so với
@@ -120,7 +128,7 @@ Journal trong nhóm 31 cặp. Dùng đúng binary/tham số V17, nhóm lõi vậ
 không ghép vào PAR-2 cuối. Dữ liệu ở
 `core_exhaustion_v17_20261107/trackB12_confirmation/` trong `results/sat_research/`.
 
-Các phiên bản V17--V26 giữ refinement `legacy`, cải tiến RC2 hoặc ràng
+Các phiên bản V17--V27 giữ refinement `legacy`, cải tiến RC2 hoặc ràng
 buộc thứ tự, nên chưa dùng kết quả làm bằng chứng cho bộ chọn AGLR thích
 nghi. Mốc tốt nhất hiện tại vẫn là **203/216**. Chưa cập nhật Abstract,
 Results hoặc Conclusion thành kết luận vượt toàn bộ SOTA.

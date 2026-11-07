@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.20}
+\fancyhead[R]{\small Phiên bản 5.21}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -67,7 +67,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.20, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.21, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -119,6 +119,7 @@ không xem chín ca \code{cont} bị loại khỏi lượt chạy là đã giả
 V26 đã cài cách thêm cùng lúc các ràng buộc chi phí còn thiếu từ một
 lịch. Bản này được xếp chạy sau V25, qua kiểm thử native trước khi đo
 hiệu năng. Mỗi ca khó giữ 300 giây và 6.000.000 KB; mỗi vòng tối đa 6 giờ.
+V27 là hướng dự phòng, chỉ được mở nếu V26 không có ca mới sau kiểm toán.
 Không sửa binary đang chạy. Lệnh ở runbook.
 
 Nếu có ca mới, script tự chạy xác nhận ba lần. Chỉ khi các ca mới đều
@@ -1581,6 +1582,53 @@ thử chứng minh tối ưu vẫn phải khớp chi phí đã biết; ít nhấ
 phải giải đúng và bộ kiểm thử phải đạt trước khi chạy 13 ca khó. Điều
 kiện này khác điều kiện dừng sớm của V22--V24 và được ghi rõ trong
 validator. Kết quả cũ giữ nguyên.
+
+\section{V27 dự phòng: báo sớm chi phí của từng lựa chọn thứ tự}
+
+V27 chỉ được chạy nếu V26 đã kiểm toán đủ 13 ca mà không giải thêm.
+Nếu V26 có ca mới, giữ phương pháp đó để xác nhận và hồi quy trước.
+V27 chỉ thêm một thành phần: các điều kiện chi phí suy ra từ từng
+lựa chọn thứ tự, ngay trước lần gọi SAT đầu tiên.
+
+Gọi $E_v$ là thời điểm sớm nhất suy ra từ thời gian bắt đầu và di chuyển
+trên tuyến của chính tàu. Chưa dùng thứ tự giữa các tàu để tính $E$.
+Nếu $o_{ij}$ nghĩa là lần $i$ trước lần $j$, thời điểm rời sớm nhất của
+$i$ là $E_{\mathrm{next}(i)}$; với lần cuối, dùng $E_i+p_i$.
+Gọi giá trị này là $F_i$. Theo lựa chọn $o_{ij}$, ta có
+\[
+ L_j=\max(E_j,F_i),\qquad
+ L_{\mathrm{next}(v)}=\max\{E_{\mathrm{next}(v)},L_v+p_v\}.
+\]
+Truyền $L$ trên phần còn lại của tuyến tàu chứa $j$. Với mỗi lần có
+$f_v(L_v)>f_v(E_v)$, thêm
+\[
+ \neg o_{ij}\lor d_v\bigl(\tau_v(f_v(L_v))\bigr).
+\]
+Đây là điều kiện ``nếu chọn thứ tự này thì phải trả ít nhất chi phí
+này''. Không bắt buộc chọn thứ tự đó. Hai hướng của một cặp đều được
+xét riêng; mốc trùng được dùng chung. Không đọc lịch hoặc chi phí đã
+biết từ bài hội nghị.
+
+Ví dụ, A không thể rời trước 7. Nếu A trước B thì B không thể vào trước
+7; B còn cần 3 giây để tới đích nên không thể tới trước 10. Nếu B dự
+kiến tới lúc 8 và dùng chi phí liên tục, lựa chọn đó phải trả ít nhất 2.
+SAT được biết điều này từ đầu, thay vì chờ sinh nhiều lịch mới phát
+hiện. Các chuỗi thứ tự dài hơn vẫn được V26 xử lý khi cần.
+
+Cờ \file{--maxsat-ladder-sc-order-master-seed-costs true} mặc định tắt;
+biến Bash \file{MAXSATDDD_ORDER_MASTER_SEED_COSTS=true}. Script dùng
+\file{--component order-master-seeds --objectives infsteps180} để thử
+bốn ca bậc thang chưa giải. Đọc thêm
+\file{maxsat_order_master_seed_clauses} và
+\file{maxsat_order_master_seed_points}: số điều kiện và mốc tạo lúc đầu.
+Nhiều điều kiện hơn chưa có nghĩa là tốt hơn; vẫn chọn theo coverage,
+rồi PAR-2 và kiểm tra hồi quy.
+
+Bộ kiểm thử phải kiểm tra thời điểm rời thật, lần cuối có thời gian
+dương, chi phí không tăng thì không thêm mốc, tràn số và đúng optimum
+với cả MiniSAT/CaDiCaL. Kiểm thử native phải đạt trước ca khó. V27 có
+source/binary riêng; không thay tệp đang chạy V26. Lượt chỉ gồm một
+objective vẫn chưa đủ để báo coverage full.
 
 \section{Nội dung được phép đưa vào bài báo}
 

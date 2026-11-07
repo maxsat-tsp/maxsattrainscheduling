@@ -157,3 +157,22 @@ lệ và kiểm tra thứ tự chọn; kiểm thử đầy đủ cần chạy na
 trước khi sàng lọc. Bài thử thật timeout hợp lệ không còn tự chặn lượt
 sàng lọc chỉ vì chậm; validator ghi rõ điều kiện mới. Chưa có số liệu
 nào thay thế bảng full V17.
+
+
+## V27 dự phòng: điều kiện chi phí theo từng hướng trước SAT
+
+Mã c1b046f chỉ dùng cận cứng từ tuyến để suy ra chi phí khi chọn một
+hướng thứ tự. Ví dụ A rời không sớm hơn 7, A trước B, B còn 3 giây tới
+đích thì B không thể tới trước 10. Mệnh đề có một literal thứ tự làm
+điều kiện; không ép chọn hướng và không đọc nghiệm hội nghị. Cả hai hướng
+được xét, chỉ thêm nếu chi phí tăng. Mốc trùng dùng chung và được CostTree
+đăng ký trước SAT đầu tiên. Lượt chỉ mở nếu đủ 13 ca V26 không có gain.
+
+Đếm tĩnh bằng parser TXT độc lập cho trackA11/infsteps180 cho thấy khoảng
+6.170 điều kiện ban đầu với 1.799 mức chi phí dùng chung, trên 6.144 cặp
+thứ tự. Đây là ước lượng số lượng từ dữ liệu, chưa là số đo hiệu năng hoặc
+kiểm toán native. So với 132.265 đường V25 sinh trên ca này sau 300 giây,
+đáng kiểm tra liệu các điều kiện ngắn ban đầu có giảm số lần giải lại.
+Script đếm và CSV được giữ trong thư mục artifact V27; số native phải
+đọc lại từ telemetry. Local đạt 37 test nhân SAT và 113 Python, typecheck
+đạt. Chưa có kết quả ca khó V27.

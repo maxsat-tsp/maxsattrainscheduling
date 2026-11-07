@@ -1,0 +1,18 @@
+{
+  "service": "maxsat-master-seeds-v27",
+  "source_commit": "c1b046f",
+  "timeout_seconds": 300,
+  "ram_kb": 6000000,
+  "cpu_affinity": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "round_wall_limit_seconds": 21600,
+  "objective_filter": [
+    "infsteps180"
+  ],
+  "conditional_on": "complete audited V26 with no gains",
+  "submission_passed": false
+}

@@ -40,6 +40,12 @@ AGLR với `aglr_policy=legacy`, `heuristic_period=8` và telemetry đã khóa �
 Archive ở `results/sat_research/v33_heuristic_period8_20261108/`. Lượt V32
 không được tính vì dùng alias không nhận tham số period.
 
+**V34 thử phân cực random của MiniSAT và cũng không có gain.** Alias mới
+`minisat-random-polarity` ghi đúng signature, smoke test đạt
+`cost=lb=ub`, nhưng 13/13 ca khó đều timeout ở 300 giây. Archive ở
+`results/sat_research/v34_random_polarity_20261108/`; không dùng backend này
+cho bảng chính.
+
 ## Trạng thái mới nhất
 
 **V17 đã chạy đủ toàn bộ dữ liệu và qua kiểm tra độc lập:**

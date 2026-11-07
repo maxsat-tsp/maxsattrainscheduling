@@ -40,6 +40,10 @@ V33 thử gửi nghiệm sang heuristic mỗi 8 vòng bằng alias AGLR ở ch�
 số AGLR, phải dùng alias `maxsat_ddd_ladder_aglr`; alias SC không đọc các
 tham số period. V32 bị loại khỏi hồ sơ vì dùng sai alias.
 
+V34 là ablation MiniSAT random-polarity. Alias được kiểm tra signature và
+chạy đủ 13 ca khó, nhưng không giải thêm ca nào; sinh viên chỉ dùng nó để
+tái tạo đối chứng, không dùng thay MiniSAT chuẩn trong bảng submission.
+
 ## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 
 **Đã kiểm toán đủ 186/186 ca**, kết thúc lúc 22:33:58 ngày 06/11/2026,

@@ -42,6 +42,7 @@ V31 tắt core exhaustion trên cùng 13 ca khó và cũng không giải thêm c
 (0/13); đây chỉ là ablation chẩn đoán.
 V33 giảm tần suất heuristic xuống mỗi 8 vòng, telemetry hợp lệ nhưng cũng
 0/13 ca mới; không dùng trong bảng chính.
+V34 thử phân cực random của MiniSAT, cũng 0/13 ca mới; chỉ giữ làm ablation.
 V28 tắt đường tăng cận MiniSAT-only để hai backend thực sự dùng cùng ngân sách.
 Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh
 chạy nằm trong `../experiment_progress_vi.md`, `../experiment_runbook_vi.md`

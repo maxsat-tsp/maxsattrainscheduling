@@ -1,0 +1,10 @@
+{
+  "source_commit": "1bcbf3d",
+  "service": "maxsat-order-cycles-v18-v2.service",
+  "performance_cases_run": 0,
+  "rust_tests_passed": 62,
+  "rust_tests_failed": 1,
+  "reason": "The new test wrongly required a full SAT model even when a verified heuristic closes LB=UB first. Its fixture also treated resource 0 as a conflicting track, whereas the legacy heuristic reserves 0 for a nonconflicting terminal.",
+  "action": "Use resources 1 and 2 plus a zero-duration resource-0 terminal; retain the forced-model MiniSAT truth-table test for actual cycle separation.",
+  "successor_source_commit": "ca96ae5"
+}

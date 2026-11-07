@@ -1,0 +1,10 @@
+{
+  "source_commit": "5e70580",
+  "service": "maxsat-order-cycles-v18.service",
+  "rust_tests_passed": 62,
+  "rust_tests_failed": 1,
+  "performance_cases_run": 0,
+  "reason": "Cross-route aimed=0 fixture has a feasible earliest schedule with positive cost. The legacy refinement path can return before queued initial cost terms are encoded; this occurs with cycle cuts disabled.",
+  "action": "Preserve this limitation separately. The component comparison now uses a conflicting earliest schedule, route-consistent aimed times and TXT-compatible resource/terminal conventions.",
+  "successor_source_commit": "1bcbf3d"
+}

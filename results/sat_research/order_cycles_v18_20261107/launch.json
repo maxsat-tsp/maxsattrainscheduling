@@ -1,0 +1,45 @@
+{
+  "source_commit": "5e70580",
+  "service": "maxsat-order-cycles-v18.service",
+  "started_at_utc": "2026-11-07T01:10:16Z",
+  "worktree": "/home/tuyenkv/projects/order-cycles-v18/maxsattrainscheduling",
+  "stage": "build-and-validation-at-launch",
+  "previous_reference": "/home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216",
+  "candidate_result_directory": "results/aglr/order-cycles-v18-unresolved300",
+  "timeout_seconds": 300,
+  "ram_kb": 6000000,
+  "cpu_affinity": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "maximum_round_seconds": 21600,
+  "systemd_grace_seconds": 30,
+  "expected_runs": 13,
+  "selection": {
+    "finsteps123": [],
+    "infsteps180": [
+      "trackA11",
+      "trackA12",
+      "stationA11",
+      "stationA12"
+    ],
+    "cont": [
+      "origA8",
+      "trackA8",
+      "trackA11",
+      "trackA12",
+      "stationA1",
+      "stationA2",
+      "stationA8",
+      "stationA11",
+      "stationA12"
+    ]
+  },
+  "submission_passed": false,
+  "file_sha256": {
+    "validate_vm_build.py": "1b7775245bae2ee5a2f9fdf79306c8fe03ebfb979ff8ef6660a1cbdbf0fb8478",
+    "run_vm_round.sh": "ded6bb217c71868b81ea7d3e358d96f443ae5f3afa28b219b278ba48e4ca6cc3"
+  }
+}

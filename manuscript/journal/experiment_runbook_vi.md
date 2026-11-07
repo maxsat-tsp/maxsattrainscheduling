@@ -72,7 +72,7 @@ Nếu một worker lỗi, cả vòng dừng và lưu `failure.json`; kiểm tra 
 `minisat.log`/`cadical.log`. Lịch sai, cận mâu thuẫn và dữ liệu bị sửa không
 được bỏ qua để chạy tiếp. Không cần chạy lại những ca đã hoàn tất hợp lệ.
 
-## Vòng hiện tại: thu gọn core trên 15 ca chưa giải
+## V16 đã hoàn tất: thu gọn core trên 15 ca chưa giải
 
 Trên đủ 26 ca cont của nhóm khó, MiniSAT chứng minh tối ưu nhiều hơn:
 Orders-Transitive 15 so với 14, CSOnet 15 so với 14, Journal 16 so với 12.
@@ -171,15 +171,15 @@ các ca trước đó hợp lệ. Sau khi thêm công cụ chụp, kiểm toán 
 82 test Python đạt trên VM; số test lúc khởi chạy V16 vẫn là 69 như manifest
 ghi nhận.
 
-### Xác nhận tự động sau hai lượt
+### Xác nhận V16 đã hoàn tất
 
-Dịch vụ `maxsat-core-v16-confirm-v2.service` đang chờ hai lượt V16 kết thúc.
-Nó không chạy SAT thứ ba trong lúc hai lượt còn hoạt động. Sau đó, công cụ
-`confirm_targeted_core_minimization.py` kiểm toán lại, yêu cầu đủ 15/15 ở
-cả hai cấu hình, chọn theo số ca giải thêm rồi tổng PAR-2. Dùng đúng một
-cấu hình để chạy lại ba lần từng ca giải thêm. Các lần này chạy tuần tự,
-cùng binary, timeout 300 giây và 6.000.000 KB RAM. Cả dịch vụ, kể cả thời
-gian chờ, có giới hạn khoảng 6 giờ.
+Dịch vụ `maxsat-core-v16-confirm-v2.service` đã hoàn tất sáu lượt: hai ca
+giải thêm, mỗi ca ba lần, đều chứng minh lại đúng optimum. Công cụ chọn
+ngân sách 100 theo coverage rồi PAR-2 sau khi kiểm toán đủ hai lượt 15/15.
+Các lần xác nhận chạy tuần tự, cùng binary, timeout 300 giây và 6.000.000 KB
+RAM. Median là 182,25 giây cho `origB11/cont`, 5,67 giây cho
+`stationB12/cont`. Sáu JSON đã được tải về và kiểm toán độc lập trong
+`results/sat_research/limited_core_v16_20261106/confirmation_complete/`.
 
 ```bash
 systemctl status maxsat-core-v16-confirm-v2.service --no-pager
@@ -195,43 +195,49 @@ không chạy lặp để chọn ba lần tốt nhất. Nếu có nghiệm sai h
 ưu mâu thuẫn, dịch vụ dừng. Vẫn cần kiểm tra hồi quy và full; bước xác nhận
 này không tự cho phép kết luận thắng SOTA.
 
-## V17 đã chuẩn bị: tăng cận ngay trên core
+## V17: đã hoàn tất 216 cặp, đạt 203 optimum
 
 Mã `43cae76` bổ sung core exhaustion: nếu nhóm điều kiện đã biết phải vi
 phạm ít nhất một phần tử, thử chứng minh phải vi phạm ít nhất hai, ba phần
 tử ngay trên bộ đếm của nhóm đó. Chỉ tăng cận sau một chứng minh UNSAT mới;
 SAT hoặc hết ngân sách thì giữ mức đã chứng minh. Đây là bước tối ưu RC2
 tham khảo [tài liệu PySAT](https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.exhaust_core).
-Ví dụ và công thức bảo toàn chi phí ở cuối hướng dẫn sinh viên, bản 5.13.
+Ví dụ và công thức bảo toàn chi phí ở cuối hướng dẫn sinh viên, bản 5.15.
 
 Cờ `--maxsat-ladder-sc-core-exhaust-checks` mặc định 0. V17 đặt 4; mỗi lời
 gọi thêm dùng ngân sách xung đột của cấu hình V16 được chọn. CLI yêu cầu
 MiniSAT, thu gọn core đang bật và ngân sách xung đột dương. Mặc định CSOnet
 vẫn giữ nguyên. Biến Bash tương ứng là `MAXSATDDD_CORE_EXHAUST_CHECKS`.
 
-Dịch vụ `maxsat-core-exhaust-v17.service` chờ cả hai lượt tham số và bước
-xác nhận V16 kết thúc thành công. Nếu các ca giải thêm không lặp lại được
-đủ ba lần, nó dừng để xem lại. Sau đó mới kiểm thử Rust trên VM, chạy 85
-test Python, build release và kiểm tra ba lịch nhỏ cùng một ca timeout.
-Vì V16 đã giải thêm hai ca, bước kiểm tra còn chạy lại cấu hình V16 được
-chọn trên **16 cặp khó mà phương án cũ đã giải được**. Dùng binary V16 và
-ngân sách cũ; mọi lịch và chi phí phải giữ đúng. Đây là kiểm tra hồi quy
-của phương pháp mới, không chạy lại baseline. Nếu mất ca hoặc có chi phí
-mâu thuẫn thì dừng để xem lại. Dữ liệu ở
-`results/aglr/core-v16-regression-selected/` trong worktree V17.
-Chỉ khi toàn bộ bước kiểm tra đạt mới bắt đầu ca khó. Giới hạn khoảng 6
-giờ áp dụng cho toàn bộ dịch vụ, gồm thời gian chờ, kiểm thử và thực nghiệm.
+Cả hai lượt V16 đã hoàn tất. Ngân sách 100 được chọn theo PAR-2 và hai ca
+giải thêm đã lặp lại thành công đủ ba lần. Hồi quy giữ 15/16 ca cũ, mất
+`stationA9/cont`. Trên 31 cặp khó, V16 đạt 17 optimum, bằng Journal; chưa
+vượt baseline mạnh nhất.
 
-Worktree riêng: `~/projects/core-exhaust-v17/maxsattrainscheduling`. Build
-và test dùng profile release để tiết kiệm dung lượng, không sửa binary V16.
-Thư mục kết quả: `results/aglr/core-exhaust-v17-unresolved300/`.
+Lượt chuẩn bị `maxsat-core-exhaust-v17.service` đã qua **56 test Rust**,
+85 test Python, ba lịch nhỏ có optimum 5526 và kiểm tra timeout. Nó dừng
+ở cổng hồi quy, trước khi chạy V17 trên ca khó. Dữ liệu hồi quy ở
+`results/aglr/core-v16-regression-selected/` trong worktree chuẩn bị.
+
+Runner `438129f` bổ sung kiểm toán hồi quy và đưa ca mất trở lại danh sách
+cần thử. Nó đã qua **90 test Python trên VM**. Lượt hiện tại là
+`maxsat-core-exhaust-v17-followup.service`, dùng lại binary đã kiểm tra của
+solver `43cae76`; hash `ca8fef89fb275803ec1934950f509dab2e4e1bf42321a01e7e9d2df18d9f0a88`.
+Worktree: `~/projects/core-exhaust-v17-followup/maxsattrainscheduling`.
+Kết quả: `results/aglr/core-exhaust-v17-followup300/`.
+
+Lượt đầu gồm **14 cặp**: bốn `infsteps180`, mười `cont`, gồm cả
+`stationA9`. Lượt này đã xong: khôi phục `stationA9/cont` ở 45,46 giây;
+13 ca còn lại timeout. Cả 14 JSON đã qua kiểm toán độc lập. Giới hạn
+300 giây mỗi ca, 6.000.000 KB RAM; cả vòng tối đa khoảng 6 giờ. Mọi ca
+được chạy một lần. Baseline dùng lại, không chạy thêm trong vòng này.
 
 ```bash
-systemctl status maxsat-core-exhaust-v17.service --no-pager
-journalctl -u maxsat-core-exhaust-v17.service -n 30 --no-pager
+systemctl status maxsat-core-exhaust-v17-followup.service --no-pager
+journalctl -u maxsat-core-exhaust-v17-followup.service -n 30 --no-pager
 ```
 
-Lệnh chạy do dịch vụ gọi sau khi kiểm tra đạt:
+Lệnh tái tạo hoặc tiếp tục sau gián đoạn, khi dịch vụ đã dừng:
 
 ```bash
 taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_core_minimization.py \
@@ -239,25 +245,88 @@ taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_core_minimization.py \
   --previous-trials \
     /home/tuyenkv/projects/limited-core-v16/maxsattrainscheduling/results/aglr/core-v16-conflicts1000-unresolved300 \
     /home/tuyenkv/projects/limited-core-v16/maxsattrainscheduling/results/aglr/core-v16-conflicts100-unresolved300 \
-  --binary ./target/release/ddd \
-  --build-manifest results/aglr/core-exhaust-v17-build/manifest.json \
+  --regression-reference /home/tuyenkv/projects/core-exhaust-v17/maxsattrainscheduling/results/aglr/core-v16-regression-selected \
+  --binary /home/tuyenkv/projects/core-exhaust-v17/maxsattrainscheduling/target/release/ddd \
+  --build-manifest /home/tuyenkv/projects/core-exhaust-v17/maxsattrainscheduling/results/aglr/core-exhaust-v17-build/manifest.json \
   --core-exhaust-checks 4 \
-  --results results/aglr/core-exhaust-v17-unresolved300 \
+  --results results/aglr/core-exhaust-v17-followup300 \
   --ram-kb 6000000 --round-seconds 21600
 ```
 
-Không chạy lại lệnh nếu dịch vụ đang hoạt động. Script chọn cấu hình V16
-theo số ca giải thêm rồi tổng PAR-2, giữ nguyên ngân sách của cấu hình đó,
-chỉ bật thêm core exhaustion. Chỉ chạy các ca mà cấu hình đã chọn còn
-timeout; danh sách tự tính sau khi V16 chốt. Hash của các lượt nguồn được
-khóa để tiếp tục an toàn và kiểm tra độc lập. Không ghép các ca tốt nhất
-của nhiều cấu hình.
+Script giữ cấu hình V16 đã chọn, chỉ bật thêm core exhaustion. Nó kiểm
+toán lại đủ 16 ca hồi quy, xác minh mọi lịch và chi phí, rồi hợp các ca
+timeout cũ với các ca bị mất. Hash của lượt nguồn, hồi quy, binary và tham
+số được khóa để tiếp tục an toàn. Không ghép các ca tốt nhất của nhiều
+cấu hình. Nghiệm sai, chi phí mâu thuẫn hoặc dữ liệu thiếu sẽ làm dừng
+vòng chạy; timeout hợp lệ được giữ làm kết quả chưa giải được.
 
 Khi audit bản chụp V17, thêm `--previous-trials` với hai thư mục dữ liệu
-V16 đã giải nén, theo đúng nguồn lưu trong manifest. Auditor kiểm tra lại
-hash nguồn, cách chọn cấu hình, danh sách còn thiếu, lịch và chi phí. Báo
-cáo sau thực nghiệm là `core-exhaust-v17-independent-audit.json` ở thư mục
-`results/aglr/`. Chưa có số liệu hiệu năng của V17 để đưa vào bản thảo.
+V16 đã giải nén và `--regression-reference` với bản hồi quy đã giải nén.
+Auditor kiểm tra lại hash, cách chọn cấu hình và đầy đủ các ca bị mất.
+Báo cáo sau thực nghiệm là `core-exhaust-v17-followup-independent-audit.json`
+ở `results/aglr/`. V17 đã được đánh giá đủ 31 ca khó (18 optimum), sau đó
+đủ 216 cặp (203 optimum: 72,68,63). Dữ liệu gốc ở `complete_31/` và
+`full_216/` trong `results/sat_research/core_exhaustion_v17_20261107/`.
+Lượt full giữ nguyên 31 ca và chỉ chạy thêm 185. Chưa đạt cổng toàn bộ SOTA.
+
+Sau khi giải nén mỗi `raw_snapshot.tar.gz` vào một thư mục mới, kiểm toán:
+
+```bash
+python3 results/sat_research/core_exhaustion_v17_20261107/audit_completion.py \
+  /thu/muc/giai/nen/31-ca --parent /thu/muc/giai/nen/14-ca \
+  --reference /thu/muc/giai/nen/186-ca-backend
+python3 results/sat_research/core_exhaustion_v17_20261107/audit_completion.py \
+  /thu/muc/giai/nen/216-ca --parent /thu/muc/giai/nen/31-ca \
+  --reference /thu/muc/giai/nen/186-ca-backend
+```
+
+## V18: chỉ thử chu trình thứ tự trên 13 ca còn lại
+
+Nguồn `ca96ae5` thêm cờ `--maxsat-ladder-sc-order-cycle-cuts true`, mặc định
+false. Cờ yêu cầu `resource_orders=true`. Thuật toán chỉ dùng các biến thứ
+tự đã có; sau một model SAT đầy đủ, nếu các hướng được chọn tạo chu trình
+có tổng thời gian dương thì thêm một mệnh đề loại tổ hợp đó. Chu trình
+thời gian 0 vẫn được giữ. Cạnh thứ tự dùng thời điểm rời thật của lần đi
+qua, tức thời điểm vào lần kế tiếp nếu chưa phải lần cuối.
+
+Dịch vụ `maxsat-order-cycles-v18-v3.service` bắt đầu lúc 08:18:58 ngày 07/11,
+giờ Việt Nam. Worktree `~/projects/order-cycles-v18/maxsattrainscheduling`.
+Controller giữ nguyên binary V17 trong worktree cũ, kiểm thử Rust/Python,
+build release mới rồi kiểm tra optimum 5526 và timeout native trước thí nghiệm.
+Tối đa 6 giờ gồm cả kiểm thử/build; 300 giây và 6.000.000 KB mỗi ca, chạy
+lần lượt trên nhóm CPU `0,1,4,5`.
+
+```bash
+systemctl status maxsat-order-cycles-v18-v3.service --no-pager
+journalctl -u maxsat-order-cycles-v18-v3.service -n 30 --no-pager
+```
+
+Lệnh tái tạo/tiếp tục chỉ dùng khi không còn dịch vụ đang chạy vào cùng
+thư mục. Cần kích hoạt môi trường Gurobi và build từ cùng commit đã ghi:
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary ./target/release/ddd \
+  --build-manifest results/aglr/order-cycles-v18-build/manifest.json \
+  --results results/aglr/order-cycles-v18-unresolved300 --round-seconds 21000
+python3 quick_scripts/analyze/targeted_order_cycles.py audit \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/order-cycles-v18-unresolved300
+```
+
+Runner kiểm tra lại đủ 216 ca nguồn, chọn đúng 13 ca chưa chứng minh tối ưu,
+khóa hash của từng JSON nguồn, binary, commit, dependency, dữ liệu và tham
+số. Resume chỉ dùng lại ca đã xong khi toàn bộ cấu hình khớp. Dữ liệu đầu
+ra là `order_cycles_audit.json`, `summary.csv` và các JSON/log từng ca.
+Đọc cả `failure.json` nếu có; báo cáo `complete=false` chưa phải kết quả cuối.
+Theo dõi `maxsat_order_cycle_checks`, `maxsat_order_cycles_blocked` và
+`maxsat_order_cycle_time` để biết cơ chế có hoạt động và tốn bao lâu.
+
+`newly_solved` chỉ nói về 13 ca thử. Có ca mới thì xác nhận ba lần và chạy
+hồi quy các ca V17 đã giải trước khi tính coverage full của V18. Chưa có
+kết quả V18 khi lập bản ghi khởi chạy này. Không ghép kết quả tốt nhất của
+V17 và V18 thành một solver.
 
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 

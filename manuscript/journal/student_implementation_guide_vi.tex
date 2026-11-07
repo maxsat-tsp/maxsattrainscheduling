@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.13}
+\fancyhead[R]{\small Phiên bản 5.15}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -42,7 +42,11 @@
 \rule{\textwidth}{0.4pt}
 \vspace{6mm}
 
-Tài liệu này mô tả phiên bản đã được cài trong solver CSOnet. Phương pháp mới
+Tài liệu hướng dẫn hai hướng đã cài trong solver CSOnet: chọn xung đột bằng
+AGLR, và tăng sức giải bằng RC2 cùng ràng buộc thứ tự tàu. Kết quả mới nhất
+thuộc hướng RC2 và thứ tự tàu, chưa dùng bộ chọn AGLR thích nghi.
+
+Phương pháp chọn xung đột
 có tên \emph{Adaptive Growth-Limited Refinement} (AGLR), nghĩa là tinh chỉnh
 thích nghi nhưng kiểm soát mức tăng của mô hình. Mục tiêu của AGLR rất đơn giản:
 trong mỗi vòng DDD, xử lý trước những xung đột có ích và chưa làm mô hình tăng
@@ -63,7 +67,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.13, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.15, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -72,42 +76,44 @@ Mỗi báo cáo phải ghi rõ giả định này.
 
 \section{Sinh viên đọc phần này trước}
 
-\textbf{Cập nhật mới nhất:} đối chứng MiniSAT và CaDiCaL đã hoàn tất đủ
-186 ca và qua kiểm tra độc lập. Giữ lại 174 ca đã chạy đúng, chỉ đo mới
-12 ca còn thiếu. Trên 26 ca khó của \code{cont}, MiniSAT giải được nhiều
-hơn: phương án bộ ba đạt 15 so với 14, CSOnet 15 so với 14, Journal 16 so
-với 12. Trên 5 ca khó của \code{infsteps180}, mỗi phương pháp giải được
-1 ca với mỗi backend. Chưa có phương án vượt SOTA.
+\textbf{Kết quả đã kiểm tra:} V17 đã chạy đủ 72 instance với cả ba hàm mục
+tiêu, chứng minh tối ưu \textbf{72/72, 68/72 và 63/72}, tổng
+\textbf{203/216}, ở timeout 300 giây. Giữ nguyên 31 ca đã đo và chỉ chạy
+thêm 185 ca còn thiếu. Đã kiểm tra độc lập từng lịch, chi phí và cận;
+dữ liệu gốc đã lưu trên GitHub.
 
-\textbf{Việc đang làm:} giữ MiniSAT, chỉ thử thu gọn nhóm điều kiện mâu
-thuẫn trên 15 cặp chưa giải được: 4 \code{infsteps180}, 11 \code{cont}.
-Mỗi nhóm được thử thêm tối đa bốn lần. Mỗi lần thử có ngân sách riêng,
-100 hoặc 1.000 xung đột SAT. Nếu chưa có kết luận khi hết ngân sách thì
-giữ nhóm đã chứng minh trước đó. Chỉ bỏ điều kiện sau một chứng minh
-mâu thuẫn mới. Hai cấu hình chạy song song trên hai nhóm lõi riêng, cùng
-binary và timeout 300 giây. Không chạy lại baseline ở vòng này.
+Trên cùng 31 ca khó ở 300 giây, V17 giải 18 ca, Journal giải 17 và CSOnet
+giải 16; không mất ca nào so với hai đối chứng này. Vẫn còn 13 ca chưa giải
+và chưa vượt toàn bộ đối chứng MILP. Nếu tính ở 120 giây, V17 đạt tổng
+202, trong khi bảng Gurobi hội nghị có 206. Không dùng bảng 300 giây để
+tuyên bố thắng một bảng 120 giây.
 
-Lượt cũ V15 dừng sau hai timeout hợp lệ và một ca lỗi; không ghi là 0/15.
-V16 thêm ngân sách cho mỗi lần thử và cho MiniSAT dừng ngay trong tìm kiếm
-khi hết thời gian của instance. Lệnh, vị trí kết quả và cách tiếp tục có
-trong runbook. Nếu có ca mới giải được, cần xác nhận lại và kiểm tra các
-ca cũ trước khi kết luận tốt hơn.
+\textbf{Việc tiếp theo:} theo dõi V18, chỉ thử 13 ca còn lại: 4
+\code{infsteps180}, 9 \code{cont}. V18 giữ cấu hình RC2 của V17, chỉ thêm
+phép kiểm tra chu trình thứ tự. Nếu các lựa chọn bắt một tàu phải chờ
+chính nó qua một chuỗi có thời gian dương, cấm tổ hợp đó. Cờ mặc định tắt
+nên baseline vẫn chạy như trước.
 
-Ngân sách 1.000 đã hoàn tất 15/15 ca và giải thêm hai ca:
-\code{origB11/cont} ở 153,39 giây, chi phí 75.494;
-\code{stationB12/cont} ở 34,59 giây, chi phí 16.909. Phương án bộ ba cũ
-timeout ở 300 giây trên cả hai ca. Lịch và các cận đã được tải về, kiểm
-tra độc lập. Journal cũng đã giải được hai ca này. Hệ thống đã xếp hàng
-bước chạy lại ba lần các ca giải thêm của cấu hình được chọn; chỉ bắt đầu
-sau khi cả hai lượt tham số hoàn tất và qua kiểm toán.
+VM đã qua 63 test Rust, 94 test Python, kiểm tra lịch và timeout; đang
+chạy trong worktree riêng
+\file{~/projects/order-cycles-v18/maxsattrainscheduling}.
+Dịch vụ \file{maxsat-order-cycles-v18-v3.service} bắt đầu lúc 08:18:58 ngày
+07/11, giờ Việt Nam. Các kiểm thử đã đạt trước khi chạy ca khó. Mỗi ca 300
+giây, 6.000.000 KB RAM; cả vòng gồm kiểm thử và build tối đa 6 giờ.
+Không build hoặc chạy lệnh trùng khi dịch vụ đang hoạt động. Lệnh theo dõi,
+tái tạo và kiểm toán có trong runbook.
 
-Bước V17 đã có mã để thử tăng cận ngay trên một nhóm mâu thuẫn. Nó chỉ
-được chạy sau khi các ca giải thêm của V16 lặp lại thành công ba lần.
-Sau đó, cấu hình V16 còn phải giữ đúng kết quả của 16 cặp khó mà phương án
-cũ đã giải được. Bước này kiểm tra xem cải tiến có làm mất ca nào hay không.
-Trước khi chạy ca khó, hệ thống còn phải qua kiểm thử Rust trên VM, kiểm
-tra lịch nhỏ và kiểm tra timeout. Phần cuối tài liệu giải thích công thức
-và ví dụ. Hiện chưa có kết quả hiệu năng của V17.
+Nếu V18 giải thêm ca, xác nhận lại ba lần rồi kiểm tra các ca V17 từng
+giải được. Khi chưa kiểm tra các ca cũ, chưa cộng ca mới vào 203 để báo
+coverage full. Không ghép ca tốt nhất của nhiều cấu hình. Nếu không có
+ca mới, đọc số chu trình đã loại và thời gian SAT để chọn một thay đổi
+cho vòng sau; vẫn giữ kết quả không cải thiện.
+
+Hai ca giải thêm của V16 đã xác nhận đủ ba lần, nhưng V16 mất
+\code{stationA9/cont} khi hồi quy. V17 khôi phục ca này ở 45,46 giây.
+Các lần xác nhận V16 chưa thay thế việc xác nhận cấu hình mới.
+Trong V17/V18, \code{aglr\_policy=legacy}: phần đang cải tiến là RC2 và
+ràng buộc thứ tự, chưa phải bộ chọn AGLR thích nghi.
 
 \textbf{CSOnet dùng RC2; mã được kiểm tra gọi MiniSAT bên trong.}
 RC2 tìm chi phí nhỏ nhất. Khi cần biết các điều kiện hiện tại có thể cùng
@@ -1013,12 +1019,13 @@ kết quả 300 giây bằng cách đổi nhãn. Kết quả 31 cặp chỉ mô 
 chưa phải coverage toàn bộ dataset. Sau khi có cấu hình tốt hơn, kiểm tra
 lại toàn bộ dữ liệu trước khi đưa vào bảng chính của bài báo.
 
-\section{Thử nghiệm hiện tại: thu gọn tập gây mâu thuẫn}
+\section{V16: thu gọn tập gây mâu thuẫn}
 
 Ở những ca khó đã đo, phần lớn thời gian nằm trong SAT. Một số mô hình
 đã có gần 100 nghìn biến. Thử nghiệm mới giữ cách phát hiện xung đột và
-chỉ sửa bước xử lý mâu thuẫn của RC2. Mặc định tính năng này tắt; chưa có
-kết quả hiệu năng để khẳng định tốt hơn.
+chỉ sửa bước xử lý mâu thuẫn của RC2. Mặc định tính năng này tắt. V16 đã
+giải thêm hai ca và mất một ca khi hồi quy; bảng đối chiếu nằm trong tài
+liệu tiến độ. Phần này giải thích cách cài đặt bước thu gọn.
 
 Gọi $F$ là các mệnh đề hiện tại và $C$ là một tập điều kiện mà SAT đã
 chứng minh không thể đồng thời thỏa. Ta thử bỏ một điều kiện $\ell$:
@@ -1061,7 +1068,7 @@ Khi timeout, xem thêm \code{maxsat\_native\_budgeted\_calls} và
 lần chưa kết luận được. Các trường này được ghi ngay cả khi lượt giải
 chưa kết thúc bình thường.
 
-Vòng hiện tại chỉ chạy 15 cặp chưa giải được của phương án bộ ba, dùng
+Vòng V16 đã chạy 15 cặp chưa giải được của phương án bộ ba, dùng
 lại đối chứng đã hoàn tất. Chạy trong worktree đã build và kiểm thử;
 thay ba đường dẫn mẫu dưới đây bằng đường dẫn thực tế trong runbook:
 \begin{verbatim}
@@ -1146,10 +1153,17 @@ chưa có kết luận, không tăng cận. Mọi lời gọi vẫn cùng dùng 
 
 Script chọn đúng một cấu hình V16 theo coverage rồi PAR-2, sau khi cả hai
 lượt đã đủ và qua kiểm toán. V17 dùng lại cấu hình đó, chỉ bật thêm bước
-trên, và chỉ chạy các cặp mà nó còn chưa giải được. Không chạy lại
-\code{origB11/cont} nếu ca này đã được xác nhận. Danh sách và hash của hai
-lượt nguồn được khóa trong manifest để có thể kiểm tra lại lựa chọn.
-Lệnh và dịch vụ chờ được ghi trong runbook.
+trên và chạy các cặp nó còn chưa giải được, gồm cả ca bị mất khi hồi quy.
+Lượt đầu có 14 cặp và đã khôi phục \code{stationA9/cont}. Sau đó giữ
+nguyên 14 ca, đo thêm 17 ca để đủ 31 ca khó; cuối cùng đo thêm 185 ca để
+đủ 216 cặp. Kết quả V17 là \code{(72,68,63)}, tổng 203. Dữ liệu ở
+\file{results/sat_research/core_exhaustion_v17_20261107/}.
+
+Tham số \file{--regression-reference} trỏ tới thư mục hồi quy 16 ca. Runner
+kiểm tra lại từng lịch, chi phí, trạng thái và hash trước khi bổ sung các
+ca mất vào danh sách. Nó không chỉ đọc con số tổng trong báo cáo. Danh
+sách và hash của hai lượt tham số cùng lượt hồi quy được khóa trong
+manifest. Lệnh hiện tại có trong runbook.
 
 Theo dõi số lần kiểm tra, số lần tăng được mức vi phạm, số lần chưa kết
 luận và thời gian ở các trường \file{maxsat_native_exhaust_checks},
@@ -1158,6 +1172,63 @@ luận và thời gian ở các trường \file{maxsat_native_exhaust_checks},
 \file{maxsat_native_exhaust_time}. Các số đo này còn được giữ khi
 instance hết giờ. Sau khi đủ ca, kiểm toán lại dữ liệu và đối chiếu chi phí
 với các đối chứng đã kiểm tra trước khi quyết định bước tiếp theo.
+
+\section{Bước V18: loại chu trình thứ tự không thể thực hiện}
+
+Ví dụ, các lựa chọn thứ tự có thể buộc $t_2\geq t_1+2$,
+$t_3\geq t_2$ và $t_1\geq t_3+1$. Cộng lại sẽ có $0\geq3$.
+Không lịch hợp lệ nào thực hiện được cả ba lựa chọn. Ta cấm chúng cùng
+xuất hiện mà không cần thử từng thời điểm.
+
+Mỗi đỉnh là một lần tàu đi qua khu vực, với thời điểm vào $t_v$ và thời
+gian di chuyển tối thiểu $d_v\geq0$. Có hai loại cạnh:
+\begin{itemize}
+\item Hai lần đi qua nối tiếp của cùng tàu: $t_{s(u)}\geq t_u+d_u$.
+\item Nếu chọn $u$ trước $v$ ở một cặp xung đột: khi $u$ chưa phải lần
+cuối, dùng $t_v\geq t_{s(u)}$; khi là lần cuối, dùng $t_v\geq t_u+d_u$.
+\end{itemize}
+Ở đây $s(u)$ là lần kế tiếp của cùng tàu. Phải dùng đúng thời điểm rời:
+tàu có thể chờ tại $u$, nên $t_u+d_u$ chưa chắc là lúc thực sự rời $u$.
+
+Viết mỗi cạnh là $t_v\geq t_u+\delta_e$, với $\delta_e\geq0$.
+Một chu trình $C$ có $\sum_{e\in C}\delta_e>0$ là bất khả thi.
+Nếu các cạnh thứ tự trên chu trình được bật bởi literal $o_1,\ldots,o_m$,
+thêm mệnh đề
+\[
+ \neg o_1\lor\cdots\lor\neg o_m.
+\]
+Cạnh nối tiếp trong cùng tàu luôn có, không cần literal. Chu trình có
+tổng thời gian 0 vẫn được giữ. Quy tắc giữ được mọi lịch hợp lệ: chọn các
+thứ tự theo lịch thật thì không thể có chu trình với tổng thời gian dương.
+
+Cách cài theo từng bước:
+\begin{enumerate}
+\item Chỉ dùng biến thứ tự của các cặp đã phát hiện, cùng các cạnh cố
+định của tuyến tàu. Không tạo hàng loạt cặp mới.
+\item Sau một lần SAT với đủ điều kiện chi phí, đọc hướng các biến thứ
+tự và tạo đồ thị tương ứng.
+\item Tìm một chu trình có tổng thời gian dương. Nếu có, đọc xong model,
+thêm mệnh đề cấm tổ hợp đó rồi gọi SAT lại với cùng điều kiện chi phí.
+\item Khi không còn chu trình như vậy, tiếp tục bước kiểm tra thời gian
+và phát hiện xung đột của DDD như trước.
+\end{enumerate}
+
+Cờ là \file{--maxsat-ladder-sc-order-cycle-cuts true}, mặc định false;
+biến Bash là \file{MAXSATDDD_ORDER_CYCLE_CUTS=true}.
+Mã ở \file{order_cycles.rs}, \file{resource_orders.rs} và nhánh nhận
+model SAT đầy đủ của \file{maxsat_ladder_sc/solve.rs}.
+Kiểm thử gồm chu trình dài, chu trình thời gian 0, đúng thời điểm rời,
+mệnh đề tác động lên MiniSAT thật, và lịch nhỏ vét cạn với ba hàm mục tiêu
+trên MiniSAT/CaDiCaL.
+
+Script \file{quick_scripts/analyze/targeted_order_cycles.py} kiểm tra lại
+216 kết quả nguồn rồi chọn đúng 13 ca chưa giải. Nó khóa commit, binary,
+dependency, dữ liệu và tham số. Đọc \file{order_cycles_audit.json}:
+\code{newly\_solved} là ca mới; \code{complete} cho biết đã đủ ca;
+\code{errors} phải rỗng. Theo dõi \file{maxsat_order_cycle_checks},
+\file{maxsat_order_cycles_blocked} và \file{maxsat_order_cycle_time}.
+Chưa có kết quả hiệu năng V18 khi khởi chạy; cài xong chưa phải bằng chứng
+tốt hơn baseline.
 
 \section{Nội dung được phép đưa vào bài báo}
 

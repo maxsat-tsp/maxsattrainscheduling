@@ -849,13 +849,19 @@ mod tests {
     #[test]
     fn late_instances_get_a_disjunction_coefficient_above_the_old_horizon() {
         let problem = Problem { name: "late".into(), trains: vec![
-            Train { visits: vec![Visit { resource_id: 1, earliest: 0, aimed: Some(0), travel_time: 7 }] },
-            Train { visits: vec![Visit { resource_id: 1, earliest: 50_000, aimed: Some(0), travel_time: 7 }] },
+            Train { visits: vec![
+                Visit { resource_id: 1, earliest: 0, aimed: Some(0), travel_time: 7 },
+                Visit { resource_id: 2, earliest: 0, aimed: None, travel_time: 7 },
+            ] },
+            Train { visits: vec![
+                Visit { resource_id: 1, earliest: 50_000, aimed: Some(0), travel_time: 7 },
+                Visit { resource_id: 2, earliest: 50_000, aimed: None, travel_time: 7 },
+            ] },
         ], conflicts: vec![(1, 1)] };
         let path = std::env::temp_dir().join(format!("export-lp-m-{}.lp", std::process::id()));
         write_bigm_lp(path.to_str().unwrap(), &problem, DelayCostType::Continuous);
         let text = std::fs::read_to_string(&path).unwrap(); std::fs::remove_file(path).unwrap();
-        assert!(text.contains("50022"), "dynamic M must cover the release-time span and route travel");
+        assert!(text.contains("50036"), "dynamic M must cover the release-time span and route travel");
     }
 
     #[test]

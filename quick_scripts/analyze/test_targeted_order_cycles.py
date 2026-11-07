@@ -6,6 +6,29 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_snapshot_hashes_detect_changed_or_unrecorded_files(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            for name,value in [('manifest.json',{}),('build_manifest.json',{}),('order_paths_audit.json',dict(completed_runs=1,complete=False))]:
+                extended.save(root/name,value)
+            index=dict(schema='targeted-component-snapshot-v1',report='order_paths_audit.json',completed_runs=1,complete=False,
+                file_sha256={p.name:extended.focus.sha(p) for p in root.iterdir()})
+            extended.save(root/'snapshot.json',index);cycles.verify_snapshot(root)
+            extended.save(root/'manifest.json',dict(changed=True))
+            with self.assertRaisesRegex(ValueError,'changed snapshot'):cycles.verify_snapshot(root)
+            extended.save(root/'manifest.json',{});(root/'unexpected.txt').write_text('not in archive index')
+            with self.assertRaisesRegex(ValueError,'unrecorded'):cycles.verify_snapshot(root)
+
+    def test_snapshot_completeness_cannot_hide_a_partial_trial(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw)
+            for name,value in [('manifest.json',{}),('build_manifest.json',{}),('order_paths_full_audit.json',dict(completed_runs=1,complete=False))]:
+                extended.save(root/name,value)
+            index=dict(schema='targeted-component-snapshot-v1',report='order_paths_full_audit.json',completed_runs=1,complete=True,
+                file_sha256={p.name:extended.focus.sha(p) for p in root.iterdir()})
+            extended.save(root/'snapshot.json',index)
+            with self.assertRaisesRegex(ValueError,'completeness'):cycles.verify_snapshot(root)
+
     def test_full_path_contrast_changes_only_assumption_scheduling_against_v20(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         v20=cycles.candidate_config(source,'order-paths')

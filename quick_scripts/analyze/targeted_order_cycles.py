@@ -37,6 +37,25 @@ def report_name(component):
 def tag_for(component):
     return {'order-cycles':TAG,'initial-cost':'Initial-Cost','order-paths':'Order-Paths','order-paths-full':'Order-Paths-Full'}[component]
 
+def verify_snapshot(root):
+    path=root/'snapshot.json'
+    if not path.exists():return
+    index=json.loads(path.read_text())
+    reports={report_name(c) for c in ['order-cycles','initial-cost','order-paths','order-paths-full']}
+    if index.get('schema')!='targeted-component-snapshot-v1' or index.get('report') not in reports:
+        raise ValueError('unsupported component snapshot')
+    hashes=index['file_sha256']
+    if not {'manifest.json','build_manifest.json',index['report']}.issubset(hashes):raise ValueError('snapshot lacks its source or report')
+    if any(p.is_symlink() for p in root.rglob('*')):raise ValueError('snapshot contains a symlink')
+    actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+    if actual!=set(hashes)|{'snapshot.json'}:raise ValueError('snapshot has missing or unrecorded artifacts')
+    for name,digest in hashes.items():
+        target=(root/name).resolve()
+        if not target.is_relative_to(root.resolve()) or extended.focus.sha(target)!=digest:
+            raise ValueError(f'changed snapshot artifact: {name}')
+    report=json.loads((root/index['report']).read_text())
+    if any(index[k]!=report[k] for k in ['completed_runs','complete']):raise ValueError('snapshot completeness differs from report')
+
 def load_reference(root):
     manifest=json.loads((root/'manifest.json').read_text());saved=json.loads((root/'full_audit.json').read_text())
     if manifest.get('schema')!='completed-core-full-v1' or not saved.get('complete') or saved.get('errors'):
@@ -66,6 +85,7 @@ def load_reference(root):
     return manifest,unresolved,digests
 
 def audit_saved(root,reference):
+    verify_snapshot(root)
     source,selection,digests=load_reference(reference)
     manifest=json.loads((root/'manifest.json').read_text());component=manifest.get('component','order-cycles')
     saved=json.loads((root/report_name(component)).read_text())

@@ -63,6 +63,49 @@ struct Step<L: Lit> {
     guard: Bool<L>,
 }
 
+pub(super) struct Schedule<L: Lit> {
+    pub times: Vec<i32>,
+    witnesses: Vec<Option<usize>>,
+    steps: Vec<Step<L>>,
+}
+
+pub(super) enum Analysis<L: Lit> {
+    Cycle(Vec<Bool<L>>),
+    Feasible(Schedule<L>),
+}
+
+impl<L: Lit> Schedule<L> {
+    pub fn violated(
+        &self,
+        model_times: &[i32],
+        priority: impl Fn(usize, i32, i32) -> usize,
+        cost_only: bool,
+    ) -> Result<Option<Cut<L>>, String> {
+        if model_times.len() != self.times.len() {
+            return Err("temporal model size mismatch".into());
+        }
+        let chosen = (0..self.times.len())
+            .filter(|&v| self.times[v] > model_times[v])
+            .filter(|&v| !cost_only || priority(v, self.times[v], model_times[v]) > 0)
+            .max_by_key(|&v| {
+                (
+                    priority(v, self.times[v], model_times[v]),
+                    i64::from(self.times[v]) - i64::from(model_times[v]),
+                    std::cmp::Reverse(v),
+                )
+            });
+        chosen
+            .map(|visit| {
+                Ok(Cut::Path {
+                    visit,
+                    time: self.times[visit],
+                    prefix: prefix(&self.steps, self.witnesses[visit])?,
+                })
+            })
+            .transpose()
+    }
+}
+
 fn extend<L: Lit>(
     steps: &mut Vec<Step<L>>,
     previous: Option<usize>,
@@ -96,14 +139,23 @@ fn prefix<L: Lit>(steps: &[Step<L>], mut witness: Option<usize>) -> Result<Vec<B
 /// time increase. A positive cycle is separated before propagating path bounds.
 pub(super) fn separate<L: Lit>(
     topology: &Topology,
-    mut edges: Vec<Edge<L>>,
+    edges: Vec<Edge<L>>,
     model_times: &[i32],
     priority: impl Fn(usize, i32, i32) -> usize,
 ) -> Result<Option<Cut<L>>, String> {
+    match analyse(topology, edges)? {
+        Analysis::Cycle(clause) => Ok(Some(Cut::Cycle(clause))),
+        Analysis::Feasible(schedule) => schedule.violated(model_times, priority, false),
+    }
+}
+
+pub(super) fn analyse<L: Lit>(
+    topology: &Topology,
+    mut edges: Vec<Edge<L>>,
+) -> Result<Analysis<L>, String> {
     let n = topology.next.len();
     if topology.travel.len() != n
         || topology.earliest.len() != n
-        || model_times.len() != n
         || topology.travel.iter().any(|&d| d < 0)
         || edges
             .iter()
@@ -125,7 +177,7 @@ pub(super) fn separate<L: Lit>(
             .collect(),
     )?;
     if let Some(clause) = cycle {
-        return Ok(Some(Cut::Cycle(clause)));
+        return Ok(Analysis::Cycle(clause));
     }
 
     let mut forward = vec![Vec::new(); n];
@@ -256,24 +308,11 @@ pub(super) fn separate<L: Lit>(
     if processed != count {
         return Err("component graph is not acyclic".into());
     }
-    let chosen = (0..n)
-        .filter(|&v| bounds[v] > model_times[v])
-        .max_by_key(|&v| {
-            (
-                priority(v, bounds[v], model_times[v]),
-                i64::from(bounds[v]) - i64::from(model_times[v]),
-                std::cmp::Reverse(v),
-            )
-        });
-    if let Some(visit) = chosen {
-        Ok(Some(Cut::Path {
-            visit,
-            time: bounds[visit],
-            prefix: prefix(&steps, witnesses[visit])?,
-        }))
-    } else {
-        Ok(None)
-    }
+    Ok(Analysis::Feasible(Schedule {
+        times: bounds,
+        witnesses,
+        steps,
+    }))
 }
 
 #[cfg(test)]
@@ -299,6 +338,43 @@ mod tests {
             next: vec![None; n],
             travel: vec![0; n],
         }
+    }
+
+    #[test]
+    fn complete_schedule_and_cost_only_witnesses_respect_zero_components() {
+        let a = g(1);
+        let b = g(2);
+        let topology = t(vec![5, 0, 0]);
+        let edges = vec![e(0, 1, 0, Some(a)), e(1, 0, 0, Some(b)), e(1, 2, 3, None)];
+        let Analysis::Feasible(schedule) = analyse(&topology, edges).unwrap() else {
+            panic!("zero cycle is feasible")
+        };
+        assert_eq!(schedule.times, vec![5, 5, 8]);
+        assert!(schedule
+            .violated(&[5, 0, 0], |_, _, _| 0, true)
+            .unwrap()
+            .is_none());
+        assert_eq!(
+            schedule
+                .violated(&[5, 0, 0], |v, _, _| usize::from(v == 2), true)
+                .unwrap(),
+            Some(Cut::Path {
+                visit: 2,
+                time: 8,
+                prefix: vec![!a]
+            })
+        );
+        // The proof remains unchanged after another projection of the schedule.
+        assert_eq!(
+            schedule
+                .violated(&[5, 5, 0], |v, _, _| usize::from(v == 2), true)
+                .unwrap(),
+            Some(Cut::Path {
+                visit: 2,
+                time: 8,
+                prefix: vec![!a]
+            })
+        );
     }
 
     #[test]

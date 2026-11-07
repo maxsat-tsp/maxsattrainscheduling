@@ -6,6 +6,24 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_order_master_is_a_separate_locked_representation(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        cfg=cycles.candidate_config(source,'order-master')
+        self.assertEqual(cfg,dict(source['definition'],order_master='true'))
+        self.assertEqual(cycles.schema_for('order-master'),'targeted-order-master-v1')
+        self.assertEqual(cycles.report_name('order-master'),'order_master_audit.json')
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw);args=SimpleNamespace(binary=root/'ddd',timeout=300,ram_kb=6000000,method_definitions={'test':cfg})
+            with patch.object(extended,'execute') as execute:
+                extended.run_case('test','cont','origA1',args,root)
+                self.assertEqual(execute.call_args.args[4]['MAXSATDDD_ORDER_MASTER'],'true')
+            solve=dict(status='timeout',total_time=300,timeout_seconds=300,process_exit_code=0)
+            solve.update({'maxsat_'+k:v for k,v in cfg.items() if k not in ('solver','kind')})
+            extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertFalse(extended.assess_case(root,'test','cont','origA1',300,cfg)['errors'])
+            solve['maxsat_order_master']=False;extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertIn('maxsat_order_master differs from the locked configuration',extended.assess_case(root,'test','cont','origA1',300,cfg)['errors'])
+
     def test_snapshot_hashes_detect_changed_or_unrecorded_files(self):
         with tempfile.TemporaryDirectory() as raw:
             root=Path(raw)

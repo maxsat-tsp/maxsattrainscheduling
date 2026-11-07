@@ -298,6 +298,7 @@ def run_case(method: str, objective: str, name: str, args, root: Path) -> None:
                             ("order_transitivity", "ORDER_TRANSITIVITY"),
                             ("order_cycle_cuts", "ORDER_CYCLE_CUTS"),
                             ("order_path_cuts", "ORDER_PATH_CUTS"),
+                            ("order_master", "ORDER_MASTER"),
                             ("extract_initial_cost", "EXTRACT_INITIAL_COST"),
                             ("objective_bound", "OBJECTIVE_BOUND"), ("residual_hardening", "RESIDUAL_HARDENING"),
                             ("core_minimize_checks", "CORE_MINIMIZE_CHECKS"),

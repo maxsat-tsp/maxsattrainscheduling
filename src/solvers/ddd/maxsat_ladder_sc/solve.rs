@@ -91,6 +91,8 @@ pub struct SolveStats {
     pub order_path_new_points: usize,
     pub order_path_guards: usize,
     pub order_path_time: Duration,
+    pub order_master_models: usize,
+    pub order_master_schedules: usize,
     pub core_literals: usize,
     pub max_core_size: usize,
     pub unit_weight_cores: usize,
@@ -944,6 +946,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             "temporal cycle cuts require resource-order decisions");
     assert!(!settings.order_path_cuts || settings.resource_orders,
             "temporal path cuts require resource-order decisions");
+    assert!(!settings.order_master || (settings.resource_orders && settings.aglr.policy==RefinementPolicy::Legacy
+        && !settings.seed_sc_from_earliest && !settings.prealloc_cost_thresholds),
+        "order master requires resource orders, legacy policy and no seeded time-point expansion");
     let use_objective_bound = settings.use_objective_bound
         || (settings.aglr.use_objective_bound && settings.aglr.policy != RefinementPolicy::Legacy);
 
@@ -980,6 +985,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
     output_stats("maxsat_order_cycle_cuts".to_string(), settings.order_cycle_cuts.into());
     output_stats("maxsat_order_path_cuts".to_string(), settings.order_path_cuts.into());
+    output_stats("maxsat_order_master".to_string(),settings.order_master.into());
     output_stats("maxsat_extract_initial_cost".to_string(), settings.extract_initial_cost.into());
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
@@ -1063,7 +1069,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     // The first iteration (0) does not need a solve call; we
     // know it's SAT because there are no constraints yet.
     let mut iteration = 1;
-    let mut is_sat = true;
+    let mut is_sat = !settings.order_master;
 
     // Every feasible entry is >= its propagated earliest time. Separate that
     // unavoidable constant from all future CostTree increments, exactly once.
@@ -1089,7 +1095,21 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let mut fixed_prec_rows: HashSet<(VisitId, i32)> = HashSet::new();
     let mut encoded_refinement_clauses = HashSet::<AglrClauseKey>::new();
     let mut resource_orders = super::resource_orders::ResourceOrders::new(settings.order_transitivity);
-    let order_topology=(settings.order_cycle_cuts && !settings.order_path_cuts).then(|| {
+    if settings.order_master {
+        // One bit per cross-train conflicting pair, including pairs not yet
+        // encountered by a time-point DDD model. No time-indexed overlap rows.
+        let mut pairs=std::collections::BTreeSet::new();
+        for first in visits.keys(){
+            let (train,index)=visits[first];let resource=problem.trains[train].visits[index].resource_id;
+            if let Some(others)=conflicts.get(&resource){for &other_resource in others{
+                if let Some(candidates)=resource_visits.get(other_resource){for &second in candidates{
+                    if first.0<second.0 && visits[second].0!=train{pairs.insert((first.0,second.0));}
+                }}
+            }}
+        }
+        for (a,b) in pairs{if resource_orders.ensure_pair(&mut solver,a,b){stats.resource_order_pairs+=1;}}
+    }
+    let order_topology=(settings.order_cycle_cuts && !settings.order_path_cuts && !settings.order_master).then(|| {
         let mut next=Vec::with_capacity(visits.len());let mut positive=Vec::with_capacity(visits.len());
         for (id,&(train,index)) in visits.iter_enumerated() {
             let route=&problem.trains[train].visits;
@@ -1099,7 +1119,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         }
         super::order_cycles::Topology{next,positive}
     });
-    let path_topology=settings.order_path_cuts.then(||{
+    let path_topology=(settings.order_path_cuts || settings.order_master).then(||{
         let mut next=Vec::with_capacity(visits.len());let mut travel=Vec::with_capacity(visits.len());
         let mut earliest=Vec::with_capacity(visits.len());
         for (id,&(train,index)) in visits.iter_enumerated(){
@@ -1178,7 +1198,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     ));
 
     //UB from Gurobi
-    let heur_thread = USE_HEURISTIC.then(|| {
+    let heur_thread = (USE_HEURISTIC && !settings.order_master).then(|| {
         let (sol_in_tx, sol_in_rx) = std::sync::mpsc::channel();
         let (sol_out_tx, sol_out_rx) = std::sync::mpsc::channel();
         let problem = problem.clone();
@@ -1241,6 +1261,17 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 &heuristic_filter,
             );
             return Err(SolverError::Timeout);
+        }
+
+        if settings.order_master{
+            if let Some((upper,solution))=&best_heur{
+                if *upper<total_cost{return Err(SolverError::InvalidSolution("order master LB exceeds verified schedule cost".into()));}
+                if *upper==total_cost{
+                    do_output_stats(&mut output_stats,iteration,&iteration_types,&stats,&occupations,
+                        start_time,solver_time,total_cost,*upper,&aglr_telemetry,&heuristic_filter);
+                    return Ok((solution.clone(),stats));
+                }
+            }
         }
 
         // Check SAT/UNSAT of the current iteration's formula.
@@ -1854,6 +1885,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             let solve_start = Instant::now();
             let mut cycle_clause=None;
             let mut path_cut=None;
+            let mut master_solution=None;
+            let mut master_return=None;
             {
             let result = {
                 let _p = hprof::enter("sat check");
@@ -1871,7 +1904,58 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     n_assumps = settings.assumption_strategy.next(n_assumps, soft_constraints.len());
                 }
                 satcoder::SatResultWithCore::Sat(model) => {
-                    if let Some(topology)=&path_topology{
+                    if settings.order_master{
+                        stats.order_master_models+=1;stats.order_path_checks+=1;stats.order_cycle_checks+=1;
+                        let path_start=Instant::now();
+                        match resource_orders.analyse(path_topology.as_ref().unwrap(),|lit|model.value(&lit))
+                            .map_err(SolverError::InvalidSolution)?{
+                            super::order_paths::Analysis::Cycle(clause)=>{
+                                resource_orders.remember(&super::order_paths::Cut::Cycle(clause.clone()))
+                                    .map_err(SolverError::InvalidSolution)?;
+                                cycle_clause=Some(clause);
+                            }
+                            super::order_paths::Analysis::Feasible(schedule)=>{
+                                stats.order_master_schedules+=1;
+                                let mut times=problem.trains.iter().map(|train|Vec::with_capacity(train.visits.len()+1)).collect::<Vec<_>>();
+                                let mut cost=0i32;
+                                for (id,&(train,index)) in visits.iter_enumerated(){
+                                    let time=schedule.times[usize::from(id)];times[train].push(time);
+                                    cost=cost.checked_add(i32::try_from(problem.trains[train].visit_delay_cost(delay_cost_type,index,time))
+                                        .map_err(|_|SolverError::InvalidSolution("order master cost exceeds i32".into()))?)
+                                        .ok_or_else(||SolverError::InvalidSolution("order master cost overflow".into()))?;
+                                }
+                                for (train,route) in problem.trains.iter().enumerate(){
+                                    if let Some(last)=route.visits.last(){
+                                        let exit=times[train].last().unwrap().checked_add(last.travel_time)
+                                            .ok_or_else(||SolverError::InvalidSolution("order master completion time overflow".into()))?;
+                                        times[train].push(exit);
+                                    }else{times[train].push(0);}
+                                }
+                                if cost<total_cost{return Err(SolverError::InvalidSolution("order graph cost below RC2 lower bound".into()));}
+                                if cost<best_heur.as_ref().map_or(i32::MAX,|(upper,_)|*upper) || cost==total_cost{
+                                    if problem.verify_solution(&times,delay_cost_type)!=Some(cost){
+                                        return Err(SolverError::InvalidSolution("complete order graph returned an invalid schedule".into()));
+                                    }
+                                    master_solution=Some((cost,times));
+                                }
+                                if cost==total_cost{master_return=Some(cost);}else{
+                                    let model_times=occupations.iter().map(|occ|{
+                                        let index=occ.delays.partition_point(|(lit,_)|model.value(lit));
+                                        assert!(index>0 && index<occ.delays.len());occ.delays[index-1].1
+                                    }).collect::<Vec<_>>();
+                                    let cut=schedule.violated(&model_times,|v,bound,current|{
+                                        let (train,index)=visits[VisitId::from(v)];
+                                        problem.trains[train].visit_delay_cost(delay_cost_type,index,bound)
+                                            .saturating_sub(problem.trains[train].visit_delay_cost(delay_cost_type,index,current))
+                                    },true).map_err(SolverError::InvalidSolution)?
+                                        .ok_or_else(||SolverError::InvalidSolution("order master cost gap has no violated objective path".into()))?;
+                                    resource_orders.remember(&cut).map_err(SolverError::InvalidSolution)?;
+                                    if let super::order_paths::Cut::Path{visit,time,prefix}=cut{path_cut=Some((visit,time,prefix));}
+                                }
+                            }
+                        }
+                        stats.order_path_time+=path_start.elapsed();
+                    }else if let Some(topology)=&path_topology{
                         let path_start=Instant::now();stats.order_path_checks+=1;stats.order_cycle_checks+=1;
                         let model_times=occupations.iter().map(|occ|{
                             let index=occ.delays.partition_point(|(lit,_)|model.value(lit));
@@ -1894,7 +1978,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                             .expect("invalid temporal cycle separation");
                         stats.order_cycle_time+=cycle_start.elapsed();
                     }
-                    if cycle_clause.is_none() && path_cut.is_none() {
+                    if !settings.order_master && cycle_clause.is_none() && path_cut.is_none() {
                     is_sat = true;
                     stats.n_sat += 1;
                     let _p = hprof::enter("update times");
@@ -2069,6 +2153,14 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 }
             }
             } // Drop both the model and SAT result before mutating the solver.
+            if let Some((cost,times))=master_solution{
+                heuristic_filter.update_best(cost);best_heur=Some((cost,times));
+            }
+            if let Some(cost)=master_return{
+                do_output_stats(&mut output_stats,iteration,&iteration_types,&stats,&occupations,
+                    start_time,solver_time,total_cost,cost,&aglr_telemetry,&heuristic_filter);
+                return Ok((best_heur.unwrap().1,stats));
+            }
             if let Some((index,time,mut prefix))=path_cut{
                 let visit=VisitId::from(index);
                 let (literal,is_new)=occupations[visit].time_point(&mut solver,time);
@@ -2363,6 +2455,8 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_order_path_new_points".to_string(),stats.order_path_new_points.into());
     output_stats("maxsat_order_path_guards".to_string(),stats.order_path_guards.into());
     output_stats("maxsat_order_path_time".to_string(),stats.order_path_time.as_secs_f64().into());
+    output_stats("maxsat_order_master_models".to_string(),stats.order_master_models.into());
+    output_stats("maxsat_order_master_schedules".to_string(),stats.order_master_schedules.into());
     output_stats("maxsat_core_exhaust_steps".to_string(), stats.core_exhaust_steps.into());
     output_stats("maxsat_core_exhaust_inconclusive".to_string(), stats.core_exhaust_inconclusive.into());
     output_stats("maxsat_core_exhaust_time".to_string(), stats.core_exhaust_time.as_secs_f64().into());
@@ -2886,6 +2980,87 @@ mod aglr_end_to_end_tests {
             ).unwrap();
             assert_eq!(problem.verify_solution(&solution, DelayCostType::Continuous), Some(optimum));
             if hardening { assert!(stats.hardened_primary > 0); }
+        }
+    }
+
+    #[test]
+    fn order_master_matches_exhaustive_optima_with_final_occupations_and_constant_costs(){
+        let problem=Problem{name:"order-master-final-visits".into(),trains:[1,2,3].into_iter().map(|aimed|Train{
+            visits:vec![Visit{resource_id:7,earliest:5,aimed:Some(aimed),travel_time:2}],
+        }).collect(),conflicts:vec![(7,7)]};
+        let mut observed_paths=0;
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180]{
+            let mut optimum=i32::MAX;
+            for a in 5..=9{for b in 5..=9{for c in 5..=9{
+                if a+2<=b || b+2<=a{if a+2<=c || c+2<=a{if b+2<=c || c+2<=b{
+                    let times=vec![vec![a,a+2],vec![b,b+2],vec![c,c+2]];
+                    optimum=optimum.min(problem.verify_solution(&times,objective).unwrap());
+                }}}
+            }}}
+            assert_ne!(optimum,i32::MAX);
+            for offset in [false,true]{for bound in [false,true]{for sparse in [false,true]{
+                let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;settings.order_master=true;
+                settings.extract_initial_cost=offset;settings.use_objective_bound=bound;settings.sparse_costs=sparse;
+                settings.assumption_strategy=super::super::settings::AssumptionStrategy::Full;
+                settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
+                let mut telemetry=BTreeMap::new();
+                let (solution,stats)=solve_with_settings(&quiet_env,crate::solvers::util::minisat_deadline::Solver::new(30.0),
+                    &problem,30.0,objective,settings,|k,v|{telemetry.insert(k,v);}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+                assert_eq!(telemetry["lb"].as_i64(),Some(optimum as i64));assert_eq!(telemetry["ub"].as_i64(),Some(optimum as i64));
+                assert_eq!(stats.resource_order_pairs,3);assert_eq!(stats.resource_order_rows,0);assert_eq!(stats.n_conflict,0);
+                observed_paths+=stats.order_paths_added;
+                settings.core_exhaust_checks=0;settings.core_minimize_checks=0;settings.core_minimize_conflicts=0;
+                let (solution,_)=solve_with_settings(&quiet_env,satcoder::solvers::cadical::Solver::new(),
+                    &problem,30.0,objective,settings,|_,_|{}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+            }}}
+        }
+        assert!(observed_paths>0,"the master must learn a cost path rather than enumerate times in SAT");
+        // A feasible initial schedule with positive cost must not skip initial costs.
+        let independent=Problem{name:"order-master-positive-initial-cost".into(),
+            trains:vec![Train{visits:vec![Visit{resource_id:1,earliest:5,aimed:Some(0),travel_time:0}]}],conflicts:vec![]};
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180]{
+            let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;settings.order_master=true;
+            let expected=independent.cost(&[vec![5,5]],objective);
+            let (solution,_)=solve_with_settings(&quiet_env,satcoder::solvers::minisat::Solver::new(),
+                &independent,30.0,objective,settings,|_,_|{}).unwrap();
+            assert_eq!(independent.verify_solution(&solution,objective),Some(expected));
+        }
+    }
+
+    #[test]
+    fn order_master_crossing_routes_match_exhaustive_time_schedules(){
+        let routes=[vec![1,2],vec![1,2],vec![2,1]];
+        let problem=Problem{name:"order-master-crossing".into(),trains:routes.iter().map(|route|Train{
+            visits:route.iter().enumerate().map(|(i,&resource_id)|Visit{resource_id,earliest:(2*i) as i32,
+                aimed:(i==1).then_some(2),travel_time:2}).chain(std::iter::once(Visit{resource_id:0,earliest:4,aimed:None,travel_time:0})).collect(),
+        }).collect(),conflicts:vec![(1,1),(2,2)]};
+        let choices=(0..=6).flat_map(|a|(a+2..=8).map(move|b|(a,b))).collect::<Vec<_>>();
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180]{
+            let mut optimum=i32::MAX;
+            for &(a,b) in &choices{for &(c,d) in &choices{for &(e,f) in &choices{
+                let ts=[[a,b],[c,d],[e,f]];
+                let valid=(0..3).all(|i|(i+1..3).all(|j|(0..2).all(|v|(0..2).all(|w|{
+                    routes[i][v]!=routes[j][w] || (if v==0{ts[i][1]}else{ts[i][1]+2})<=ts[j][w]
+                        || (if w==0{ts[j][1]}else{ts[j][1]+2})<=ts[i][v]
+                }))));
+                if valid{let sol=ts.iter().map(|t|vec![t[0],t[1],t[1]+2,t[1]+2]).collect::<Vec<_>>();
+                    optimum=optimum.min(problem.verify_solution(&sol,objective).unwrap());}
+            }}}
+            assert_eq!(optimum,if matches!(objective,DelayCostType::Continuous){4}else{1});
+            for strategy in [super::super::settings::AssumptionStrategy::Legacy,super::super::settings::AssumptionStrategy::Full]{
+                let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;settings.order_master=true;
+                settings.assumption_strategy=strategy;settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
+                let (solution,stats)=solve_with_settings(&quiet_env,crate::solvers::util::minisat_deadline::Solver::new(30.0),
+                    &problem,30.0,objective,settings,|_,_|{}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+                assert_eq!(stats.resource_order_pairs,6);assert_eq!(stats.resource_order_rows,0);assert!(stats.order_master_schedules>0);
+                settings.core_minimize_checks=0;settings.core_minimize_conflicts=0;settings.core_exhaust_checks=0;
+                let (solution,_)=solve_with_settings(&quiet_env,satcoder::solvers::cadical::Solver::new(),
+                    &problem,30.0,objective,settings,|_,_|{}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+            }
         }
     }
 

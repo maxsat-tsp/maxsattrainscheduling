@@ -134,6 +134,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_order_path_cuts: Option<bool>,
 
+    /// SAT chooses complete resource orders; the temporal graph computes times (default false).
+    #[structopt(long)]
+    maxsat_ladder_sc_order_master: Option<bool>,
+
     /// Charge unavoidable earliest-time costs before RC2 (default false).
     #[structopt(long)]
     maxsat_ladder_sc_extract_initial_cost: Option<bool>,
@@ -462,6 +466,7 @@ enum SolverType {
     BigMLazy,
     MaxSatDddLadderRC2,
     MaxSatDddLadderSc,
+    MaxSatOrderGraph,
     MaxSatDddLadderAglr,
     MaxSatDddLadderRC2Abstract,
     MaxSatDddLadderIpamir,
@@ -534,7 +539,7 @@ fn solve_sc_with_backend(
     counting_solver::reset_counts();
     output("maxsat_backend".to_string(), backend.into());
     match backend {
-        "minisat" if settings.core_minimize_checks>0 || settings.order_cycle_cuts || settings.order_path_cuts || settings.extract_initial_cost => {
+        "minisat" if settings.core_minimize_checks>0 || settings.order_cycle_cuts || settings.order_path_cuts || settings.order_master || settings.extract_initial_cost => {
             let solver=minisat_deadline::Solver::new(timeout);
             output("maxsat_backend_signature".to_string(),solver.signature().to_string().into());
             output("maxsat_sat_timeout_mode".to_string(),"native-watchdog-deadline".into());
@@ -616,6 +621,7 @@ fn main() {
             "maxsat_ddd_ladder" => SolverType::MaxSatDddLadderRC2,
             "maxsat_ddd_abstract" => SolverType::MaxSatDddLadderRC2Abstract,
             "maxsat_ddd_ladder_sc" => SolverType::MaxSatDddLadderSc,
+            "maxsat_order_graph" => SolverType::MaxSatOrderGraph,
             "maxsat_ddd_ladder_aglr" => SolverType::MaxSatDddLadderAglr,
             "maxsat_ddd_ladder_ipamir" => SolverType::MaxSatDddLadderIpamir,
             "maxsat_ddd_cdc" => SolverType::MaxSatDddCadical,
@@ -692,6 +698,7 @@ fn main() {
         order_transitivity: opt.maxsat_ladder_sc_order_transitivity.unwrap_or(false),
         order_cycle_cuts: opt.maxsat_ladder_sc_order_cycle_cuts.unwrap_or(false),
         order_path_cuts: opt.maxsat_ladder_sc_order_path_cuts.unwrap_or(false),
+        order_master: opt.maxsat_ladder_sc_order_master.unwrap_or(false),
         extract_initial_cost: opt.maxsat_ladder_sc_extract_initial_cost.unwrap_or(false),
         use_objective_bound: opt.maxsat_ladder_sc_use_objective_bound.unwrap_or(false),
         residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),
@@ -1045,7 +1052,7 @@ fn main() {
                         },
                     )
                     .map(|(v, _)| v),
-                    SolverType::MaxSatDddLadderSc => {
+                    SolverType::MaxSatDddLadderSc | SolverType::MaxSatOrderGraph => {
                         // Reset the per-thread CNF size counters before
                         // invoking solve, then wrap the underlying solver
                         // in CountingSolver so every new_var/add_clause is
@@ -1057,7 +1064,11 @@ fn main() {
                             &p.problem,
                             timeout,
                             delay_cost_type,
-                            maxsat_ladder_sc_settings,
+                            if matches!(solver,SolverType::MaxSatOrderGraph){
+                                maxsat_ladder_sc::MaxSatDddLadderScSettings{
+                                    order_master:true,resource_orders:true,..maxsat_ladder_sc_settings
+                                }
+                            }else{maxsat_ladder_sc_settings},
                             |k, v| {
                                 solve_data.insert(k, v);
                             },

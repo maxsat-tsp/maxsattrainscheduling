@@ -1,5 +1,9 @@
 # Rà soát nội dung bản thảo COR
 
+**Quyết định backend:** CaDiCaL chỉ còn là đối chứng lịch sử. Các lượt thử
+mới của phương pháp sẽ dùng MiniSAT, cùng đường chạy với CSOnet; không mở
+thêm chiến dịch CaDiCaL.
+
 **Tệp:** `manuscript/journal/cor/main.tex`
 
 **Ngày cập nhật tình trạng thực nghiệm:** 07-11-2026

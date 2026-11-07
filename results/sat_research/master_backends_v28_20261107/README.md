@@ -1,5 +1,9 @@
 # V28: same-binary MiniSAT/CaDiCaL contrast on four unresolved rounded cases
 
+**Archived final backend contrast. Do not start another CaDiCaL campaign.**
+Future method development and regression use MiniSAT; these paired CaDiCaL
+bytes remain only for historical audit.
+
 Both profiles reuse the frozen V27 binary (solver source c1b046f) after
 its complete audited round. Runner source is 9f32564. Every method flag,
 instance, resource limit and per-instance cutoff matches within the pair;

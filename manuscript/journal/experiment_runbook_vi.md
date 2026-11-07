@@ -1,5 +1,13 @@
 # Runbook thực nghiệm AGLR
 
+## Quyết định backend hiện tại
+
+CaDiCaL đã được chạy và audit trong các lượt trước, gồm V28. Các kết quả
+đó chỉ là hồ sơ lịch sử. Từ bây giờ không chạy lại CaDiCaL, không khởi động
+dịch vụ CaDiCaL và không lập thêm bảng so sánh backend. Các script/lệnh
+CaDiCaL bên dưới chỉ để tái tạo lịch sử; sinh viên phải dùng MiniSAT cho
+mọi lượt mới.
+
 Mốc chính đã được sửa theo camera-ready: **120 giây**, MaxSAT-Default
 `(72,68,60)`, tổng 200 optimum. Dùng ba CSV
 `results/MaxSAT_Default_RC2_<objective>_120s.csv`. Bộ JSON trong

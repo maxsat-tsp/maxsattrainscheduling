@@ -1,5 +1,13 @@
 # Tiến độ thử nghiệm trên VM, cập nhật 07-11-2026
 
+## Quyết định backend từ ngày 07-11-2026
+
+Các lượt CaDiCaL đã hoàn tất và được giữ làm đối chứng lịch sử. Từ đây
+không mở thêm dịch vụ, sàng lọc hoặc hồi quy CaDiCaL. Mọi thử nghiệm mới
+dùng MiniSAT, vì đây là backend đã thống nhất với đường chạy CSOnet. Raw
+CaDiCaL không bị xóa; chỉ không dùng chúng để chọn thêm ý tưởng hoặc ghép
+runtime mới.
+
 ## Trạng thái mới nhất
 
 **V17 đã chạy đủ toàn bộ dữ liệu và qua kiểm tra độc lập:**

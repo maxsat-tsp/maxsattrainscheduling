@@ -51,6 +51,9 @@ Baseline CPLEX corrected đã hoàn tất 216 ca ở 120 giây. Dùng các CSV t
 Ca `infsteps180/trackA8` có tight rerun riêng trong `tight_fix/`, với
 integrality tolerance `1e-9` và `cost=lb=ub=146`.
 
+V35 tăng `core_minimize_checks` từ 4 lên 8 trên 13 ca khó nhưng không giải
+thêm ca nào; không dùng cấu hình này cho bảng chính.
+
 ## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 
 **Đã kiểm toán đủ 186/186 ca**, kết thúc lúc 22:33:58 ngày 06/11/2026,

@@ -47,6 +47,8 @@ Baseline CPLEX corrected đã chạy đủ 216 ca: coverage chứng minh tối �
 `(72,67,66)`, tổng 205; tight rerun đã sửa ca invalid ban đầu, còn 11 ca chỉ
 có incumbent hợp lệ nhưng chưa chứng minh tối ưu. Các số liệu này đã audit và được giữ riêng
 cho bảng baseline, chưa đưa vào Abstract/Results/Conclusion.
+V35 tăng core minimization lên 8 checks nhưng vẫn 0/13 ca SAT mới; chỉ giữ
+làm ablation.
 V28 tắt đường tăng cận MiniSAT-only để hai backend thực sự dùng cùng ngân sách.
 Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh
 chạy nằm trong `../experiment_progress_vi.md`, `../experiment_runbook_vi.md`

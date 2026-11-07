@@ -54,6 +54,10 @@ nguyên chặt hơn đã cho lịch hợp lệ `cost=lb=ub=146`. Raw snapshot, C
 `results/sat_research/cplex_full_120_20261108/`. Không dùng ca invalid hoặc
 cận chưa khớp để tuyên bố tối ưu.
 
+**V35 tăng core minimization lên 8 checks cũng không có gain.** Đủ 13 ca
+khó đều timeout hợp lệ ở 300 giây; coverage giữ `203/216`. Archive và audit
+ở `results/sat_research/v35_core_minimize8_20261108/`.
+
 ## Trạng thái mới nhất
 
 **V17 đã chạy đủ toàn bộ dữ liệu và qua kiểm tra độc lập:**

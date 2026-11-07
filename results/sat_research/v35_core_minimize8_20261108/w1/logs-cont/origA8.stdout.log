@@ -1,0 +1,1248 @@
+Opt { debug: false, solvers: ["maxsat_ddd_ladder_sc"], xml_instances: false, txt_instances: true, instance_name_filter: Some("origA8"), instance_name_exact: true, verify_instances: false, objective: Some("cont"), other_objective: None, json_output: Some("/home/tuyenkv/projects/core-exhaust-v17/results/aglr/v35-core8-300-minisat/w1/logs-cont/instances/origA8.json"), timeout_seconds: Some(300.0), satddd_use_precedence_graph: None, satddd_prealloc_cost_thresholds: None, satddd_seed_precedence_from_earliest: None, satddd_seed_resource_conflicts: None, satddd_use_sc_amo: None, maxsat_ladder_sc_use_eager_chain_expansion: None, maxsat_ladder_sc_use_precedence_graph: None, maxsat_ladder_sc_use_sc_amo: None, maxsat_ladder_sc_use_touched_clique_amo: None, maxsat_ladder_sc_seed_from_earliest: None, maxsat_ladder_sc_prealloc_cost_thresholds: None, maxsat_ladder_sc_assumptions: Some("legacy"), maxsat_ladder_sc_sparse_costs: None, maxsat_ladder_sc_resource_orders: Some(true), maxsat_ladder_sc_order_transitivity: Some(true), maxsat_ladder_sc_use_objective_bound: None, maxsat_ladder_sc_residual_hardening: None, maxsat_ladder_sc_core_minimize_checks: Some(8), maxsat_ladder_sc_core_minimize_conflicts: Some(100), maxsat_ladder_sc_core_exhaust_checks: Some(4), maxsat_ladder_sc_backend: "minisat", aglr_policy: None, aglr_min_growth: None, aglr_fraction: None, aglr_max_wait: None, aglr_rescue_progress: None, aglr_heuristic_period: None, aglr_heuristic_min_gap: None, aglr_use_objective_bound: None, aglr_filter_duplicates: None, satddd_objective_encoding: None, maxsat_rc2_bound_mode: None, maxsat_rc2_refinement_budget: None, maxsat_rc2_max_wait_iterations: None, maxsat_rc2_full_scan: None, maxsat_rc2_validate_before_return: None }
+Using solver timeout 300 seconds
+Using solvers [MaxSatDddLadderSc]
+Using delay cost type Continuous
+MaxsatRc2 settings JournalSettings { bound_mode: Off, refinement_budget: None, max_wait_iterations: 5, full_scan: true, validate_before_return: true }
+MaxSatDddLadderSc settings MaxSatDddLadderScSettings { assumption_strategy: Legacy, sparse_costs: false, resource_orders: true, order_transitivity: true, use_objective_bound: false, residual_hardening: false, core_minimize_checks: 8, core_minimize_conflicts: 100, core_exhaust_checks: 4, use_precedence_graph: true, use_sc_amo: true, use_touched_clique_amo: true, use_eager_chain_expansion: false, seed_sc_from_earliest: false, prealloc_cost_thresholds: false, aglr: AglrSettings { policy: Legacy, min_growth: 32, fraction: 0.5, max_wait: 5, rescue_progress: BoundOrHeuristic, heuristic_period: 1, heuristic_min_gap: 0, use_objective_bound: false, filter_duplicates: false } }
+MaxSatDddLadderAglr settings MaxSatDddLadderScSettings { assumption_strategy: Legacy, sparse_costs: false, resource_orders: true, order_transitivity: true, use_objective_bound: false, residual_hardening: false, core_minimize_checks: 8, core_minimize_conflicts: 100, core_exhaust_checks: 4, use_precedence_graph: true, use_sc_amo: true, use_touched_clique_amo: true, use_eager_chain_expansion: false, seed_sc_from_earliest: false, prealloc_cost_thresholds: false, aglr: AglrSettings { policy: Adaptive, min_growth: 32, fraction: 0.5, max_wait: 5, rescue_progress: BoundOrHeuristic, heuristic_period: 1, heuristic_min_gap: 0, use_objective_bound: false, filter_duplicates: false } }
+SatDdd objective encoding Scpb
+SatDdd settings SatDddSettings { use_precedence_graph: true, prealloc_cost_thresholds: false, seed_precedence_from_earliest: false, seed_resource_conflicts: false, use_sc_amo: true }
+Reading instances/original/InstanceA1.txt
+Reading instances/original/InstanceA2.txt
+Reading instances/original/InstanceA3.txt
+Reading instances/original/InstanceA4.txt
+Reading instances/original/InstanceA5.txt
+Reading instances/original/InstanceA6.txt
+Reading instances/original/InstanceA7.txt
+Reading instances/original/InstanceA8.txt
+trains 28 tracks 33 avgtracks 19.21 trackpairs 4877 delays 0 avgdelay0
+28 & 33 & 19.21 & 4877 & 0 & 0 \\
+Starting solver MaxSatDddLadderSc
+Solution verified. Cost 37305
+Finishing with cost 23648
+    LB=10334
+    LB=13831
+    LB=16515
+    LB=18029
+    LB=18869
+    LB=19133
+    LB=19387
+    LB=19606
+    LB=19800
+    LB=19958
+    LB=20056
+    LB=20236
+    LB=20386
+    LB=20446
+    LB=20467
+    LB=20661
+    LB=20723
+    LB=20724
+    LB=20725
+    LB=20726
+    LB=20727
+    LB=20728
+    LB=20729
+    LB=20897
+    LB=21011
+    LB=21094
+    LB=21122
+    LB=21194
+    LB=21202
+    LB=21211
+    LB=21309
+    LB=21332
+    LB=21392
+    LB=21393
+    LB=21394
+    LB=21395
+    LB=21396
+    LB=21397
+    LB=21498
+    LB=21560
+    LB=21596
+    LB=21597
+    LB=21598
+Solution verified. Cost 23648
+HEUR.FEAS. 23648
+    LB=21599
+Finishing with cost 24430
+    LB=21600
+    LB=21601
+    LB=21627
+    LB=21630
+    LB=21660
+    LB=21681
+    LB=21695
+    LB=21719
+    LB=21740
+    LB=21754
+    LB=21762
+    LB=21765
+    LB=21788
+    LB=21798
+    LB=21801
+Solution verified. Cost 30206
+HEUR.FEAS. 30206
+Finishing with cost 25146
+    LB=21822
+    LB=21825
+    LB=21835
+    LB=21845
+    LB=21871
+    LB=21886
+    LB=21899
+    LB=21909
+    LB=21922
+    LB=21928
+Solution verified. Cost 27871
+HEUR.FEAS. 27871
+Finishing with cost 23909
+    LB=21943
+    LB=21956
+    LB=21971
+    LB=21982
+    LB=21992
+    LB=22002
+    LB=22009
+    LB=22024
+    LB=22037
+    LB=22047
+Solution verified. Cost 25718
+HEUR.FEAS. 25718
+Finishing with cost 23452
+    LB=22054
+    LB=22062
+    LB=22069
+    LB=22075
+    LB=22082
+    LB=22086
+    LB=22090
+    LB=22093
+Solution verified. Cost 26588
+HEUR.FEAS. 26588
+Finishing with cost 23419
+    LB=22096
+    LB=22098
+    LB=22100
+    LB=22101
+    LB=22102
+    LB=22103
+    LB=22104
+Solution verified. Cost 26457
+HEUR.FEAS. 26457
+Finishing with cost 23419
+    LB=22118
+    LB=22126
+    LB=22129
+    LB=22132
+    LB=22134
+    LB=22135
+    LB=22136
+Solution verified. Cost 26457
+HEUR.FEAS. 26457
+Finishing with cost 23427
+    LB=22137
+    LB=22138
+    LB=22161
+    LB=22169
+    LB=22177
+    LB=22185
+    LB=22192
+    LB=22200
+Solution verified. Cost 25157
+HEUR.FEAS. 25157
+Finishing with cost 24000
+    LB=22208
+    LB=22215
+    LB=22221
+    LB=22224
+    LB=22227
+    LB=22232
+    LB=22234
+Solution verified. Cost 26046
+HEUR.FEAS. 26046
+Finishing with cost 23945
+    LB=22236
+    LB=22240
+    LB=22244
+    LB=22247
+    LB=22250
+    LB=22253
+Solution verified. Cost 25991
+HEUR.FEAS. 25991
+Finishing with cost 23467
+    LB=22256
+    LB=22258
+    LB=22260
+    LB=22262
+    LB=22263
+    LB=22264
+Solution verified. Cost 26318
+HEUR.FEAS. 26318
+Finishing with cost 23467
+    LB=22265
+    LB=22266
+    LB=22267
+    LB=22268
+    LB=22269
+Solution verified. Cost 26318
+HEUR.FEAS. 26318
+    LB=22270
+    LB=22271
+    LB=22272
+    LB=22273
+Finishing with cost 24336
+    LB=22282
+    LB=22289
+    LB=22292
+Solution verified. Cost 25692
+HEUR.FEAS. 25692
+Finishing with cost 24479
+    LB=22294
+    LB=22296
+    LB=22297
+    LB=22298
+    LB=22299
+Solution verified. Cost 26131
+HEUR.FEAS. 26131
+Finishing with cost 24098
+    LB=22300
+Solution verified. Cost 25750
+HEUR.FEAS. 25750
+Finishing with cost 24127
+    LB=22302
+    LB=22303
+    LB=22304
+    LB=22305
+Solution verified. Cost 26148
+HEUR.FEAS. 26148
+Finishing with cost 24127
+    LB=22306
+    LB=22307
+    LB=22308
+    LB=22309
+Solution verified. Cost 26148
+HEUR.FEAS. 26148
+Finishing with cost 23624
+    LB=22310
+    LB=22311
+    LB=22312
+    LB=22313
+Solution verified. Cost 25645
+HEUR.FEAS. 25645
+    LB=22314
+    LB=22315
+Finishing with cost 23680
+Solution verified. Cost 25222
+HEUR.FEAS. 25222
+Finishing with cost 23568
+    LB=22317
+    LB=22319
+    LB=22321
+    LB=22322
+Solution verified. Cost 25720
+HEUR.FEAS. 25720
+Finishing with cost 23568
+    LB=22323
+    LB=22324
+    LB=22325
+    LB=22326
+Solution verified. Cost 25720
+HEUR.FEAS. 25720
+    LB=22327
+    LB=22328
+    LB=22329
+    LB=22330
+Finishing with cost 23696
+Solution verified. Cost 25361
+HEUR.FEAS. 25361
+Finishing with cost 22895
+    LB=22337
+    LB=22342
+    LB=22345
+    LB=22347
+Solution verified. Cost 24815
+HEUR.FEAS. 24815
+Finishing with cost 22811
+    LB=22349
+    LB=22351
+    LB=22353
+Solution verified. Cost 24815
+HEUR.FEAS. 24815
+Finishing with cost 22811
+    LB=22354
+    LB=22355
+    LB=22356
+Solution verified. Cost 24815
+HEUR.FEAS. 24815
+    LB=22358
+    LB=22360
+    LB=22362
+    LB=22363
+    LB=22364
+    LB=22365
+    LB=22366
+    LB=22367
+    LB=22368
+    LB=22369
+    LB=22370
+    LB=22371
+    LB=22372
+    LB=22373
+    LB=22374
+    LB=22375
+    LB=22376
+    LB=22377
+    LB=22378
+Finishing with cost 23660
+    LB=22380
+    LB=22381
+    LB=22382
+Solution verified. Cost 25824
+HEUR.FEAS. 25824
+Finishing with cost 23660
+    LB=22383
+    LB=22385
+Solution verified. Cost 25824
+HEUR.FEAS. 25824
+    LB=22386
+    LB=22387
+    LB=22388
+    LB=22389
+    LB=22390
+Finishing with cost 24753
+    LB=22391
+Solution verified. Cost 28802
+HEUR.FEAS. 28802
+Finishing with cost 24939
+    LB=22392
+Solution verified. Cost 28796
+HEUR.FEAS. 28796
+Finishing with cost 23289
+    LB=22393
+    LB=22394
+Solution verified. Cost 26601
+HEUR.FEAS. 26601
+Finishing with cost 23289
+    LB=22395
+    LB=22396
+Solution verified. Cost 26601
+HEUR.FEAS. 26601
+Finishing with cost 23285
+    LB=22397
+    LB=22398
+Solution verified. Cost 25688
+HEUR.FEAS. 25688
+Finishing with cost 23285
+    LB=22399
+    LB=22401
+Solution verified. Cost 25688
+HEUR.FEAS. 25688
+    LB=22402
+    LB=22403
+    LB=22404
+    LB=22405
+    LB=22406
+    LB=22407
+    LB=22408
+    LB=22409
+    LB=22410
+    LB=22411
+    LB=22412
+    LB=22413
+    LB=22414
+    LB=22415
+    LB=22416
+    LB=22417
+    LB=22418
+    LB=22419
+    LB=22420
+    LB=22421
+    LB=22422
+    LB=22423
+    LB=22424
+    LB=22425
+    LB=22426
+    LB=22427
+Finishing with cost 23286
+Solution verified. Cost 25481
+HEUR.FEAS. 25481
+Finishing with cost 22758
+    LB=22428
+Solution verified. Cost 24278
+HEUR.FEAS. 24278
+Finishing with cost 22758
+    LB=22429
+Solution verified. Cost 24278
+HEUR.FEAS. 24278
+    LB=22430
+    LB=22431
+    LB=22432
+    LB=22433
+    LB=22434
+    LB=22435
+    LB=22436
+    LB=22437
+    LB=22438
+    LB=22439
+    LB=22440
+    LB=22441
+    LB=22442
+    LB=22443
+Finishing with cost 23671
+Solution verified. Cost 24957
+HEUR.FEAS. 24957
+Finishing with cost 23699
+Solution verified. Cost 24957
+HEUR.FEAS. 24957
+Finishing with cost 23699
+Solution verified. Cost 24957
+HEUR.FEAS. 24957
+Finishing with cost 23667
+    LB=22444
+Solution verified. Cost 25463
+HEUR.FEAS. 25463
+Finishing with cost 23407
+Solution verified. Cost 25203
+HEUR.FEAS. 25203
+    LB=22445
+    LB=22446
+    LB=22447
+    LB=22448
+    LB=22449
+Finishing with cost 24881
+Solution verified. Cost 25821
+HEUR.FEAS. 25821
+Finishing with cost 23489
+    LB=22450
+Solution verified. Cost 24429
+HEUR.FEAS. 24429
+    LB=22451
+    LB=22452
+    LB=22453
+    LB=22454
+    LB=22455
+Finishing with cost 24376
+Solution verified. Cost 25368
+HEUR.FEAS. 25368
+Finishing with cost 25249
+    LB=22456
+Solution verified. Cost 26241
+HEUR.FEAS. 26241
+    LB=22457
+    LB=22458
+    LB=22459
+    LB=22460
+    LB=22461
+    LB=22462
+    LB=22463
+    LB=22464
+    LB=22465
+    LB=22466
+    LB=22467
+    LB=22468
+    LB=22469
+    LB=22470
+    LB=22471
+    LB=22472
+    LB=22473
+    LB=22474
+    LB=22475
+    LB=22476
+    LB=22477
+    LB=22478
+    LB=22479
+    LB=22480
+    LB=22481
+    LB=22482
+    LB=22483
+    LB=22484
+    LB=22485
+    LB=22486
+    LB=22487
+    LB=22488
+    LB=22489
+    LB=22490
+    LB=22491
+    LB=22492
+    LB=22493
+    LB=22494
+    LB=22495
+    LB=22496
+    LB=22497
+    LB=22498
+    LB=22499
+    LB=22500
+    LB=22501
+    LB=22502
+    LB=22503
+    LB=22504
+    LB=22505
+    LB=22506
+    LB=22507
+    LB=22508
+    LB=22509
+    LB=22510
+    LB=22511
+    LB=22512
+    LB=22513
+    LB=22514
+    LB=22515
+    LB=22516
+    LB=22517
+    LB=22518
+    LB=22519
+    LB=22520
+    LB=22521
+    LB=22522
+    LB=22523
+    LB=22524
+    LB=22525
+    LB=22526
+    LB=22527
+    LB=22528
+    LB=22529
+    LB=22530
+    LB=22531
+    LB=22532
+    LB=22533
+    LB=22534
+    LB=22535
+    LB=22536
+    LB=22537
+    LB=22538
+    LB=22539
+    LB=22540
+    LB=22541
+    LB=22542
+    LB=22543
+    LB=22544
+    LB=22545
+    LB=22546
+    LB=22547
+    LB=22548
+    LB=22549
+    LB=22550
+    LB=22551
+    LB=22552
+    LB=22553
+    LB=22554
+    LB=22555
+    LB=22556
+    LB=22557
+    LB=22558
+    LB=22559
+    LB=22560
+    LB=22561
+    LB=22562
+    LB=22563
+    LB=22564
+    LB=22565
+    LB=22566
+    LB=22567
+    LB=22568
+    LB=22569
+    LB=22570
+    LB=22571
+    LB=22572
+    LB=22573
+    LB=22574
+    LB=22575
+    LB=22576
+    LB=22577
+Finishing with cost 23884
+Solution verified. Cost 24746
+HEUR.FEAS. 24746
+Finishing with cost 23466
+Solution verified. Cost 24328
+HEUR.FEAS. 24328
+    LB=22578
+    LB=22579
+    LB=22580
+    LB=22581
+    LB=22582
+    LB=22583
+Finishing with cost 25039
+Solution verified. Cost 25619
+HEUR.FEAS. 25619
+Finishing with cost 23647
+Solution verified. Cost 24227
+HEUR.FEAS. 24227
+Finishing with cost 24903
+Solution verified. Cost 25619
+HEUR.FEAS. 25619
+Finishing with cost 23511
+Solution verified. Cost 24227
+HEUR.FEAS. 24227
+    LB=22584
+    LB=22585
+    LB=22586
+    LB=22587
+    LB=22588
+    LB=22589
+    LB=22590
+    LB=22591
+    LB=22592
+    LB=22593
+    LB=22594
+    LB=22595
+    LB=22596
+    LB=22597
+    LB=22598
+Finishing with cost 25431
+Solution verified. Cost 26235
+HEUR.FEAS. 26235
+Finishing with cost 26350
+Solution verified. Cost 27154
+HEUR.FEAS. 27154
+Finishing with cost 23799
+Solution verified. Cost 25011
+HEUR.FEAS. 25011
+Finishing with cost 23799
+Solution verified. Cost 25011
+HEUR.FEAS. 25011
+    LB=22599
+    LB=22600
+    LB=22601
+    LB=22602
+    LB=22603
+    LB=22604
+    LB=22605
+    LB=22606
+    LB=22607
+    LB=22608
+    LB=22609
+    LB=22610
+    LB=22611
+    LB=22612
+    LB=22613
+Finishing with cost 23571
+Solution verified. Cost 24853
+HEUR.FEAS. 24853
+Finishing with cost 23349
+Solution verified. Cost 24631
+HEUR.FEAS. 24631
+    LB=22614
+    LB=22615
+    LB=22616
+    LB=22617
+    LB=22618
+    LB=22619
+    LB=22620
+    LB=22621
+    LB=22622
+    LB=22623
+Finishing with cost 24541
+Solution verified. Cost 24830
+HEUR.FEAS. 24830
+Finishing with cost 23599
+Solution verified. Cost 23888
+HEUR.FEAS. 23888
+Finishing with cost 24501
+Solution verified. Cost 24830
+HEUR.FEAS. 24830
+Finishing with cost 23559
+Solution verified. Cost 23888
+HEUR.FEAS. 23888
+Finishing with cost 24501
+Solution verified. Cost 24830
+HEUR.FEAS. 24830
+Finishing with cost 23559
+Solution verified. Cost 23888
+HEUR.FEAS. 23888
+Finishing with cost 24368
+Solution verified. Cost 24830
+HEUR.FEAS. 24830
+Finishing with cost 23802
+Solution verified. Cost 24264
+HEUR.FEAS. 24264
+    LB=22624
+    LB=22625
+    LB=22626
+    LB=22627
+    LB=22628
+    LB=22629
+    LB=22630
+    LB=22631
+Finishing with cost 23300
+Solution verified. Cost 23643
+HEUR.FEAS. 23643
+Finishing with cost 23053
+Solution verified. Cost 23396
+HEUR.FEAS. 23396
+Finishing with cost 23272
+Solution verified. Cost 23625
+HEUR.FEAS. 23625
+Finishing with cost 23149
+Solution verified. Cost 23502
+HEUR.FEAS. 23502
+    LB=22632
+    LB=22633
+    LB=22634
+    LB=22635
+    LB=22636
+    LB=22637
+    LB=22638
+Finishing with cost 25388
+Solution verified. Cost 26822
+HEUR.FEAS. 26822
+Finishing with cost 26160
+Solution verified. Cost 27594
+HEUR.FEAS. 27594
+    LB=22639
+Finishing with cost 24753
+Solution verified. Cost 25877
+HEUR.FEAS. 25877
+Finishing with cost 24412
+Solution verified. Cost 25536
+HEUR.FEAS. 25536
+    LB=22640
+    LB=22641
+    LB=22642
+    LB=22643
+    LB=22644
+    LB=22645
+    LB=22646
+    LB=22647
+Finishing with cost 24124
+Solution verified. Cost 25095
+HEUR.FEAS. 25095
+Finishing with cost 23429
+Solution verified. Cost 24400
+HEUR.FEAS. 24400
+Finishing with cost 24124
+Solution verified. Cost 25095
+HEUR.FEAS. 25095
+Finishing with cost 23429
+Solution verified. Cost 24400
+HEUR.FEAS. 24400
+Finishing with cost 23872
+Solution verified. Cost 25060
+HEUR.FEAS. 25060
+Finishing with cost 23672
+Solution verified. Cost 24860
+HEUR.FEAS. 24860
+Finishing with cost 23872
+Solution verified. Cost 25060
+HEUR.FEAS. 25060
+Finishing with cost 23672
+Solution verified. Cost 24860
+HEUR.FEAS. 24860
+    LB=22648
+    LB=22649
+    LB=22650
+    LB=22651
+Finishing with cost 24865
+Solution verified. Cost 26120
+HEUR.FEAS. 26120
+Finishing with cost 25514
+Solution verified. Cost 26769
+HEUR.FEAS. 26769
+    LB=22652
+    LB=22653
+Finishing with cost 23832
+Solution verified. Cost 24563
+HEUR.FEAS. 24563
+Finishing with cost 23589
+Solution verified. Cost 24320
+HEUR.FEAS. 24320
+    LB=22654
+    LB=22655
+    LB=22656
+Finishing with cost 23822
+Solution verified. Cost 24865
+HEUR.FEAS. 24865
+Finishing with cost 24231
+Solution verified. Cost 25274
+HEUR.FEAS. 25274
+Finishing with cost 24633
+Solution verified. Cost 25405
+HEUR.FEAS. 25405
+Finishing with cost 23892
+Solution verified. Cost 24664
+HEUR.FEAS. 24664
+    LB=22657
+    LB=22658
+    LB=22659
+    LB=22660
+    LB=22661
+    LB=22662
+    LB=22663
+    LB=22664
+    LB=22665
+    LB=22666
+    LB=22667
+    LB=22668
+    LB=22669
+    LB=22670
+    LB=22671
+    LB=22672
+    LB=22673
+    LB=22674
+    LB=22675
+    LB=22676
+    LB=22677
+Finishing with cost 24053
+Solution verified. Cost 25395
+HEUR.FEAS. 25395
+Finishing with cost 23931
+Solution verified. Cost 25273
+HEUR.FEAS. 25273
+Finishing with cost 23711
+Solution verified. Cost 25090
+HEUR.FEAS. 25090
+Finishing with cost 24327
+Solution verified. Cost 25706
+HEUR.FEAS. 25706
+    LB=22678
+    LB=22679
+    LB=22680
+    LB=22681
+    LB=22682
+    LB=22683
+Finishing with cost 26609
+Solution verified. Cost 27716
+HEUR.FEAS. 27716
+Finishing with cost 24196
+Solution verified. Cost 25303
+HEUR.FEAS. 25303
+    LB=22684
+Finishing with cost 23393
+Solution verified. Cost 24639
+HEUR.FEAS. 24639
+Finishing with cost 23393
+Solution verified. Cost 24639
+HEUR.FEAS. 24639
+Finishing with cost 23773
+Solution verified. Cost 25095
+HEUR.FEAS. 25095
+Finishing with cost 23773
+Solution verified. Cost 25095
+HEUR.FEAS. 25095
+Finishing with cost 23769
+Solution verified. Cost 25095
+HEUR.FEAS. 25095
+Finishing with cost 23769
+Solution verified. Cost 25095
+HEUR.FEAS. 25095
+Finishing with cost 23415
+Solution verified. Cost 24639
+HEUR.FEAS. 24639
+Finishing with cost 23415
+Solution verified. Cost 24639
+HEUR.FEAS. 24639
+    LB=22685
+    LB=22686
+    LB=22687
+    LB=22688
+    LB=22689
+    LB=22690
+    LB=22691
+    LB=22692
+    LB=22693
+    LB=22694
+    LB=22695
+    LB=22696
+    LB=22697
+    LB=22698
+    LB=22699
+    LB=22700
+    LB=22701
+    LB=22702
+    LB=22703
+    LB=22704
+    LB=22705
+    LB=22706
+    LB=22707
+    LB=22708
+    LB=22709
+    LB=22710
+    LB=22711
+    LB=22712
+Finishing with cost 24714
+Solution verified. Cost 25655
+HEUR.FEAS. 25655
+Finishing with cost 25314
+Solution verified. Cost 26255
+HEUR.FEAS. 26255
+Finishing with cost 23271
+Solution verified. Cost 24630
+HEUR.FEAS. 24630
+Finishing with cost 23271
+Solution verified. Cost 24630
+HEUR.FEAS. 24630
+Finishing with cost 23232
+Solution verified. Cost 24630
+HEUR.FEAS. 24630
+Finishing with cost 23232
+Solution verified. Cost 24630
+HEUR.FEAS. 24630
+Finishing with cost 23740
+Solution verified. Cost 25811
+HEUR.FEAS. 25811
+Finishing with cost 23582
+Solution verified. Cost 25653
+HEUR.FEAS. 25653
+    LB=22713
+    LB=22714
+    LB=22715
+    LB=22716
+    LB=22717
+    LB=22718
+    LB=22719
+    LB=22720
+    LB=22721
+    LB=22722
+Finishing with cost 23444
+Solution verified. Cost 25273
+HEUR.FEAS. 25273
+Finishing with cost 23444
+Solution verified. Cost 25273
+HEUR.FEAS. 25273
+Finishing with cost 24356
+Solution verified. Cost 26586
+HEUR.FEAS. 26586
+Finishing with cost 24159
+Solution verified. Cost 26389
+HEUR.FEAS. 26389
+    LB=22723
+    LB=22724
+    LB=22725
+    LB=22726
+    LB=22727
+Finishing with cost 23893
+Solution verified. Cost 25372
+HEUR.FEAS. 25372
+Finishing with cost 23491
+Solution verified. Cost 24970
+HEUR.FEAS. 24970
+    LB=22728
+    LB=22729
+    LB=22730
+    LB=22731
+    LB=22732
+    LB=22733
+    LB=22734
+Finishing with cost 23801
+Solution verified. Cost 25358
+HEUR.FEAS. 25358
+Finishing with cost 23744
+Solution verified. Cost 25301
+HEUR.FEAS. 25301
+Finishing with cost 23868
+Solution verified. Cost 25358
+HEUR.FEAS. 25358
+Finishing with cost 23811
+Solution verified. Cost 25301
+HEUR.FEAS. 25301
+    LB=22735
+    LB=22736
+    LB=22737
+    LB=22738
+    LB=22739
+    LB=22740
+    LB=22741
+    LB=22742
+Finishing with cost 26227
+Solution verified. Cost 28078
+HEUR.FEAS. 28078
+Finishing with cost 25415
+Solution verified. Cost 27266
+HEUR.FEAS. 27266
+Finishing with cost 25118
+Solution verified. Cost 26671
+HEUR.FEAS. 26671
+Finishing with cost 25317
+Solution verified. Cost 26870
+HEUR.FEAS. 26870
+Finishing with cost 24740
+Solution verified. Cost 26132
+HEUR.FEAS. 26132
+Finishing with cost 24602
+Solution verified. Cost 25994
+HEUR.FEAS. 25994
+    LB=22743
+    LB=22744
+    LB=22745
+Finishing with cost 23451
+Solution verified. Cost 23935
+HEUR.FEAS. 23935
+Finishing with cost 23384
+Solution verified. Cost 23868
+HEUR.FEAS. 23868
+Finishing with cost 23047
+Solution verified. Cost 23512
+HEUR.FEAS. 23512
+Finishing with cost 23047
+Solution verified. Cost 23512
+HEUR.FEAS. 23512
+Finishing with cost 23136
+Solution verified. Cost 23473
+HEUR.FEAS. 23473
+Finishing with cost 22984
+Solution verified. Cost 23321
+HEUR.FEAS. 23321
+    LB=22746
+    LB=22747
+    LB=22748
+    LB=22749
+    LB=22750
+    LB=22751
+    LB=22752
+    LB=22753
+    LB=22754
+Finishing with cost 24040
+Solution verified. Cost 25227
+HEUR.FEAS. 25227
+Finishing with cost 24416
+Solution verified. Cost 25603
+HEUR.FEAS. 25603
+    LB=22755
+    LB=22756
+    LB=22757
+    LB=22758
+    LB=22759
+    LB=22760
+    LB=22761
+    LB=22762
+    LB=22763
+    LB=22764
+    LB=22765
+    LB=22766
+Finishing with cost 23545
+Solution verified. Cost 24050
+HEUR.FEAS. 24050
+Finishing with cost 23545
+Solution verified. Cost 24050
+HEUR.FEAS. 24050
+Finishing with cost 23577
+Solution verified. Cost 24050
+HEUR.FEAS. 24050
+Finishing with cost 23577
+Solution verified. Cost 24050
+HEUR.FEAS. 24050
+    LB=22767
+    LB=22768
+    LB=22769
+Finishing with cost 23381
+Solution verified. Cost 23897
+HEUR.FEAS. 23897
+Finishing with cost 23661
+Solution verified. Cost 24177
+HEUR.FEAS. 24177
+    LB=22770
+Finishing with cost 23581
+Solution verified. Cost 24050
+HEUR.FEAS. 24050
+Finishing with cost 23581
+Solution verified. Cost 24050
+HEUR.FEAS. 24050
+    LB=22771
+    LB=22772
+    LB=22773
+    LB=22774
+    LB=22775
+    LB=22776
+    LB=22777
+    LB=22778
+    LB=22779
+    LB=22780
+    LB=22781
+    LB=22782
+    LB=22783
+    LB=22784
+    LB=22785
+    LB=22786
+    LB=22787
+    LB=22788
+    LB=22789
+    LB=22790
+    LB=22791
+    LB=22792
+    LB=22793
+    LB=22794
+    LB=22795
+    LB=22796
+    LB=22797
+    LB=22798
+    LB=22799
+    LB=22800
+    LB=22801
+Finishing with cost 23747
+Solution verified. Cost 24842
+HEUR.FEAS. 24842
+Finishing with cost 23747
+Solution verified. Cost 24842
+HEUR.FEAS. 24842
+    LB=22802
+    LB=22803
+    LB=22804
+    LB=22805
+    LB=22806
+Finishing with cost 23476
+Solution verified. Cost 24262
+HEUR.FEAS. 24262
+Finishing with cost 23476
+Solution verified. Cost 24262
+HEUR.FEAS. 24262
+    LB=22807
+    LB=22808
+    LB=22809
+Finishing with cost 24335
+Solution verified. Cost 25192
+HEUR.FEAS. 25192
+Finishing with cost 24335
+Solution verified. Cost 25192
+HEUR.FEAS. 25192
+    LB=22810
+    LB=22811
+    LB=22812
+    LB=22813
+    LB=22814
+    LB=22815
+    LB=22816
+    LB=22817
+    LB=22818
+    LB=22819
+    LB=22820
+    LB=22821
+Finishing with cost 23543
+Solution verified. Cost 24254
+HEUR.FEAS. 24254
+Finishing with cost 23805
+Solution verified. Cost 24516
+HEUR.FEAS. 24516
+    LB=22822
+    LB=22823
+    LB=22824
+    LB=22825
+Finishing with cost 25427
+Solution verified. Cost 26808
+HEUR.FEAS. 26808
+Finishing with cost 26661
+Solution verified. Cost 28042
+HEUR.FEAS. 28042
+Finishing with cost 25069
+Solution verified. Cost 26584
+HEUR.FEAS. 26584
+Finishing with cost 24865
+Solution verified. Cost 26380
+HEUR.FEAS. 26380
+Finishing with cost 26381
+Solution verified. Cost 28101
+HEUR.FEAS. 28101
+Finishing with cost 25084
+Solution verified. Cost 26804
+HEUR.FEAS. 26804
+Finishing with cost 23987
+Solution verified. Cost 26116
+HEUR.FEAS. 26116
+Finishing with cost 23987
+Solution verified. Cost 26116
+HEUR.FEAS. 26116
+    LB=22826
+    LB=22827
+    LB=22828
+    LB=22829
+    LB=22830
+    LB=22831
+    LB=22832
+    LB=22833
+Finishing with cost 24205
+Solution verified. Cost 25366
+HEUR.FEAS. 25366
+Finishing with cost 24007
+Solution verified. Cost 25168
+HEUR.FEAS. 25168
+Finishing with cost 23334
+Solution verified. Cost 24503
+HEUR.FEAS. 24503
+Finishing with cost 23334
+Solution verified. Cost 24503
+HEUR.FEAS. 24503
+    LB=22834
+    LB=22835
+    LB=22836
+    LB=22837
+    LB=22838
+Finishing with cost 23883
+Solution verified. Cost 24515
+HEUR.FEAS. 24515
+Finishing with cost 24836
+Solution verified. Cost 25468
+HEUR.FEAS. 25468
+Finishing with cost 23917
+Solution verified. Cost 24740
+HEUR.FEAS. 24740
+Finishing with cost 23557
+Solution verified. Cost 24380
+HEUR.FEAS. 24380
+    LB=22839
+Reading instances/original/InstanceA9.txt
+Reading instances/original/InstanceA10.txt
+Reading instances/original/InstanceA11.txt
+Reading instances/original/InstanceA12.txt
+Reading instances/original/InstanceB1.txt
+Reading instances/original/InstanceB2.txt
+Reading instances/original/InstanceB3.txt
+Reading instances/original/InstanceB4.txt
+Reading instances/original/InstanceB5.txt
+Reading instances/original/InstanceB6.txt
+Reading instances/original/InstanceB7.txt
+Reading instances/original/InstanceB8.txt
+Reading instances/original/InstanceB9.txt
+Reading instances/original/InstanceB10.txt
+Reading instances/original/InstanceB11.txt
+Reading instances/original/InstanceB12.txt
+Reading instances/addtracktime/InstanceA1.txt
+Reading instances/addtracktime/InstanceA2.txt
+Reading instances/addtracktime/InstanceA3.txt
+Reading instances/addtracktime/InstanceA4.txt
+Reading instances/addtracktime/InstanceA5.txt
+Reading instances/addtracktime/InstanceA6.txt
+Reading instances/addtracktime/InstanceA7.txt
+Reading instances/addtracktime/InstanceA8.txt
+Reading instances/addtracktime/InstanceA9.txt
+Reading instances/addtracktime/InstanceA10.txt
+Reading instances/addtracktime/InstanceA11.txt
+Reading instances/addtracktime/InstanceA12.txt
+Reading instances/addtracktime/InstanceB1.txt
+Reading instances/addtracktime/InstanceB2.txt
+Reading instances/addtracktime/InstanceB3.txt
+Reading instances/addtracktime/InstanceB4.txt
+Reading instances/addtracktime/InstanceB5.txt
+Reading instances/addtracktime/InstanceB6.txt
+Reading instances/addtracktime/InstanceB7.txt
+Reading instances/addtracktime/InstanceB8.txt
+Reading instances/addtracktime/InstanceB9.txt
+Reading instances/addtracktime/InstanceB10.txt
+Reading instances/addtracktime/InstanceB11.txt
+Reading instances/addtracktime/InstanceB12.txt
+Reading instances/addstationtime/InstanceA1.txt
+Reading instances/addstationtime/InstanceA2.txt
+Reading instances/addstationtime/InstanceA3.txt
+Reading instances/addstationtime/InstanceA4.txt
+Reading instances/addstationtime/InstanceA5.txt
+Reading instances/addstationtime/InstanceA6.txt
+Reading instances/addstationtime/InstanceA7.txt
+Reading instances/addstationtime/InstanceA8.txt
+Reading instances/addstationtime/InstanceA9.txt
+Reading instances/addstationtime/InstanceA10.txt
+Reading instances/addstationtime/InstanceA11.txt
+Reading instances/addstationtime/InstanceA12.txt
+Reading instances/addstationtime/InstanceB1.txt
+Reading instances/addstationtime/InstanceB2.txt
+Reading instances/addstationtime/InstanceB3.txt
+Reading instances/addstationtime/InstanceB4.txt
+Reading instances/addstationtime/InstanceB5.txt
+Reading instances/addstationtime/InstanceB6.txt
+Reading instances/addstationtime/InstanceB7.txt
+Reading instances/addstationtime/InstanceB8.txt
+Reading instances/addstationtime/InstanceB9.txt
+Reading instances/addstationtime/InstanceB10.txt
+Reading instances/addstationtime/InstanceB11.txt
+Reading instances/addstationtime/InstanceB12.txt
+    origA8 Continuous MaxSatDddLadderSc  9999       9999
+
+Wrote to file "/home/tuyenkv/projects/core-exhaust-v17/results/aglr/v35-core8-300-minisat/w1/logs-cont/instances/origA8.json"

@@ -949,6 +949,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     assert!(!settings.order_master || (settings.resource_orders && settings.aglr.policy==RefinementPolicy::Legacy
         && !settings.seed_sc_from_earliest && !settings.prealloc_cost_thresholds),
         "order master requires resource orders, legacy policy and no seeded time-point expansion");
+    assert!(!settings.order_master_cost_levels || settings.order_master,"canonical master cost levels require order master mode");
     let use_objective_bound = settings.use_objective_bound
         || (settings.aglr.use_objective_bound && settings.aglr.policy != RefinementPolicy::Legacy);
 
@@ -986,6 +987,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_order_cycle_cuts".to_string(), settings.order_cycle_cuts.into());
     output_stats("maxsat_order_path_cuts".to_string(), settings.order_path_cuts.into());
     output_stats("maxsat_order_master".to_string(),settings.order_master.into());
+    output_stats("maxsat_order_master_cost_levels".to_string(),settings.order_master_cost_levels.into());
     output_stats("maxsat_extract_initial_cost".to_string(), settings.extract_initial_cost.into());
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
@@ -1943,12 +1945,20 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                                         let index=occ.delays.partition_point(|(lit,_)|model.value(lit));
                                         assert!(index>0 && index<occ.delays.len());occ.delays[index-1].1
                                     }).collect::<Vec<_>>();
-                                    let cut=schedule.violated(&model_times,|v,bound,current|{
+                                    let mut cut=schedule.violated(&model_times,|v,bound,current|{
                                         let (train,index)=visits[VisitId::from(v)];
                                         problem.trains[train].visit_delay_cost(delay_cost_type,index,bound)
                                             .saturating_sub(problem.trains[train].visit_delay_cost(delay_cost_type,index,current))
                                     },true).map_err(SolverError::InvalidSolution)?
                                         .ok_or_else(||SolverError::InvalidSolution("order master cost gap has no violated objective path".into()))?;
+                                    if settings.order_master_cost_levels{
+                                        if let super::order_paths::Cut::Path{visit,time,..}=&mut cut{
+                                            let (train,index)=visits[VisitId::from(*visit)];
+                                            *time=super::order_paths::cost_threshold(occupations[VisitId::from(*visit)].delays[0].1,*time,
+                                                |t|problem.trains[train].visit_delay_cost(delay_cost_type,index,t))
+                                                .map_err(SolverError::InvalidSolution)?;
+                                        }
+                                    }
                                     resource_orders.remember(&cut).map_err(SolverError::InvalidSolution)?;
                                     if let super::order_paths::Cut::Path{visit,time,prefix}=cut{path_cut=Some((visit,time,prefix));}
                                 }
@@ -2998,8 +3008,9 @@ mod aglr_end_to_end_tests {
                 }}}
             }}}
             assert_ne!(optimum,i32::MAX);
-            for offset in [false,true]{for bound in [false,true]{for sparse in [false,true]{
+            for offset in [false,true]{for bound in [false,true]{for sparse in [false,true]{for levels in [false,true]{
                 let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;settings.order_master=true;
+                settings.order_master_cost_levels=levels;
                 settings.extract_initial_cost=offset;settings.use_objective_bound=bound;settings.sparse_costs=sparse;
                 settings.assumption_strategy=super::super::settings::AssumptionStrategy::Full;
                 settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
@@ -3014,7 +3025,7 @@ mod aglr_end_to_end_tests {
                 let (solution,_)=solve_with_settings(&quiet_env,satcoder::solvers::cadical::Solver::new(),
                     &problem,30.0,objective,settings,|_,_|{}).unwrap();
                 assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
-            }}}
+            }}}}
         }
         assert!(observed_paths>0,"the master must learn a cost path rather than enumerate times in SAT");
         // A feasible initial schedule with positive cost must not skip initial costs.
@@ -3051,6 +3062,7 @@ mod aglr_end_to_end_tests {
             assert_eq!(optimum,if matches!(objective,DelayCostType::Continuous){4}else{1});
             for strategy in [super::super::settings::AssumptionStrategy::Legacy,super::super::settings::AssumptionStrategy::Full]{
                 let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;settings.order_master=true;
+                settings.order_master_cost_levels=true;
                 settings.assumption_strategy=strategy;settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
                 let (solution,stats)=solve_with_settings(&quiet_env,crate::solvers::util::minisat_deadline::Solver::new(30.0),
                     &problem,30.0,objective,settings,|_,_|{}).unwrap();

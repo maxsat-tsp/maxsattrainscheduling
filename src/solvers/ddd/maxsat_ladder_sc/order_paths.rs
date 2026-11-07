@@ -74,6 +74,29 @@ pub(super) enum Analysis<L: Lit> {
     Feasible(Schedule<L>),
 }
 
+/// First allowed time with the same monotone cost as the proved path bound.
+pub(super) fn cost_threshold(
+    earliest: i32,
+    bound: i32,
+    cost: impl Fn(i32) -> usize,
+) -> Result<i32, String> {
+    if bound < earliest {
+        return Err("cost threshold bound precedes earliest time".into());
+    }
+    let target = cost(bound);
+    let mut left = i64::from(earliest);
+    let mut right = i64::from(bound);
+    while left < right {
+        let middle = left + (right - left) / 2;
+        if cost(middle as i32) >= target {
+            right = middle;
+        } else {
+            left = middle + 1;
+        }
+    }
+    Ok(left as i32)
+}
+
 impl<L: Lit> Schedule<L> {
     pub fn violated(
         &self,
@@ -338,6 +361,51 @@ mod tests {
             next: vec![None; n],
             travel: vec![0; n],
         }
+    }
+
+    #[test]
+    fn canonical_cost_threshold_is_the_first_point_of_each_plateau() {
+        for earliest in [-10, 0, 5, 200] {
+            for bound in earliest..=600 {
+                for kind in 0..3 {
+                    let cost = |t: i32| {
+                        let d = t.max(0) as usize;
+                        match kind {
+                            0 => d,
+                            1 => {
+                                if d == 0 {
+                                    0
+                                } else {
+                                    (d - 1) / 180 + 1
+                                }
+                            }
+                            _ => {
+                                if d > 360 {
+                                    3
+                                } else if d > 180 {
+                                    2
+                                } else if d > 0 {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
+                        }
+                    };
+                    let threshold = cost_threshold(earliest, bound, cost).unwrap();
+                    assert!(threshold >= earliest && threshold <= bound);
+                    assert_eq!(cost(threshold), cost(bound));
+                    if threshold > earliest {
+                        assert!(cost(threshold - 1) < cost(bound));
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            cost_threshold(i32::MIN, i32::MAX, |t| usize::from(t >= 7)).unwrap(),
+            7
+        );
+        assert!(cost_threshold(1, 0, |_| 0).is_err());
     }
 
     #[test]

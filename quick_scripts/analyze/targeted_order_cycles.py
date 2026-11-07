@@ -19,6 +19,8 @@ def candidate_config(source,component='order-cycles'):
     config=source['definition']
     if config.get('solver')!='maxsat_ddd_ladder_sc' or config.get('resource_orders')!='true':
         raise ValueError('cycle cuts require the existing resource-order candidate')
+    if component=='order-master-levels':
+        return dict(candidate_config(source,'order-master'),order_master_cost_levels='true')
     if component=='order-paths-full':
         if config.get('assumptions')!='legacy':raise ValueError('full-assumption contrast requires the legacy assumption reference')
         return dict(candidate_config(source,'order-paths'),assumptions='full')
@@ -29,19 +31,22 @@ def candidate_config(source,component='order-cycles'):
     return dict(config,**{field:'true'})
 
 def schema_for(component):
+    if component=='order-master-levels':return 'targeted-order-master-levels-v1'
     return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1','order-paths':'targeted-order-paths-v1','order-paths-full':'targeted-order-paths-full-v1','order-master':'targeted-order-master-v1'}[component]
 
 def report_name(component):
+    if component=='order-master-levels':return 'order_master_levels_audit.json'
     return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json','order-paths':'order_paths_audit.json','order-paths-full':'order_paths_full_audit.json','order-master':'order_master_audit.json'}[component]
 
 def tag_for(component):
+    if component=='order-master-levels':return 'Order-Master-Levels'
     return {'order-cycles':TAG,'initial-cost':'Initial-Cost','order-paths':'Order-Paths','order-paths-full':'Order-Paths-Full','order-master':'Order-Master'}[component]
 
 def verify_snapshot(root):
     path=root/'snapshot.json'
     if not path.exists():return
     index=json.loads(path.read_text())
-    reports={report_name(c) for c in ['order-cycles','initial-cost','order-paths','order-paths-full','order-master']}
+    reports={report_name(c) for c in ['order-cycles','initial-cost','order-paths','order-paths-full','order-master','order-master-levels']}
     if index.get('schema')!='targeted-component-snapshot-v1' or index.get('report') not in reports:
         raise ValueError('unsupported component snapshot')
     hashes=index['file_sha256']
@@ -169,7 +174,7 @@ def main():
     parser.add_argument('--reference',type=Path,required=True);parser.add_argument('--results',type=Path,required=True)
     parser.add_argument('--binary',type=Path);parser.add_argument('--round-seconds',type=int,default=21600)
     parser.add_argument('--build-manifest',type=Path)
-    parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths','order-paths-full','order-master'],default='order-cycles')
+    parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths','order-paths-full','order-master','order-master-levels'],default='order-cycles')
     parser.add_argument('--reuse-build',action='store_true',help='reuse the hashed binary while retaining its own source commit')
     args=parser.parse_args()
     if args.action=='audit':print(json.dumps(audit_saved(args.results,args.reference),indent=2));return

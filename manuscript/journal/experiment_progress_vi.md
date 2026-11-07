@@ -139,6 +139,22 @@ Kiểm thử công cụ trên local đạt 121 Python. Hướng dẫn sinh viên
 và runbook ghi rõ cách chạy, xác nhận ba lần, hồi quy 68 ca theo objective
 và điều kiện trước khi lập bảng full. Mốc full vẫn là 203/216 ở 300 giây.
 
+**V28 đã hoàn tất đối chứng MiniSAT/CaDiCaL.** Cả hai backend chạy cùng
+binary V27, cùng bốn ca infsteps180 và cùng ngân sách `core_minimize_checks=4`,
+`core_exhaust_checks=0`, `core_minimize_conflicts=0`. Mỗi backend timeout
+4/4; comparator độc lập kết luận hòa, không có ca cùng giải để ghép runtime.
+Các thời gian smoke đã biết đúng cost nhưng không phải ca khó. Raw/audit
+và `paired_comparison.json` ở `master_backends_v28_20261107/`; runtime chạy
+song song chỉ là chẩn đoán, chưa đưa vào bảng chính.
+
+**CPLEX baseline đang được kiểm tra lại.** Exporter Big-M đã bỏ trần thời gian
+43.200 giây và dùng hệ số động theo release time/tổng travel. Hai vòng đầu
+bị loại: một nghiệm CPLEX còn overlap tài nguyên; vòng sau dừng vì test hồi
+quy hệ số động chưa đúng. Raw lỗi được giữ riêng, không tính là baseline.
+Vòng thứ ba đang chạy native test và hai ca `trackA1/finsteps123`,
+`stationB12/infsteps180`; chỉ nghiệm có lịch hợp lệ và `cost=lb=ub` mới được
+giữ.
+
 **`trackB12/cont` của V17 đã xác nhận thành công 3/3 lần.** Mọi lịch đều
 hợp lệ và có cost=LB=UB=15.182. Thời gian 10,65; 4,64; 11,86 giây, median
 10,65 giây. Đã tải về và kiểm toán lại độc lập. Đây là ca giải thêm so với

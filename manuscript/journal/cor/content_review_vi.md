@@ -18,11 +18,13 @@ pháp; giữ RC2 và SAT backend là hai thành phần khác nhau.
 
 V18--V21 hoàn tất 13 ca chưa giải mỗi lượt, chưa tăng coverage. V22--V24
 dừng tại bài thử thật trước ca khó; lịch tối ưu trả về đều qua kiểm tra.
-V25 đang thử riêng bốn ca infsteps180; V26 đã cài cách thêm nhiều mệnh đề
-chi phí từ một lịch và xếp chạy sau V25, phải qua test native trước đo.
+V25 đã xong bốn ca infsteps180, đều timeout hợp lệ và chưa có gain. V26
+đã qua 78 test Rust, 111 Python trên VM và đang chạy 13 ca chưa giải.
+V27 thêm điều kiện chi phí từ từng hướng thứ tự và chỉ mở nếu V26 đủ ca
+nhưng không có gain; phải qua kiểm thử native trước đo.
 Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh
 chạy nằm trong `../experiment_progress_vi.md`, `../experiment_runbook_vi.md`
-và hướng dẫn sinh viên phiên bản 5.20.
+và hướng dẫn sinh viên phiên bản 5.21.
 
 Theo yêu cầu đã chốt, runtime hội nghị có thể dùng theo giả định cùng
 phần cứng, bỏ qua khác biệt nhỏ về phiên bản; vẫn giữ rõ nguồn và timeout.

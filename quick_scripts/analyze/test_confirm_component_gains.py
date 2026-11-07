@@ -4,6 +4,13 @@ from pathlib import Path
 import confirm_component_gains as follow
 
 class FollowupTests(unittest.TestCase):
+    def test_incomplete_confirmations_cannot_be_masked_by_completed_regressions(self):
+        manifest=dict(schema='test',selected_gains=[dict(name='new')],confirmation_plan=[{}]*3,regression_plan=[{}])
+        record=dict(stage='regression',repeat=0,objective='cont',name='old',retained=True)
+        report=follow.report_for(manifest,[record])
+        self.assertTrue(report['regression_complete'])
+        self.assertFalse(report['confirmed']);self.assertFalse(report['regression_passed'])
+
     def test_objective_filtered_gain_regresses_only_the_declared_scope(self):
         source=dict(objective_filter=['infsteps180'],instances_by_objective=dict(finsteps123=[],infsteps180=['trackA11'],cont=[]))
         gain=dict(objective='infsteps180',name='trackA11',cost=7,seconds=10)

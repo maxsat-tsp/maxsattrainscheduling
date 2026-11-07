@@ -51,7 +51,7 @@ def run(args):
     runtime=SimpleNamespace(timeout=source['timeout_seconds'],ram_kb=source['ram_kb'],binary=args.binary,method_definitions={'Component-followup':source['definition']})
     deadline=time.monotonic()+args.round_seconds;records=[]
     for stage,items in [('confirmation',confirmations),('regression',regressions if gains else [])]:
-        if stage=='regression' and not all(r['retained'] for r in records):break
+        if stage=='regression' and (len(records)!=len(confirmations) or not all(r['retained'] for r in records)):break
         for task in items:
             case=root/'cases'/stage/f'repeat-{task["repeat"]}'/task['objective']/task['name']
             path=case/f'{task["objective"]}.json'
@@ -73,11 +73,12 @@ def report_for(manifest,records):
     confirmed=[r for r in records if r['stage']=='confirmation'];regressed=[r for r in records if r['stage']=='regression']
     expected=len(manifest['confirmation_plan'])+(len(manifest['regression_plan']) if manifest['selected_gains'] else 0)
     confirmation_complete=len(confirmed)==len(manifest['confirmation_plan'])
+    gains_confirmed=bool(manifest['selected_gains']) and confirmation_complete and all(r['retained'] for r in confirmed)
     regression_complete=bool(manifest['selected_gains']) and len(regressed)==len(manifest['regression_plan'])
     report=dict(schema=manifest['schema'],selected_gains=manifest['selected_gains'],expected_runs=expected,completed_runs=len(records),
         complete=len(records)==expected,confirmation_complete=confirmation_complete,
-        confirmed=bool(manifest['selected_gains']) and confirmation_complete and all(r['retained'] for r in confirmed),
-        regression_complete=regression_complete,regression_passed=regression_complete and all(r['retained'] for r in regressed),
+        confirmed=gains_confirmed,
+        regression_complete=regression_complete,regression_passed=gains_confirmed and regression_complete and all(r['retained'] for r in regressed),
         lost=[dict(objective=r['objective'],name=r['name']) for r in regressed if not r['retained']],
         confirmation_failures=[dict(repeat=r['repeat'],objective=r['objective'],name=r['name']) for r in confirmed if not r['retained']],
         cases=records,errors=[],submission_passed=False,scope='gain confirmations and previously solved-pair regression only; full-table construction and independent audit remain separate')

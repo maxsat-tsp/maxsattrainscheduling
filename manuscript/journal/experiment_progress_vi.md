@@ -99,41 +99,45 @@ Các cận đọc từ stdout được để riêng trong CSV, không sửa JSON
 đường và thời gian đồ thị cho thấy cần giảm số lần giải lại và đưa thêm
 thông tin chi phí vào SAT sớm hơn; chưa có bằng chứng coverage mới.
 
-**V26 đã qua kiểm thử native và bắt đầu sàng lọc 13 ca lúc 14:29:53
-ngày 07/11, giờ Việt Nam, sau sửa validator.** Mã `984e221` bổ sung mọi điều kiện
-chi phí bị lịch SAT vi phạm thay vì chỉ một điều kiện. Mỗi điều kiện vẫn
-có chứng minh từ đường thời gian; chi phí mốc mới được thêm trước SAT
-kế tiếp. Native đã đạt 78 test Rust và 111 test Python. Hai bài thử bậc thang
-giải đúng ở 5,48 và 7,82 giây, số điều kiện thêm cùng lúc cao nhất là
-28 và 29; bài cont timeout hợp lệ sau khoảng 30 giây. Kiểm toán local
-đã xác nhận cả ba raw và hash log test. Validator ban đầu đọc một trường
-telemetry không được ghi khi native timeout; đã sửa để dùng lại raw,
-giữ rõ trường thiếu, không điền 0 và không chạy lại phép đo. V26 chỉ build sau khi V25 đã dừng. Cả vòng có giới hạn 6 giờ, gồm thời gian chờ.
+**V26 đã hoàn tất 13/13 ca, chưa giải thêm.** Mọi kết quả là timeout hợp
+lệ ở 300 giây, đã tải về và kiểm toán độc lập, gồm đủ bốn ca bậc thang
+và chín ca liên tục. Raw và hash tại
+`results/sat_research/master_batch_v26_20261107/complete_13/`.
+Không có gain nên followup không chạy xác nhận/hồi quy và không báo PASS.
 
-Nếu V25 có gain, script xác nhận ba lần rồi hồi quy 68 ca infsteps180 đã
-giải; đó chỉ là hồi quy theo objective. V26 sàng lọc đủ 13 ca chưa giải;
-nếu có gain thì xác nhận ba lần và hồi quy 203 ca. Mọi báo cáo này vẫn
-`submission_passed=false` cho tới khi lập và kiểm toán bảng full cùng
-đối chứng. Bộ kiểm tra của V26 chấp nhận timeout hợp lệ trong bài thử
-thật như một kết quả hiệu năng; các lịch tối ưu trả về vẫn phải khớp
-chi phí đã biết, và ít nhất một bài thử phải chứng minh đúng optimum.
-Điều kiện mới được ghi rõ, các lượt V22--V24 đã dừng vẫn giữ nguyên.
+Việc thêm nhiều điều kiện một lúc đã giảm thời gian đồ thị: trackA11/
+infsteps180 có 5.642 lời gọi SAT, 5,74 giây đồ thị, so với 134.327 và
+148,61 giây của V25. Nhưng SAT vẫn dùng 293,64 giây, chưa chứng minh
+optimum. Với các ca cont, mô hình có khoảng 0,94--4,10 triệu biến và
+4,56--13,99 triệu mệnh đề. Giảm chi phí kiểm tra đồ thị chưa khắc phục
+được quy mô mô hình còn lớn. Cần kiểm tra thêm cách biểu diễn chi phí. CSV diagnostics giữ riêng cận đọc từ stdout;
+không điền counter hoặc cận thiếu vào JSON gốc.
 
-Ca đầu V26, trackA11/infsteps180, đã xong và kiểm toán local: vẫn timeout
-ở 300 giây. So với V25 trên cùng ca, lời gọi SAT giảm từ 134.327 xuống
-5.642; thời gian đồ thị từ 148,61 xuống 5,74 giây. SAT dùng 293,64 giây;
-cận chẩn đoán từ stdout là 56, so với 30 ở V25, chưa chứng minh optimum.
-Không điền các counter/cận thiếu vào JSON gốc. Lượt mới chỉ xong 1/13
-trong snapshot này; VM tiếp tục các ca còn lại. Raw và audit riêng ở
-`master_batch_v26_20261107/partial_1/` trong `results/sat_research/`.
+**V27 đã qua 79 test Rust, 113 test Python trên VM và đã chạy đủ bốn ca infsteps180, đều timeout hợp lệ và chưa có gain.
+Raw/audit ở `master_seeds_v27_20261107/complete_4/`. Solver source `c1b046f`; sàng lọc bắt đầu 15:37:45 ngày
+07/11, giờ Việt Nam. Ba bài thử origA1 có đúng cost=LB=UB: finsteps123=11
+ở 0,043 giây, infsteps180=34 ở 0,089 giây, cont=5526 ở 0,170 giây. Đây
+là kết quả bài thử dễ, chưa phải bằng chứng tăng coverage trên ca khó.
+Mốc thời gian và mệnh đề khởi tạo được chia sẻ đúng như công thức đã cài.
+Native timeout probe cũng đạt. Không đổi binary trong lượt đang chạy.
 
-**V27 dự phòng đã cài, chưa có kết quả native/hiệu năng.** Mã `c1b046f`
-báo ngay chi phí tối thiểu suy ra từ từng lựa chọn thứ tự, chỉ dùng thời
-gian cứng trên tuyến. Local đạt 37 test nhân SAT, 113 Python và typecheck.
-Chỉ chạy nếu V26 đã kiểm toán đủ 13 ca mà vẫn không tăng coverage. Nếu
-V26 có gain thì bỏ qua V27 và ưu tiên xác nhận/hồi quy. Giữ source/binary
-riêng và chỉ sàng lọc bốn ca infsteps180. Quyết định mở lượt phải được
-lưu; công thức và lệnh ở hướng dẫn sinh viên 5.21 và runbook.
+**V28 đang chạy đối chiếu backend cùng binary.** Runner `9f32564`
+giữ nguyên phương pháp V27, chạy MiniSAT và CaDiCaL trên cùng bốn ca.
+Hai backend dùng cùng ngân sách: bốn lượt thu gọn, bốn lượt tăng cận,
+bỏ giới hạn xung đột riêng (giá trị 0), mỗi instance vẫn 300 giây. Giới
+hạn 100 chỉ được adapter MiniSAT áp dụng nên không giả định hai backend
+đã có cùng giới hạn khi cùng ghi 100. V27 MiniSAT/100 giữ làm đối chứng
+riêng; V28 MiniSAT/0 tách tác dụng giới hạn, CaDiCaL/0 tách tác dụng backend.
+
+Hai service `maxsat-master-v28-minisat` và `maxsat-master-v28-cadical`
+được pin vào hai nhóm lõi vật lý riêng, cùng 6.000.000 KB. Mỗi service
+tối đa 6 giờ kể cả thời gian chờ. Source/binary gốc và hash được giữ;
+không rebuild. Runtime song song và followup mang `paired-screen`, chỉ
+chẩn đoán. Công cụ so sánh `296199d` kiểm toán lại raw, chặn khác cấu
+hình/binary/chi phí, không tuyên bố bên thắng khi dữ liệu còn thiếu.
+Kiểm thử công cụ trên local đạt 121 Python. Hướng dẫn sinh viên 5.22
+và runbook ghi rõ cách chạy, xác nhận ba lần, hồi quy 68 ca theo objective
+và điều kiện trước khi lập bảng full. Mốc full vẫn là 203/216 ở 300 giây.
 
 **`trackB12/cont` của V17 đã xác nhận thành công 3/3 lần.** Mọi lịch đều
 hợp lệ và có cost=LB=UB=15.182. Thời gian 10,65; 4,64; 11,86 giây, median
@@ -143,7 +147,7 @@ Journal trong nhóm 31 cặp. Dùng đúng binary/tham số V17, nhóm lõi vậ
 không ghép vào PAR-2 cuối. Dữ liệu ở
 `core_exhaustion_v17_20261107/trackB12_confirmation/` trong `results/sat_research/`.
 
-Các phiên bản V17--V27 giữ refinement `legacy`, cải tiến RC2 hoặc ràng
+Các phiên bản V17--V28 giữ refinement `legacy`, cải tiến RC2 hoặc ràng
 buộc thứ tự, nên chưa dùng kết quả làm bằng chứng cho bộ chọn AGLR thích
 nghi. Mốc tốt nhất hiện tại vẫn là **203/216**. Chưa cập nhật Abstract,
 Results hoặc Conclusion thành kết luận vượt toàn bộ SOTA.

@@ -20,7 +20,8 @@ V18--V21 hoàn tất 13 ca chưa giải mỗi lượt, chưa tăng coverage. V22
 dừng tại bài thử thật trước ca khó; lịch tối ưu trả về đều qua kiểm tra.
 V25 đã xong bốn ca infsteps180, đều timeout hợp lệ và chưa có gain. V26
 đã xong 13/13 ca và kiểm toán độc lập, chưa tăng coverage. V27 đã qua
-79 test Rust và 113 Python trên VM, đang chạy bốn ca infsteps180. V28
+79 test Rust và 113 Python trên VM, đã chạy đủ bốn ca infsteps180
+nhưng chưa giải thêm ca nào. V28
 chờ để so MiniSAT/CaDiCaL trên cùng binary và cùng giới hạn thực tế;
 sàng lọc song song vẫn cần đo lại tuần tự trước bảng thời gian chính.
 V28 tắt đường tăng cận MiniSAT-only để hai backend thực sự dùng cùng ngân sách.

@@ -788,7 +788,7 @@ khóa cách chọn cấu hình và kiểm toán các objective còn lại.
 
 ## V28: đối chứng backend cùng binary và cùng ngân sách kiểm tra
 
-Runner `9f32564`, cùng binary V27 (solver source `c1b046f`). Hai dịch vụ
+Runner `23591b3`, cùng binary V27 (solver source `c1b046f`). Hai dịch vụ
 `maxsat-master-v28-minisat` và `maxsat-master-v28-cadical` chờ V27 hoàn tất,
 kiểm toán đủ bốn ca rồi mới kiểm tra binary/hash và chạy thêm các bài thử
 thật. Không build lại Rust. Nếu V27 lỗi hoặc thiếu dữ liệu, chưa mở V28.

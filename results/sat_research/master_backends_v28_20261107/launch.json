@@ -1,0 +1,35 @@
+{
+  "runner_commit": "9f32564",
+  "solver_source": "c1b046f (frozen V27 binary, hash checked after its round)",
+  "services": {
+    "minisat": "maxsat-master-v28-minisat",
+    "cadical": "maxsat-master-v28-cadical"
+  },
+  "cpu_affinity": {
+    "minisat": [
+      0,
+      1,
+      4,
+      5
+    ],
+    "cadical": [
+      2,
+      3,
+      6,
+      7
+    ]
+  },
+  "measurement_context": "paired-screen",
+  "paired_run_id": "master-backends-v28",
+  "timeout_seconds": 300,
+  "ram_kb_per_backend": 6000000,
+  "round_wall_limit_seconds": 21600,
+  "wait_for": "complete, independently audited four-case V27 round",
+  "objective_filter": [
+    "infsteps180"
+  ],
+  "core_minimize_checks": 4,
+  "core_minimize_conflicts": 0,
+  "core_exhaust_checks": 4,
+  "submission_passed": false
+}

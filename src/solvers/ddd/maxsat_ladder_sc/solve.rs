@@ -83,6 +83,9 @@ pub struct SolveStats {
     pub resource_order_pairs: usize,
     pub resource_order_rows: usize,
     pub resource_order_triangles: usize,
+    pub order_cycle_checks: usize,
+    pub order_cycles_blocked: usize,
+    pub order_cycle_time: Duration,
     pub core_literals: usize,
     pub max_core_size: usize,
     pub unit_weight_cores: usize,
@@ -932,6 +935,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             "resource-order experiments currently require legacy refinement");
     assert!(!settings.order_transitivity || settings.resource_orders,
             "order transitivity requires resource-order decisions");
+    assert!(!settings.order_cycle_cuts || settings.resource_orders,
+            "temporal cycle cuts require resource-order decisions");
     let use_objective_bound = settings.use_objective_bound
         || (settings.aglr.use_objective_bound && settings.aglr.policy != RefinementPolicy::Legacy);
 
@@ -966,6 +971,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_sparse_costs".to_string(), settings.sparse_costs.into());
     output_stats("maxsat_resource_orders".to_string(), settings.resource_orders.into());
     output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
+    output_stats("maxsat_order_cycle_cuts".to_string(), settings.order_cycle_cuts.into());
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
     output_stats("maxsat_core_minimize_checks".to_string(), settings.core_minimize_checks.into());
@@ -1062,6 +1068,16 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let mut fixed_prec_rows: HashSet<(VisitId, i32)> = HashSet::new();
     let mut encoded_refinement_clauses = HashSet::<AglrClauseKey>::new();
     let mut resource_orders = super::resource_orders::ResourceOrders::new(settings.order_transitivity);
+    let order_topology=settings.order_cycle_cuts.then(|| {
+        let mut next=Vec::with_capacity(visits.len());let mut positive=Vec::with_capacity(visits.len());
+        for (id,&(train,index)) in visits.iter_enumerated() {
+            let route=&problem.trains[train].visits;
+            assert!(route[index].travel_time>=0,"temporal cycle cuts require nonnegative travel times");
+            next.push((index+1<route.len()).then_some(usize::from(id)+1));
+            positive.push(route[index].travel_time>0);
+        }
+        super::order_cycles::Topology{next,positive}
+    });
 
     // Optional: seed fixed-precedence (travel-time) constraints from the earliest
     // time points to reduce the number of "travel-time conflict" iterations.
@@ -1799,6 +1815,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         let core = loop {
             stats.sat_calls += 1;
             let solve_start = Instant::now();
+            let mut cycle_clause=None;
+            {
             let result = {
                 let _p = hprof::enter("sat check");
                 SatSolverWithCore::solve_with_assumptions(
@@ -1815,6 +1833,13 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     n_assumps = settings.assumption_strategy.next(n_assumps, soft_constraints.len());
                 }
                 satcoder::SatResultWithCore::Sat(model) => {
+                    if let Some(topology)=&order_topology {
+                        let cycle_start=Instant::now();stats.order_cycle_checks+=1;
+                        cycle_clause=resource_orders.separate_cycle(topology,|lit|model.value(&lit))
+                            .expect("invalid temporal cycle separation");
+                        stats.order_cycle_time+=cycle_start.elapsed();
+                    }
+                    if cycle_clause.is_none() {
                     is_sat = true;
                     stats.n_sat += 1;
                     let _p = hprof::enter("update times");
@@ -1979,6 +2004,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     });
 
                     break None;
+                    }
                 }
 
                 satcoder::SatResultWithCore::Unsat(core) => {
@@ -1986,6 +2012,14 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     stats.n_unsat += 1;
                     break Some(core);
                 }
+            }
+            } // Drop both the model and SAT result before mutating the solver.
+            if let Some(clause)=cycle_clause {
+                solver.add_clause(clause);
+                stats.order_cycles_blocked+=1;
+                output_stats("maxsat_order_cycle_checks".to_string(),stats.order_cycle_checks.into());
+                output_stats("maxsat_order_cycles_blocked".to_string(),stats.order_cycles_blocked.into());
+                output_stats("maxsat_order_cycle_time".to_string(),stats.order_cycle_time.as_secs_f64().into());
             }
         };
 
@@ -2251,6 +2285,9 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_core_minimize_inconclusive".to_string(), stats.core_minimize_inconclusive.into());
     output_stats("maxsat_core_minimize_time".to_string(), stats.core_minimize_time.as_secs_f64().into());
     output_stats("maxsat_core_exhaust_calls".to_string(), stats.core_exhaust_calls.into());
+    output_stats("maxsat_order_cycle_checks".to_string(), stats.order_cycle_checks.into());
+    output_stats("maxsat_order_cycles_blocked".to_string(), stats.order_cycles_blocked.into());
+    output_stats("maxsat_order_cycle_time".to_string(), stats.order_cycle_time.as_secs_f64().into());
     output_stats("maxsat_core_exhaust_steps".to_string(), stats.core_exhaust_steps.into());
     output_stats("maxsat_core_exhaust_inconclusive".to_string(), stats.core_exhaust_inconclusive.into());
     output_stats("maxsat_core_exhaust_time".to_string(), stats.core_exhaust_time.as_secs_f64().into());
@@ -2774,6 +2811,39 @@ mod aglr_end_to_end_tests {
             ).unwrap();
             assert_eq!(problem.verify_solution(&solution, DelayCostType::Continuous), Some(optimum));
             if hardening { assert!(stats.hardened_primary > 0); }
+        }
+    }
+
+    #[test]
+    fn temporal_cycle_cuts_match_exhaustive_two_route_optima() {
+        let problem=Problem{
+            name:"crossing-routes-order-cycles".into(),
+            trains:[vec![0,1],vec![1,0]].into_iter().map(|route|Train{
+                visits:route.into_iter().map(|resource_id|Visit{
+                    resource_id,earliest:0,aimed:Some(0),travel_time:2,
+                }).collect(),
+            }).collect(),conflicts:vec![(0,0),(1,1)],
+        };
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180] {
+            let mut optimum=i32::MAX;
+            for a in 0..=6 {for b in a+2..=6 {for c in 0..=6 {for d in c+2..=6 {
+                if let Some(cost)=problem.verify_solution(&vec![vec![a,b,b+2],vec![c,d,d+2]],objective) {
+                    optimum=optimum.min(cost);
+                }
+            }}}}
+            assert_ne!(optimum,i32::MAX);
+            for cycles in [false,true] {
+                let mut settings=MaxSatDddLadderScSettings::default();
+                settings.resource_orders=true;settings.order_transitivity=true;settings.order_cycle_cuts=cycles;
+                let (solution,stats)=solve_with_settings(&quiet_env,
+                    crate::solvers::util::minisat_deadline::Solver::new(30.0),
+                    &problem,30.0,objective,settings,|_,_|{}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+                if cycles {assert!(stats.order_cycle_checks>0);}else{assert_eq!(stats.order_cycle_checks,0);}
+                let (solution,_)=solve_with_settings(&quiet_env,satcoder::solvers::cadical::Solver::new(),
+                    &problem,30.0,objective,settings,|_,_|{}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+            }
         }
     }
 

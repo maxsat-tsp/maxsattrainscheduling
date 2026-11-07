@@ -17,6 +17,7 @@
 mod aglr;
 mod precedence;
 mod resource_orders;
+mod order_cycles;
 mod sc_amo;
 mod settings;
 mod hardening;

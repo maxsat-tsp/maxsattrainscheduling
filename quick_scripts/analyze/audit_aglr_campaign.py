@@ -178,6 +178,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append("maxsat_resource_orders differs from the locked configuration")
             if "order_transitivity" in config and str(solve.get("maxsat_order_transitivity")).lower() != config["order_transitivity"].lower():
                 errors.append("maxsat_order_transitivity differs from the locked configuration")
+            if "order_cycle_cuts" in config and str(solve.get("maxsat_order_cycle_cuts")).lower() != config["order_cycle_cuts"].lower():
+                errors.append("maxsat_order_cycle_cuts differs from the locked configuration")
             if "objective_bound" in config and str(solve.get("maxsat_objective_bound")).lower() != config["objective_bound"].lower():
                 errors.append("maxsat_objective_bound differs from the locked configuration")
             if "residual_hardening" in config and str(solve.get("maxsat_residual_hardening")).lower() != config["residual_hardening"].lower():

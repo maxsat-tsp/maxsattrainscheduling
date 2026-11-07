@@ -296,6 +296,7 @@ def run_case(method: str, objective: str, name: str, args, root: Path) -> None:
         for key, suffix in (("assumptions", "ASSUMPTIONS"), ("backend", "BACKEND"),
                             ("sparse_costs", "SPARSE_COSTS"), ("resource_orders", "RESOURCE_ORDERS"),
                             ("order_transitivity", "ORDER_TRANSITIVITY"),
+                            ("order_cycle_cuts", "ORDER_CYCLE_CUTS"),
                             ("objective_bound", "OBJECTIVE_BOUND"), ("residual_hardening", "RESIDUAL_HARDENING"),
                             ("core_minimize_checks", "CORE_MINIMIZE_CHECKS"),
                             ("core_minimize_conflicts", "CORE_MINIMIZE_CONFLICTS"),

@@ -10,6 +10,7 @@ pub(super) struct ResourceOrders<L: Lit> {
     rows: HashSet<(u32, u32, i32)>,
     transitivity: bool,
     neighbors: BTreeMap<u32, BTreeSet<u32>>,
+    cycle_clauses: HashSet<Vec<Bool<L>>>,
 }
 
 impl<L: Lit> ResourceOrders<L> {
@@ -19,7 +20,28 @@ impl<L: Lit> ResourceOrders<L> {
             rows: HashSet::new(),
             transitivity,
             neighbors: BTreeMap::new(),
+            cycle_clauses: HashSet::new(),
         }
+    }
+
+    pub fn separate_cycle(
+        &mut self,
+        topology: &super::order_cycles::Topology,
+        mut value: impl FnMut(Bool<L>) -> bool,
+    ) -> Result<Option<Vec<Bool<L>>>, String> {
+        let mut arcs=topology.arcs();
+        let mut pairs=self.bits.iter().collect::<Vec<_>>();
+        pairs.sort_unstable_by_key(|(key,_)| **key);
+        for (&(a,b), &bit) in pairs {
+            let (first,second,guard)=if value(bit) {(a,b,bit)} else {(b,a,!bit)};
+            arcs.push(topology.ordered(first as usize,second as usize,guard));
+        }
+        if let Some(clause)=super::order_cycles::separate(topology.next.len(),arcs)? {
+            if !self.cycle_clauses.insert(clause.clone()) {
+                return Err("SAT model violates an already added temporal cycle clause".into());
+            }
+            Ok(Some(clause))
+        } else { Ok(None) }
     }
 
     /// `first_after_second` means first entry >= the current second exit;
@@ -90,6 +112,7 @@ impl<L: Lit> ResourceOrders<L> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use satcoder::prelude::SymbolicModel;
     use satcoder::{SatResultWithCore, SatSolverWithCore};
 
     fn add_unrestricted_pair(
@@ -112,6 +135,32 @@ mod tests {
                 true.into(),
             )
             .2
+    }
+
+    #[test]
+    fn temporal_cycle_cut_blocks_only_impossible_orders_and_respects_exact_exit() {
+        use super::super::order_cycles::Topology;
+        for zero in [false,true] {
+          for a in [false,true] { for b in [false,true] {
+            let mut solver=satcoder::solvers::minisat::Solver::new();
+            let mut orders=ResourceOrders::new(false);
+            add_unrestricted_pair(&mut orders,&mut solver,0,2);
+            add_unrestricted_pair(&mut orders,&mut solver,1,2);
+            let x=orders.bits[&(0,2)];let y=orders.bits[&(1,2)];
+            let assumptions=[if a {x}else{!x},if b{y}else{!y}];
+            let topology=Topology{next:vec![Some(1),None,None],positive:vec![true,true,!zero]};
+            let cut=match solver.solve_with_assumptions(assumptions) {
+                SatResultWithCore::Sat(model)=>orders.separate_cycle(&topology,|l|model.value(&l)).unwrap(),
+                _=>panic!("free orders must be SAT"),
+            };
+            let forbidden=a!=b && !(zero && a && !b);
+            assert_eq!(cut.is_some(),forbidden);
+            if let Some(clause)=cut {
+                SatInstance::add_clause(&mut solver,clause);
+                assert!(matches!(solver.solve_with_assumptions(assumptions),SatResultWithCore::Unsat(_)));
+            }
+          }}
+        }
     }
 
     #[test]

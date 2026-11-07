@@ -1,3 +1,9 @@
+# Completed trial: no coverage gain
+
+V19 completed all 13 unresolved pairs at 300 seconds, with no new optimum. Native tests passed: 65 Rust and 96 Python; both known-cost smokes and native timeout passed. The raw complete results were independently audited; see `complete_13/` and `validation_snapshot.tar.gz`.
+
+## Original launch record
+
 # V19: queued single-component initial-cost extraction
 
 Source `20e24a9`. The optional flag is false by default. For each visit,

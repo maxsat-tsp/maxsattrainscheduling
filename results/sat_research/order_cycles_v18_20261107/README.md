@@ -1,3 +1,9 @@
+# Completed trial: no coverage gain
+
+V18 completed all 13 unresolved pairs at 300 seconds, with no new optimum. All raw results were independently audited after download; see `complete_13/`. V17 remains the best full candidate at 203/216.
+
+## Original launch record
+
 # V18: optional positive temporal-cycle cuts
 
 Source `5e70580`; isolated VM service `maxsat-order-cycles-v18.service`.

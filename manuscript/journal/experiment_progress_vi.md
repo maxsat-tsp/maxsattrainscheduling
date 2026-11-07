@@ -27,26 +27,38 @@ mốc MaxSAT, nhưng chưa vượt tổng 206 của Gurobi ngay ở mốc 120 gi
 Không so trực tiếp PAR-2 của bảng 120 với bảng 300 giây. Đối chứng cùng
 300 giây và xác nhận các ca quan trọng vẫn cần hoàn tất trước bảng chính.
 
-**V18 đã qua kiểm thử và đang chạy trên VM:** thêm đúng một thay đổi: tìm một
-chu trình thứ tự tàu bất khả thi và cấm tổ hợp thứ tự đó. Cờ mặc định tắt.
-Đã qua 63 test Rust, 94 test Python, hai lịch nhỏ và kiểm tra timeout. Chỉ chạy **13 ca V17 chưa giải được**: bốn
-`infsteps180`, chín `cont`. Không chạy lại 203 ca đã giải hoặc baseline
-trong vòng sàng lọc này. Mã `ca96ae5`, dịch vụ
-`maxsat-order-cycles-v18-v3.service`, bắt đầu **08:18:58 ngày 07/11**, giờ
-Việt Nam. Worktree riêng `~/projects/order-cycles-v18/maxsattrainscheduling`.
-Mỗi ca 300 giây, 6.000.000 KB RAM; cả vòng gồm build và chạy tối đa 6 giờ.
-Bản ghi, kết quả kiểm thử và hash ở
-`results/sat_research/order_cycles_v18_20261107/`. Binary:
-`5b3f0829650deee56f5d6b4f89111d3b7901f16374fa8734ac94cd85a379638f`.
-Hai lần kiểm thử ban đầu đã dừng trước khi chạy hiệu năng; log được giữ,
-đã điều chỉnh bài nhỏ theo quy ước TXT và cho phép dừng sớm khi LB=UB.
-Giới hạn về chi phí ban đầu của lịch đã hợp lệ được ghi riêng trong ghi
-chú nghiên cứu, chưa trộn sửa lỗi này vào phép thử chu trình.
+**V18 và V19 đã hoàn tất, chưa giải thêm ca:**
 
-Nếu V18 có ca mới, phải xác nhận ba lần rồi kiểm tra các ca cũ trước khi
-đổi con số 203/216. V17/V18 giữ refinement `legacy`, biến thứ tự và quy tắc
-bộ ba; đây là cải tiến RC2/ràng buộc thứ tự, chưa phải kết quả của bộ chọn
-AGLR thích nghi. Chưa đưa các số này vào Abstract, Results hay Conclusion.
+| Phép thử trên 13 ca V17 chưa giải | Số ca đã chạy | Giải thêm | Kiểm toán |
+|---|---:|---:|---|
+| V18: cấm chu trình thứ tự có thời gian dương | 13/13 | 0 | Đạt |
+| V19: tách chi phí bắt buộc của lịch sớm nhất | 13/13 | 0 | Đạt |
+
+Đã tải về toàn bộ JSON và log, xác minh hash rồi dựng lại báo cáo độc lập.
+Cả 26 ca đều timeout hợp lệ ở 300 giây, không có lỗi lịch hoặc chi phí.
+V19 đã qua **65 test Rust, 96 test Python**, hai lịch có optimum 5526 và
+kiểm tra timeout native. Lưu dữ liệu trong `complete_13/` của từng thư mục
+`order_cycles_v18_20261107/` và `initial_cost_v19_20261107/`, thuộc
+`results/sat_research/`. Không cộng các phép thử này vào coverage V17.
+
+SAT vẫn dùng gần hết 300 giây mỗi ca. V18 đã cấm nhiều chu trình nhưng
+chưa khép khoảng cách giữa cận và nghiệm. Tách chi phí V19 cũng chưa giúp
+chứng minh thêm optimum. Bảng `v18_v19_diagnostics.csv` giữ các số đo và
+cận đọc từ log; các cận này chỉ dùng chẩn đoán, không sửa JSON gốc.
+
+**V20 đang chạy trên VM:** chuyển sang truyền thời điểm sớm nhất qua
+cả chuỗi lựa chọn thứ tự. Khi một chuỗi buộc lần đi qua v phải bắt đầu
+muộn hơn, thêm mốc và mệnh đề có điều kiện đó ngay. Chi phí của mốc mới
+phải được mã hóa trước lần SAT kế tiếp. Cơ chế cũng xử lý chu trình dương
+và giữ chu trình thời gian 0. Chỉ bật một cờ mới trên cấu hình V17; tách
+chi phí V19 vẫn tắt. Đã qua 73 test Rust, 97 test Python, hai smoke có optimum 5526 và
+kiểm tra timeout native. Mã `8898caf`, dịch vụ
+`maxsat-order-paths-v20.service`, bắt đầu **11:39:29 ngày 07/11**, giờ
+Việt Nam; đo ca khó từ 11:40:00. Chỉ chạy 13 ca chưa giải, 300 giây và
+6.000.000 KB mỗi ca, trên CPU `0,1,4,5`, cả vòng tối đa 6 giờ. Binary:
+`b888e424572ad22cfa145a8f57381eab9354e81a2dcd13b059bb8564535bf340`.
+Dữ liệu ở worktree `~/projects/order-paths-v20/maxsattrainscheduling`,
+thư mục `results/aglr/order-paths-v20-unresolved300/`.
 
 **`trackB12/cont` của V17 đã xác nhận thành công 3/3 lần.** Mọi lịch đều
 hợp lệ và có cost=LB=UB=15.182. Thời gian 10,65; 4,64; 11,86 giây, median
@@ -56,16 +68,10 @@ Journal trong nhóm 31 cặp. Dùng đúng binary/tham số V17, nhóm lõi vậ
 không ghép vào PAR-2 cuối. Dữ liệu ở
 `core_exhaustion_v17_20261107/trackB12_confirmation/` trong `results/sat_research/`.
 
-**Đã chuẩn bị V19 nếu V18 không giải thêm:** tách phần chi phí bắt buộc ở
-lịch sớm nhất khỏi các phần chi phí RC2 còn phải tối ưu. Mã `20e24a9`,
-cờ `--maxsat-ladder-sc-extract-initial-cost` mặc định false. Kiểm tra kiểu
-Rust và 96 test Python đạt trên local; kiểm thử Rust native còn chờ.
-Controller chỉ tiếp tục sau khi V18 xong, qua audit và không có ca mới.
-Nếu V18 có ca mới, giữ kết quả để xác nhận trước, không tự đổi cấu hình.
-V19 tắt chu trình, dùng cấu hình V17 và chỉ thêm phép tách chi phí; không
-sửa binary hoặc thư mục V18 đang chạy. Mỗi vòng gồm cả chờ, kiểm thử,
-build và chạy tối đa 6 giờ. Chi tiết ở runbook và
-`results/sat_research/initial_cost_v19_20261107/`.
+Các phiên bản V17--V20 giữ refinement `legacy`, cải tiến RC2 hoặc ràng
+buộc thứ tự, nên chưa dùng kết quả làm bằng chứng cho bộ chọn AGLR thích
+nghi. Mốc tốt nhất hiện tại vẫn là **203/216**. Chưa cập nhật Abstract,
+Results hoặc Conclusion thành kết luận vượt toàn bộ SOTA.
 
 ## Diễn biến V16 và V17 đã hoàn tất
 
@@ -134,7 +140,7 @@ khôi phục. Vì vậy chưa quy kết việc khôi phục chỉ cho cơ chế 
 Hướng dự phòng về chu trình thứ tự được ghi trong
 `research_note_order_cycles_vi.md`; mã đã cài và kiểm thử; V18 chưa có kết quả hiệu năng khi khởi chạy.
 
-Hướng dẫn sinh viên bản 5.16 có công thức, ví dụ và lệnh chạy hiện tại.
+Hướng dẫn sinh viên bản 5.17 có công thức, ví dụ và lệnh chạy hiện tại.
 Bản thảo COR giữ số liệu chính cho đến khi hoàn tất kiểm tra và đánh giá full.
 
 ## Chi tiết các lượt V16 và đối chứng backend

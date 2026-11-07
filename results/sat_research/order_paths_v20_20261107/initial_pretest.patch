@@ -1,0 +1,953 @@
+diff --git a/quick_scripts/analyze/audit_aglr_campaign.py b/quick_scripts/analyze/audit_aglr_campaign.py
+index 2b6ea7f..63d2d28 100755
+--- a/quick_scripts/analyze/audit_aglr_campaign.py
++++ b/quick_scripts/analyze/audit_aglr_campaign.py
+@@ -180,6 +180,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
+                 errors.append("maxsat_order_transitivity differs from the locked configuration")
+             if "order_cycle_cuts" in config and str(solve.get("maxsat_order_cycle_cuts")).lower() != config["order_cycle_cuts"].lower():
+                 errors.append("maxsat_order_cycle_cuts differs from the locked configuration")
++            if "order_path_cuts" in config and str(solve.get("maxsat_order_path_cuts")).lower() != config["order_path_cuts"].lower():
++                errors.append("maxsat_order_path_cuts differs from the locked configuration")
+             if "extract_initial_cost" in config and str(solve.get("maxsat_extract_initial_cost")).lower() != config["extract_initial_cost"].lower():
+                 errors.append("maxsat_extract_initial_cost differs from the locked configuration")
+             if "objective_bound" in config and str(solve.get("maxsat_objective_bound")).lower() != config["objective_bound"].lower():
+diff --git a/quick_scripts/analyze/extended_timeout_experiments.py b/quick_scripts/analyze/extended_timeout_experiments.py
+index ea8f5e2..bb632ad 100644
+--- a/quick_scripts/analyze/extended_timeout_experiments.py
++++ b/quick_scripts/analyze/extended_timeout_experiments.py
+@@ -297,6 +297,7 @@ def run_case(method: str, objective: str, name: str, args, root: Path) -> None:
+                             ("sparse_costs", "SPARSE_COSTS"), ("resource_orders", "RESOURCE_ORDERS"),
+                             ("order_transitivity", "ORDER_TRANSITIVITY"),
+                             ("order_cycle_cuts", "ORDER_CYCLE_CUTS"),
++                            ("order_path_cuts", "ORDER_PATH_CUTS"),
+                             ("extract_initial_cost", "EXTRACT_INITIAL_COST"),
+                             ("objective_bound", "OBJECTIVE_BOUND"), ("residual_hardening", "RESIDUAL_HARDENING"),
+                             ("core_minimize_checks", "CORE_MINIMIZE_CHECKS"),
+diff --git a/quick_scripts/analyze/targeted_order_cycles.py b/quick_scripts/analyze/targeted_order_cycles.py
+index 78fc0a0..9c6de3c 100644
+--- a/quick_scripts/analyze/targeted_order_cycles.py
++++ b/quick_scripts/analyze/targeted_order_cycles.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Test only unresolved full-dataset pairs with temporal order-cycle cuts."""
++"""Test one optional MaxSAT component on unresolved full-dataset pairs."""
+ from __future__ import annotations
+ import argparse,json,os,subprocess,time
+ from pathlib import Path
+@@ -12,20 +12,20 @@ def candidate_config(source,component='order-cycles'):
+     config=source['definition']
+     if config.get('solver')!='maxsat_ddd_ladder_sc' or config.get('resource_orders')!='true':
+         raise ValueError('cycle cuts require the existing resource-order candidate')
+-    field={'order-cycles':'order_cycle_cuts','initial-cost':'extract_initial_cost'}.get(component)
++    field={'order-cycles':'order_cycle_cuts','initial-cost':'extract_initial_cost','order-paths':'order_path_cuts'}.get(component)
+     if field is None:raise ValueError('unsupported single-component experiment')
+     if config.get(field,'false')!='false':
+         raise ValueError('reference already enables the component being tested')
+     return dict(config,**{field:'true'})
+ 
+ def schema_for(component):
+-    return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1'}[component]
++    return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1','order-paths':'targeted-order-paths-v1'}[component]
+ 
+ def report_name(component):
+-    return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json'}[component]
++    return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json','order-paths':'order_paths_audit.json'}[component]
+ 
+ def tag_for(component):
+-    return TAG if component=='order-cycles' else 'Initial-Cost'
++    return {'order-cycles':TAG,'initial-cost':'Initial-Cost','order-paths':'Order-Paths'}[component]
+ 
+ def load_reference(root):
+     manifest=json.loads((root/'manifest.json').read_text());saved=json.loads((root/'full_audit.json').read_text())
+@@ -140,7 +140,7 @@ def main():
+     parser.add_argument('--reference',type=Path,required=True);parser.add_argument('--results',type=Path,required=True)
+     parser.add_argument('--binary',type=Path);parser.add_argument('--round-seconds',type=int,default=21600)
+     parser.add_argument('--build-manifest',type=Path)
+-    parser.add_argument('--component',choices=['order-cycles','initial-cost'],default='order-cycles')
++    parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths'],default='order-cycles')
+     args=parser.parse_args()
+     if args.action=='audit':print(json.dumps(audit_saved(args.results,args.reference),indent=2));return
+     if args.binary is None or args.build_manifest is None or not 0<args.round_seconds<=21600:
+diff --git a/quick_scripts/analyze/test_targeted_order_cycles.py b/quick_scripts/analyze/test_targeted_order_cycles.py
+index ef13f38..6545b99 100644
+--- a/quick_scripts/analyze/test_targeted_order_cycles.py
++++ b/quick_scripts/analyze/test_targeted_order_cycles.py
+@@ -6,6 +6,25 @@ import targeted_order_cycles as cycles
+ import extended_timeout_experiments as extended
+ 
+ class CycleTrialTests(unittest.TestCase):
++    def test_whole_path_trial_changes_only_one_flag_and_checks_its_execution(self):
++        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
++        config=cycles.candidate_config(source,'order-paths')
++        self.assertEqual(config,dict(source['definition'],order_path_cuts='true'))
++        self.assertNotIn('extract_initial_cost',config)
++        self.assertEqual(cycles.schema_for('order-paths'),'targeted-order-paths-v1')
++        self.assertEqual(cycles.report_name('order-paths'),'order_paths_audit.json')
++        with tempfile.TemporaryDirectory() as raw:
++            root=Path(raw);args=SimpleNamespace(binary=root/'ddd',timeout=300,ram_kb=6000000,method_definitions={'test':config})
++            with patch.object(extended,'execute') as execute:
++                extended.run_case('test','cont','origA1',args,root)
++                self.assertEqual(execute.call_args.args[4]['MAXSATDDD_ORDER_PATH_CUTS'],'true')
++            solve=dict(status='timeout',total_time=300,timeout_seconds=300,process_exit_code=0)
++            solve.update({'maxsat_'+k:v for k,v in config.items() if k not in ('solver','kind')})
++            extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
++            self.assertFalse(extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
++            solve['maxsat_order_path_cuts']=False;extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
++            self.assertIn('maxsat_order_path_cuts differs from the locked configuration',extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
++
+     def test_initial_cost_changes_one_component_without_enabling_cycles(self):
+         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+         config=cycles.candidate_config(source,'initial-cost')
+diff --git a/quick_scripts/run_all_txt_instances_limited.sh b/quick_scripts/run_all_txt_instances_limited.sh
+index 155d92f..87fb6e4 100644
+--- a/quick_scripts/run_all_txt_instances_limited.sh
++++ b/quick_scripts/run_all_txt_instances_limited.sh
+@@ -70,6 +70,7 @@ MAXSATDDD_SPARSE_COSTS="${MAXSATDDD_SPARSE_COSTS:-}"
+ MAXSATDDD_RESOURCE_ORDERS="${MAXSATDDD_RESOURCE_ORDERS:-}"
+ MAXSATDDD_ORDER_TRANSITIVITY="${MAXSATDDD_ORDER_TRANSITIVITY:-}"
+ MAXSATDDD_ORDER_CYCLE_CUTS="${MAXSATDDD_ORDER_CYCLE_CUTS:-}"
++MAXSATDDD_ORDER_PATH_CUTS="${MAXSATDDD_ORDER_PATH_CUTS:-}"
+ MAXSATDDD_EXTRACT_INITIAL_COST="${MAXSATDDD_EXTRACT_INITIAL_COST:-}"
+ MAXSATDDD_OBJECTIVE_BOUND="${MAXSATDDD_OBJECTIVE_BOUND:-}"
+ MAXSATDDD_BACKEND="${MAXSATDDD_BACKEND:-}"
+@@ -289,6 +290,7 @@ run_fingerprint="$(python3 - \
+   "${MAXSATDDD_RESOURCE_ORDERS:-default}" \
+   "${MAXSATDDD_ORDER_TRANSITIVITY:-default}" \
+   "${MAXSATDDD_ORDER_CYCLE_CUTS:-default}" \
++  "${MAXSATDDD_ORDER_PATH_CUTS:-default}" \
+   "${MAXSATDDD_EXTRACT_INITIAL_COST:-default}" \
+   "${MAXSATDDD_OBJECTIVE_BOUND:-default}" \
+   "${MAXSATDDD_BACKEND:-default}" \
+@@ -376,6 +378,7 @@ else
+     printf 'maxsatddd_resource_orders=%s\n' "${MAXSATDDD_RESOURCE_ORDERS:-default}"
+     printf 'maxsatddd_order_transitivity=%s\n' "${MAXSATDDD_ORDER_TRANSITIVITY:-default}"
+     printf 'maxsatddd_order_cycle_cuts=%s\n' "${MAXSATDDD_ORDER_CYCLE_CUTS:-default}"
++    printf 'maxsatddd_order_path_cuts=%s\n' "${MAXSATDDD_ORDER_PATH_CUTS:-default}"
+     printf 'maxsatddd_extract_initial_cost=%s\n' "${MAXSATDDD_EXTRACT_INITIAL_COST:-default}"
+     printf 'maxsatddd_objective_bound=%s\n' "${MAXSATDDD_OBJECTIVE_BOUND:-default}"
+     printf 'maxsatddd_backend=%s\n' "${MAXSATDDD_BACKEND:-default}"
+@@ -461,6 +464,9 @@ run_one() {
+   if [[ -n "$MAXSATDDD_ORDER_CYCLE_CUTS" ]]; then
+     extra_args+=(--maxsat-ladder-sc-order-cycle-cuts "$MAXSATDDD_ORDER_CYCLE_CUTS")
+   fi
++  if [[ -n "$MAXSATDDD_ORDER_PATH_CUTS" ]]; then
++    extra_args+=(--maxsat-ladder-sc-order-path-cuts "$MAXSATDDD_ORDER_PATH_CUTS")
++  fi
+   if [[ -n "$MAXSATDDD_EXTRACT_INITIAL_COST" ]]; then
+     extra_args+=(--maxsat-ladder-sc-extract-initial-cost "$MAXSATDDD_EXTRACT_INITIAL_COST")
+   fi
+diff --git a/src/main.rs b/src/main.rs
+index bdc152d..9990c03 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -130,6 +130,10 @@ struct Opt {
+     #[structopt(long)]
+     maxsat_ladder_sc_order_cycle_cuts: Option<bool>,
+ 
++    /// Learn conditional earliest-time bounds across resource-order paths (default false).
++    #[structopt(long)]
++    maxsat_ladder_sc_order_path_cuts: Option<bool>,
++
+     /// Charge unavoidable earliest-time costs before RC2 (default false).
+     #[structopt(long)]
+     maxsat_ladder_sc_extract_initial_cost: Option<bool>,
+@@ -530,7 +534,7 @@ fn solve_sc_with_backend(
+     counting_solver::reset_counts();
+     output("maxsat_backend".to_string(), backend.into());
+     match backend {
+-        "minisat" if settings.core_minimize_checks>0 || settings.order_cycle_cuts || settings.extract_initial_cost => {
++        "minisat" if settings.core_minimize_checks>0 || settings.order_cycle_cuts || settings.order_path_cuts || settings.extract_initial_cost => {
+             let solver=minisat_deadline::Solver::new(timeout);
+             output("maxsat_backend_signature".to_string(),solver.signature().to_string().into());
+             output("maxsat_sat_timeout_mode".to_string(),"native-watchdog-deadline".into());
+@@ -687,6 +691,7 @@ fn main() {
+         resource_orders: opt.maxsat_ladder_sc_resource_orders.unwrap_or(false),
+         order_transitivity: opt.maxsat_ladder_sc_order_transitivity.unwrap_or(false),
+         order_cycle_cuts: opt.maxsat_ladder_sc_order_cycle_cuts.unwrap_or(false),
++        order_path_cuts: opt.maxsat_ladder_sc_order_path_cuts.unwrap_or(false),
+         extract_initial_cost: opt.maxsat_ladder_sc_extract_initial_cost.unwrap_or(false),
+         use_objective_bound: opt.maxsat_ladder_sc_use_objective_bound.unwrap_or(false),
+         residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),
+diff --git a/src/solvers/ddd/maxsat_ladder_sc/mod.rs b/src/solvers/ddd/maxsat_ladder_sc/mod.rs
+index a5d4fe8..866965e 100644
+--- a/src/solvers/ddd/maxsat_ladder_sc/mod.rs
++++ b/src/solvers/ddd/maxsat_ladder_sc/mod.rs
+@@ -18,6 +18,7 @@ mod aglr;
+ mod precedence;
+ mod resource_orders;
+ mod order_cycles;
++mod order_paths;
+ mod sc_amo;
+ mod settings;
+ mod hardening;
+diff --git a/src/solvers/ddd/maxsat_ladder_sc/order_paths.rs b/src/solvers/ddd/maxsat_ladder_sc/order_paths.rs
+new file mode 100644
+index 0000000..576e14a
+--- /dev/null
++++ b/src/solvers/ddd/maxsat_ladder_sc/order_paths.rs
+@@ -0,0 +1,507 @@
++//! Conditional earliest-time propagation through the resource orders selected
++//! by a full SAT model. Every learned clause is witnessed by a temporal path.
++use satcoder::{Bool, Lit};
++use std::collections::{BTreeSet, VecDeque};
++
++pub(super) struct Topology {
++    pub next: Vec<Option<usize>>,
++    pub travel: Vec<i32>,
++    pub earliest: Vec<i32>,
++}
++
++#[derive(Clone, Copy)]
++pub(super) struct Edge<L: Lit> {
++    pub from: usize,
++    pub to: usize,
++    pub weight: i32,
++    pub guard: Option<Bool<L>>,
++}
++
++#[derive(Debug, PartialEq, Eq)]
++pub(super) enum Cut<L: Lit> {
++    Cycle(Vec<Bool<L>>),
++    Path {
++        visit: usize,
++        time: i32,
++        prefix: Vec<Bool<L>>,
++    },
++}
++
++impl Topology {
++    pub fn edges<L: Lit>(&self) -> Vec<Edge<L>> {
++        self.next
++            .iter()
++            .enumerate()
++            .filter_map(|(from, &to)| {
++                to.map(|to| Edge {
++                    from,
++                    to,
++                    weight: self.travel[from],
++                    guard: None,
++                })
++            })
++            .collect()
++    }
++
++    pub fn ordered<L: Lit>(&self, first: usize, second: usize, guard: Bool<L>) -> Edge<L> {
++        Edge {
++            from: self.next[first].unwrap_or(first),
++            to: second,
++            weight: if self.next[first].is_some() {
++                0
++            } else {
++                self.travel[first]
++            },
++            guard: Some(guard),
++        }
++    }
++}
++
++// Immutable witness links: extending a path never changes another node's proof.
++struct Step<L: Lit> {
++    previous: Option<usize>,
++    guard: Bool<L>,
++}
++
++fn extend<L: Lit>(
++    steps: &mut Vec<Step<L>>,
++    previous: Option<usize>,
++    guard: Option<Bool<L>>,
++) -> Option<usize> {
++    match guard {
++        Some(g) if g.constant() != Some(true) => {
++            let index = steps.len();
++            steps.push(Step { previous, guard: g });
++            Some(index)
++        }
++        _ => previous,
++    }
++}
++
++fn prefix<L: Lit>(steps: &[Step<L>], mut witness: Option<usize>) -> Result<Vec<Bool<L>>, String> {
++    let mut result = Vec::new();
++    while let Some(i) = witness {
++        result.push(!steps[i].guard);
++        witness = steps[i].previous;
++    }
++    result.sort_unstable();
++    result.dedup();
++    if result.iter().any(|g| result.binary_search(&!*g).is_ok()) {
++        return Err("temporal path contains contradictory active orders".into());
++    }
++    Ok(result)
++}
++
++/// Return one violated path implication, prioritizing objective increase then
++/// time increase. A positive cycle is separated before propagating path bounds.
++pub(super) fn separate<L: Lit>(
++    topology: &Topology,
++    mut edges: Vec<Edge<L>>,
++    model_times: &[i32],
++    priority: impl Fn(usize, i32, i32) -> usize,
++) -> Result<Option<Cut<L>>, String> {
++    let n = topology.next.len();
++    if topology.travel.len() != n
++        || topology.earliest.len() != n
++        || model_times.len() != n
++        || topology.travel.iter().any(|&d| d < 0)
++        || edges
++            .iter()
++            .any(|e| e.from >= n || e.to >= n || e.weight < 0 || e.guard == Some(false.into()))
++    {
++        return Err("invalid nonnegative temporal graph".into());
++    }
++    edges.sort_by_key(|e| (e.from, e.to, e.weight, e.guard));
++    let cycle = super::order_cycles::separate(
++        n,
++        edges
++            .iter()
++            .map(|e| super::order_cycles::Arc {
++                from: e.from,
++                to: e.to,
++                positive: e.weight > 0,
++                guard: e.guard,
++            })
++            .collect(),
++    )?;
++    if let Some(clause) = cycle {
++        return Ok(Some(Cut::Cycle(clause)));
++    }
++
++    let mut forward = vec![Vec::new(); n];
++    let mut reverse = vec![Vec::new(); n];
++    for (i, e) in edges.iter().enumerate() {
++        forward[e.from].push(i);
++        reverse[e.to].push(e.from);
++    }
++    let mut visited = vec![false; n];
++    let mut finish = Vec::with_capacity(n);
++    for start in 0..n {
++        if visited[start] {
++            continue;
++        }
++        visited[start] = true;
++        let mut stack = vec![(start, 0)];
++        while let Some((node, index)) = stack.last_mut() {
++            if *index == forward[*node].len() {
++                finish.push(*node);
++                stack.pop();
++            } else {
++                let to = edges[forward[*node][*index]].to;
++                *index += 1;
++                if !visited[to] {
++                    visited[to] = true;
++                    stack.push((to, 0));
++                }
++            }
++        }
++    }
++    let mut component = vec![usize::MAX; n];
++    let mut count = 0;
++    for &start in finish.iter().rev() {
++        if component[start] != usize::MAX {
++            continue;
++        }
++        component[start] = count;
++        let mut stack = vec![start];
++        while let Some(node) = stack.pop() {
++            for &from in &reverse[node] {
++                if component[from] == usize::MAX {
++                    component[from] = count;
++                    stack.push(from);
++                }
++            }
++        }
++        count += 1;
++    }
++    // With no positive cycle, all edges internal to an SCC have weight zero.
++    let mut members = vec![Vec::new(); count];
++    let mut indegree = vec![0usize; count];
++    for node in 0..n {
++        members[component[node]].push(node);
++    }
++    for e in &edges {
++        if component[e.from] != component[e.to] {
++            indegree[component[e.to]] += 1;
++        } else if e.weight != 0 {
++            return Err("positive edge survived cycle separation".into());
++        }
++    }
++    let mut roots = members
++        .iter()
++        .map(|nodes| {
++            *nodes
++                .iter()
++                .max_by_key(|&&v| (topology.earliest[v], std::cmp::Reverse(v)))
++                .unwrap()
++        })
++        .collect::<Vec<_>>();
++    let mut best = roots
++        .iter()
++        .map(|&r| topology.earliest[r])
++        .collect::<Vec<_>>();
++    let mut incoming = vec![None; count];
++    let mut witnesses = vec![None; n];
++    let mut bounds = vec![0; n];
++    let mut steps = Vec::new();
++    let mut ready = (0..count)
++        .filter(|&c| indegree[c] == 0)
++        .collect::<BTreeSet<_>>();
++    visited.fill(false);
++    let mut processed = 0;
++    while let Some(c) = ready.pop_first() {
++        processed += 1;
++        let root = roots[c];
++        let mut queue = VecDeque::from([root]);
++        bounds[root] = best[c];
++        witnesses[root] = incoming[c];
++        visited[root] = true;
++        while let Some(node) = queue.pop_front() {
++            for &i in &forward[node] {
++                let e = edges[i];
++                if component[e.to] == c && !visited[e.to] {
++                    visited[e.to] = true;
++                    bounds[e.to] = best[c];
++                    witnesses[e.to] = extend(&mut steps, witnesses[node], e.guard);
++                    queue.push_back(e.to);
++                }
++            }
++        }
++        for &node in &members[c] {
++            if !visited[node] {
++                return Err("zero-weight component is not reachable from its root".into());
++            }
++            for &i in &forward[node] {
++                let e = edges[i];
++                let target = component[e.to];
++                if target == c {
++                    continue;
++                }
++                let candidate = bounds[node]
++                    .checked_add(e.weight)
++                    .filter(|&t| t < i32::MAX)
++                    .ok_or("temporal bound exceeds finite i32 time domain")?;
++                if candidate > best[target] {
++                    best[target] = candidate;
++                    roots[target] = e.to;
++                    incoming[target] = extend(&mut steps, witnesses[node], e.guard);
++                }
++                indegree[target] -= 1;
++                if indegree[target] == 0 {
++                    ready.insert(target);
++                }
++            }
++        }
++    }
++    if processed != count {
++        return Err("component graph is not acyclic".into());
++    }
++    let chosen = (0..n)
++        .filter(|&v| bounds[v] > model_times[v])
++        .max_by_key(|&v| {
++            (
++                priority(v, bounds[v], model_times[v]),
++                i64::from(bounds[v]) - i64::from(model_times[v]),
++                std::cmp::Reverse(v),
++            )
++        });
++    if let Some(visit) = chosen {
++        Ok(Some(Cut::Path {
++            visit,
++            time: bounds[visit],
++            prefix: prefix(&steps, witnesses[visit])?,
++        }))
++    } else {
++        Ok(None)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use satcoder::solvers::minisat::Lit;
++    fn g(n: usize) -> Bool<Lit> {
++        let mut s = minisat::Solver::new();
++        (0..n).map(|_| s.new_lit()).last().unwrap().into()
++    }
++    fn e(from: usize, to: usize, weight: i32, guard: Option<Bool<Lit>>) -> Edge<Lit> {
++        Edge {
++            from,
++            to,
++            weight,
++            guard,
++        }
++    }
++    fn t(earliest: Vec<i32>) -> Topology {
++        let n = earliest.len();
++        Topology {
++            earliest,
++            next: vec![None; n],
++            travel: vec![0; n],
++        }
++    }
++
++    #[test]
++    fn whole_path_yields_exact_bound_and_only_its_required_guards() {
++        let a = g(1);
++        let b = g(2);
++        let c = g(3);
++        let edges = vec![
++            e(0, 1, 3, Some(a)),
++            e(1, 2, 4, None),
++            e(2, 3, 0, Some(b)),
++            e(4, 3, 1, Some(c)),
++        ];
++        let expected = Some(Cut::Path {
++            visit: 3,
++            time: 12,
++            prefix: vec![!a, !b],
++        });
++        let mut reversed = edges.clone();
++        reversed.reverse();
++        assert_eq!(
++            separate(
++                &t(vec![5, 0, 0, 0, 0]),
++                edges,
++                &[5, 8, 12, 0, 0],
++                |_, _, _| 0
++            )
++            .unwrap(),
++            expected
++        );
++        assert_eq!(
++            separate(
++                &t(vec![5, 0, 0, 0, 0]),
++                reversed,
++                &[5, 8, 12, 0, 0],
++                |_, _, _| 0
++            )
++            .unwrap(),
++            expected
++        );
++    }
++
++    #[test]
++    fn zero_cycles_propagate_external_and_earliest_bounds_without_false_conflicts() {
++        let a = g(1);
++        let b = g(2);
++        let c = g(3);
++        let edges = vec![
++            e(0, 1, 0, Some(a)),
++            e(1, 0, 0, Some(b)),
++            e(2, 0, 3, Some(c)),
++        ];
++        assert_eq!(
++            separate(&t(vec![0, 0, 5]), edges.clone(), &[8, 0, 5], |_, _, _| 0).unwrap(),
++            Some(Cut::Path {
++                visit: 1,
++                time: 8,
++                prefix: vec![!a, !c]
++            })
++        );
++        assert_eq!(
++            separate(&t(vec![0, 0, 5]), edges, &[8, 8, 5], |_, _, _| 0).unwrap(),
++            None
++        );
++        assert_eq!(
++            separate(
++                &t(vec![7, 0]),
++                vec![e(0, 1, 0, Some(a)), e(1, 0, 0, Some(b))],
++                &[7, 0],
++                |_, _, _| 0
++            )
++            .unwrap(),
++            Some(Cut::Path {
++                visit: 1,
++                time: 7,
++                prefix: vec![!a]
++            })
++        );
++    }
++
++    #[test]
++    fn positive_cycle_is_blocked_before_path_propagation() {
++        let a = g(1);
++        let b = g(2);
++        assert_eq!(
++            separate(
++                &t(vec![0, 0]),
++                vec![e(0, 1, 2, Some(a)), e(1, 0, 0, Some(b))],
++                &[0, 0],
++                |_, _, _| 0
++            )
++            .unwrap(),
++            Some(Cut::Cycle(vec![!a, !b]))
++        );
++    }
++
++    #[test]
++    fn objective_increase_precedes_large_time_shift_at_a_dummy_visit() {
++        let a = g(1);
++        assert_eq!(
++            separate(
++                &t(vec![0, 0, 0]),
++                vec![e(0, 1, 3, Some(a)), e(0, 2, 20, None)],
++                &[0, 0, 0],
++                |v, _, _| usize::from(v == 1)
++            )
++            .unwrap(),
++            Some(Cut::Path {
++                visit: 1,
++                time: 3,
++                prefix: vec![!a]
++            })
++        );
++    }
++
++    #[test]
++    fn exact_exit_and_fixed_route_edges_use_actual_travel_weights() {
++        let topology = Topology {
++            next: vec![Some(1), None, None],
++            travel: vec![3, 2, 4],
++            earliest: vec![5, 0, 0],
++        };
++        let a = g(1);
++        let mut edges = topology.edges();
++        edges.push(topology.ordered(0, 2, a));
++        assert_eq!(
++            separate(&topology, edges, &[5, 8, 0], |_, _, _| 0).unwrap(),
++            Some(Cut::Path {
++                visit: 2,
++                time: 8,
++                prefix: vec![!a]
++            })
++        );
++        let mut edges = topology.edges();
++        edges.push(topology.ordered(1, 2, a));
++        assert_eq!(
++            separate(&topology, edges, &[5, 8, 0], |_, _, _| 0).unwrap(),
++            Some(Cut::Path {
++                visit: 2,
++                time: 10,
++                prefix: vec![!a]
++            })
++        );
++    }
++
++    #[test]
++    fn path_clause_preserves_every_small_feasible_guarded_assignment() {
++        let a = g(1);
++        let b = g(2);
++        let edges = vec![e(0, 1, 2, Some(a)), e(1, 2, 1, Some(b))];
++        let cut = separate(&t(vec![1, 0, 0]), edges, &[1, 3, 0], |_, _, _| 0)
++            .unwrap()
++            .unwrap();
++        assert_eq!(
++            cut,
++            Cut::Path {
++                visit: 2,
++                time: 4,
++                prefix: vec![!a, !b]
++            }
++        );
++        for mask in 0..4 {
++            for x in 1..=6 {
++                for y in 0..=6 {
++                    for z in 0..=6 {
++                        let av = mask & 1 != 0;
++                        let bv = mask & 2 != 0;
++                        if av && y < x + 2 || bv && z < y + 1 {
++                            continue;
++                        }
++                        assert!(!av || !bv || z >= 4);
++                    }
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn long_chain_uses_iterative_linear_propagation_and_checked_times() {
++        let n = 10000;
++        let a = g(1);
++        let edges = (0..n - 1).map(|i| e(i, i + 1, 1, Some(a))).collect();
++        assert_eq!(
++            separate(&t(vec![0; n]), edges, &vec![0; n], |_, _, _| 0).unwrap(),
++            Some(Cut::Path {
++                visit: n - 1,
++                time: n as i32 - 1,
++                prefix: vec![!a]
++            })
++        );
++        assert!(separate(
++            &t(vec![i32::MAX - 1, 0]),
++            vec![e(0, 1, 2, None)],
++            &[0, 0],
++            |_, _, _| 0
++        )
++        .is_err());
++        assert!(separate(
++            &t(vec![0, 0]),
++            vec![e(0, 1, -1, None)],
++            &[0, 0],
++            |_, _, _| 0
++        )
++        .is_err());
++    }
++}
+diff --git a/src/solvers/ddd/maxsat_ladder_sc/resource_orders.rs b/src/solvers/ddd/maxsat_ladder_sc/resource_orders.rs
+index ee0e6b7..f77c766 100644
+--- a/src/solvers/ddd/maxsat_ladder_sc/resource_orders.rs
++++ b/src/solvers/ddd/maxsat_ladder_sc/resource_orders.rs
+@@ -11,6 +11,7 @@ pub(super) struct ResourceOrders<L: Lit> {
+     transitivity: bool,
+     neighbors: BTreeMap<u32, BTreeSet<u32>>,
+     cycle_clauses: HashSet<Vec<Bool<L>>>,
++    path_clauses: HashSet<(usize,i32,Vec<Bool<L>>)>,
+ }
+ 
+ impl<L: Lit> ResourceOrders<L> {
+@@ -21,9 +22,37 @@ impl<L: Lit> ResourceOrders<L> {
+             transitivity,
+             neighbors: BTreeMap::new(),
+             cycle_clauses: HashSet::new(),
++            path_clauses: HashSet::new(),
+         }
+     }
+ 
++    pub fn separate_path(
++        &mut self,topology:&super::order_paths::Topology,model_times:&[i32],
++        mut value:impl FnMut(Bool<L>)->bool,priority:impl Fn(usize,i32,i32)->usize,
++    )->Result<Option<super::order_paths::Cut<L>>,String>{
++        let mut edges=topology.edges();let mut pairs=self.bits.iter().collect::<Vec<_>>();
++        pairs.sort_unstable_by_key(|(key,_)|**key);
++        for (&(a,b),&bit) in pairs{
++            let (first,second,guard)=if value(bit){(a,b,bit)}else{(b,a,!bit)};
++            edges.push(topology.ordered(first as usize,second as usize,guard));
++        }
++        let cut=super::order_paths::separate(topology,edges,model_times,priority)?;
++        match &cut{
++            Some(super::order_paths::Cut::Cycle(clause))=>{
++                if !self.cycle_clauses.insert(clause.clone()){
++                    return Err("SAT model violates an already encoded temporal cycle".into());
++                }
++            }
++            Some(super::order_paths::Cut::Path{visit,time,prefix})=>{
++                if !self.path_clauses.insert((*visit,*time,prefix.clone())){
++                    return Err("SAT model violates an already encoded temporal path".into());
++                }
++            }
++            None=>{}
++        }
++        Ok(cut)
++    }
++
+     pub fn separate_cycle(
+         &mut self,
+         topology: &super::order_cycles::Topology,
+diff --git a/src/solvers/ddd/maxsat_ladder_sc/settings.rs b/src/solvers/ddd/maxsat_ladder_sc/settings.rs
+index 8f1587b..9f714d6 100644
+--- a/src/solvers/ddd/maxsat_ladder_sc/settings.rs
++++ b/src/solvers/ddd/maxsat_ladder_sc/settings.rs
+@@ -108,6 +108,8 @@ pub struct MaxSatDddLadderScSettings {
+     pub order_transitivity: bool,
+     /// Lazily forbid positive temporal cycles among existing resource orders.
+     pub order_cycle_cuts: bool,
++    /// Propagate conditional earliest times through complete temporal paths.
++    pub order_path_cuts: bool,
+     /// Charge unavoidable earliest-time costs directly; encode only residuals.
+     pub extract_initial_cost: bool,
+     /// Restrict original weighted cost terms by a verified feasible upper bound.
+@@ -146,6 +148,7 @@ impl Default for MaxSatDddLadderScSettings {
+             resource_orders: false,
+             order_transitivity: false,
+             order_cycle_cuts: false,
++            order_path_cuts: false,
+             extract_initial_cost: false,
+             use_objective_bound: false,
+             residual_hardening: false,
+diff --git a/src/solvers/ddd/maxsat_ladder_sc/solve.rs b/src/solvers/ddd/maxsat_ladder_sc/solve.rs
+index 907afc7..077b591 100644
+--- a/src/solvers/ddd/maxsat_ladder_sc/solve.rs
++++ b/src/solvers/ddd/maxsat_ladder_sc/solve.rs
+@@ -86,6 +86,11 @@ pub struct SolveStats {
+     pub order_cycle_checks: usize,
+     pub order_cycles_blocked: usize,
+     pub order_cycle_time: Duration,
++    pub order_path_checks: usize,
++    pub order_paths_added: usize,
++    pub order_path_new_points: usize,
++    pub order_path_guards: usize,
++    pub order_path_time: Duration,
+     pub core_literals: usize,
+     pub max_core_size: usize,
+     pub unit_weight_cores: usize,
+@@ -937,6 +942,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
+             "order transitivity requires resource-order decisions");
+     assert!(!settings.order_cycle_cuts || settings.resource_orders,
+             "temporal cycle cuts require resource-order decisions");
++    assert!(!settings.order_path_cuts || settings.resource_orders,
++            "temporal path cuts require resource-order decisions");
+     let use_objective_bound = settings.use_objective_bound
+         || (settings.aglr.use_objective_bound && settings.aglr.policy != RefinementPolicy::Legacy);
+ 
+@@ -972,6 +979,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
+     output_stats("maxsat_resource_orders".to_string(), settings.resource_orders.into());
+     output_stats("maxsat_order_transitivity".to_string(), settings.order_transitivity.into());
+     output_stats("maxsat_order_cycle_cuts".to_string(), settings.order_cycle_cuts.into());
++    output_stats("maxsat_order_path_cuts".to_string(), settings.order_path_cuts.into());
+     output_stats("maxsat_extract_initial_cost".to_string(), settings.extract_initial_cost.into());
+     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
+     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
+@@ -1081,7 +1089,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
+     let mut fixed_prec_rows: HashSet<(VisitId, i32)> = HashSet::new();
+     let mut encoded_refinement_clauses = HashSet::<AglrClauseKey>::new();
+     let mut resource_orders = super::resource_orders::ResourceOrders::new(settings.order_transitivity);
+-    let order_topology=settings.order_cycle_cuts.then(|| {
++    let order_topology=(settings.order_cycle_cuts && !settings.order_path_cuts).then(|| {
+         let mut next=Vec::with_capacity(visits.len());let mut positive=Vec::with_capacity(visits.len());
+         for (id,&(train,index)) in visits.iter_enumerated() {
+             let route=&problem.trains[train].visits;
+@@ -1091,6 +1099,17 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
+         }
+         super::order_cycles::Topology{next,positive}
+     });
++    let path_topology=settings.order_path_cuts.then(||{
++        let mut next=Vec::with_capacity(visits.len());let mut travel=Vec::with_capacity(visits.len());
++        let mut earliest=Vec::with_capacity(visits.len());
++        for (id,&(train,index)) in visits.iter_enumerated(){
++            let route=&problem.trains[train].visits;
++            assert!(route[index].travel_time>=0,"temporal paths require nonnegative travel times");
++            next.push((index+1<route.len()).then_some(usize::from(id)+1));
++            travel.push(route[index].travel_time);earliest.push(occupations[id].delays[0].1);
++        }
++        super::order_paths::Topology{next,travel,earliest}
++    });
+ 
+     // Optional: seed fixed-precedence (travel-time) constraints from the earliest
+     // time points to reduce the number of "travel-time conflict" iterations.
+@@ -1834,6 +1853,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
+             stats.sat_calls += 1;
+             let solve_start = Instant::now();
+             let mut cycle_clause=None;
++            let mut path_cut=None;
+             {
+             let result = {
+                 let _p = hprof::enter("sat check");
+@@ -1851,13 +1871,30 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
+                     n_assumps = settings.assumption_strategy.next(n_assumps, soft_constraints.len());
+                 }
+                 satcoder::SatResultWithCore::Sat(model) => {
++                    if let Some(topology)=&path_topology{
++                        let path_start=Instant::now();stats.order_path_checks+=1;stats.order_cycle_checks+=1;
++                        let model_times=occupations.iter().map(|occ|{
++                            let index=occ.delays.partition_point(|(lit,_)|model.value(lit));
++                            assert!(index>0 && index<occ.delays.len());occ.delays[index-1].1
++                        }).collect::<Vec<_>>();
++                        match resource_orders.separate_path(topology,&model_times,|lit|model.value(&lit),|v,bound,current|{
++                            let (train,index)=visits[VisitId::from(v)];
++                            problem.trains[train].visit_delay_cost(delay_cost_type,index,bound)
++                                .saturating_sub(problem.trains[train].visit_delay_cost(delay_cost_type,index,current))
++                        }).expect("invalid temporal path separation"){
++                            Some(super::order_paths::Cut::Cycle(clause))=>cycle_clause=Some(clause),
++                            Some(super::order_paths::Cut::Path{visit,time,prefix})=>path_cut=Some((visit,time,prefix)),
++                            None=>{}
++                        }
++                        stats.order_path_time+=path_start.elapsed();
++                    }
+                     if let Some(topology)=&order_topology {
+                         let cycle_start=Instant::now();stats.order_cycle_checks+=1;
+                         cycle_clause=resource_orders.separate_cycle(topology,|lit|model.value(&lit))
+                             .expect("invalid temporal cycle separation");
+                         stats.order_cycle_time+=cycle_start.elapsed();
+                     }
+-                    if cycle_clause.is_none() {
++                    if cycle_clause.is_none() && path_cut.is_none() {
+                     is_sat = true;
+                     stats.n_sat += 1;
+                     let _p = hprof::enter("update times");
+@@ -2032,6 +2069,21 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
+                 }
+             }
+             } // Drop both the model and SAT result before mutating the solver.
++            if let Some((index,time,mut prefix))=path_cut{
++                let visit=VisitId::from(index);
++                let (literal,is_new)=occupations[visit].time_point(&mut solver,time);
++                if is_new{new_time_points.push((visit,literal,time));stats.order_path_new_points+=1;}
++                stats.order_path_guards+=prefix.len();prefix.push(literal);solver.add_clause(prefix);
++                stats.order_paths_added+=1;
++                output_stats("maxsat_order_path_checks".into(),stats.order_path_checks.into());
++                output_stats("maxsat_order_paths_added".into(),stats.order_paths_added.into());
++                output_stats("maxsat_order_path_new_points".into(),stats.order_path_new_points.into());
++                output_stats("maxsat_order_path_guards".into(),stats.order_path_guards.into());
++                output_stats("maxsat_order_path_time".into(),stats.order_path_time.as_secs_f64().into());
++                // New ladder points must receive their objective costs before
++                // another SAT call. Skip conflict detection on the stale model.
++                is_sat=false;break None;
++            }
+             if let Some(clause)=cycle_clause {
+                 solver.add_clause(clause);
+                 stats.order_cycles_blocked+=1;
+@@ -2306,6 +2358,11 @@ fn do_output_stats<L: satcoder::Lit>(
+     output_stats("maxsat_order_cycle_checks".to_string(), stats.order_cycle_checks.into());
+     output_stats("maxsat_order_cycles_blocked".to_string(), stats.order_cycles_blocked.into());
+     output_stats("maxsat_order_cycle_time".to_string(), stats.order_cycle_time.as_secs_f64().into());
++    output_stats("maxsat_order_path_checks".to_string(),stats.order_path_checks.into());
++    output_stats("maxsat_order_paths_added".to_string(),stats.order_paths_added.into());
++    output_stats("maxsat_order_path_new_points".to_string(),stats.order_path_new_points.into());
++    output_stats("maxsat_order_path_guards".to_string(),stats.order_path_guards.into());
++    output_stats("maxsat_order_path_time".to_string(),stats.order_path_time.as_secs_f64().into());
+     output_stats("maxsat_core_exhaust_steps".to_string(), stats.core_exhaust_steps.into());
+     output_stats("maxsat_core_exhaust_inconclusive".to_string(), stats.core_exhaust_inconclusive.into());
+     output_stats("maxsat_core_exhaust_time".to_string(), stats.core_exhaust_time.as_secs_f64().into());
+@@ -2832,6 +2889,52 @@ mod aglr_end_to_end_tests {
+         }
+     }
+ 
++    #[test]
++    fn temporal_paths_match_exhaustive_cross_route_optima_with_cost_registration(){
++        let routes=[vec![1,2],vec![1,2],vec![2,1]];
++        let problem=Problem{name:"whole-path-three-trains".into(),
++            trains:routes.iter().map(|route|Train{visits:route.iter().enumerate().map(|(i,&resource_id)|Visit{
++                resource_id,earliest:(2*i) as i32,aimed:(i==1).then_some(2),travel_time:2,
++            }).chain(std::iter::once(Visit{resource_id:0,earliest:4,aimed:None,travel_time:0})).collect()}).collect(),
++            conflicts:vec![(1,1),(2,2)]};
++        let choices=(0..=6).flat_map(|a|(a+2..=8).map(move|b|(a,b))).collect::<Vec<_>>();
++        let mut observed_paths=0;
++        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180]{
++            let mut optimum=i32::MAX;
++            for &(a,b) in &choices{for &(c,d) in &choices{for &(e,f) in &choices{
++                let times=[[a,b],[c,d],[e,f]];
++                let valid=(0..3).all(|i|(i+1..3).all(|j|(0..2).all(|v|(0..2).all(|w|{
++                    if routes[i][v]!=routes[j][w]{return true;}
++                    let exit_i=if v==0{times[i][1]}else{times[i][1]+2};
++                    let exit_j=if w==0{times[j][1]}else{times[j][1]+2};
++                    exit_i<=times[j][w] || exit_j<=times[i][v]
++                }))));
++                if valid{let solution=times.iter().map(|ts|vec![ts[0],ts[1],ts[1]+2,ts[1]+2]).collect::<Vec<_>>();
++                    let cost=problem.verify_solution(&solution,objective).unwrap();optimum=optimum.min(cost);}
++            }}}
++            // With cost <=4 every continuous target is <=8. For step costs,
++            // zero is impossible because the first two trains share a target.
++            assert_eq!(optimum,if matches!(objective,DelayCostType::Continuous){4}else{1});
++            for paths in [false,true]{for bound in [false,true]{
++                let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;
++                settings.order_transitivity=true;settings.order_path_cuts=paths;settings.use_objective_bound=bound;
++                settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
++                let (solution,stats)=solve_with_settings(&quiet_env,
++                    crate::solvers::util::minisat_deadline::Solver::new(30.0),&problem,30.0,objective,settings,|_,_|{}).unwrap();
++                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
++                if !paths{assert_eq!(stats.order_path_checks,0);}
++                assert!(stats.order_path_new_points<=stats.order_paths_added);observed_paths+=stats.order_paths_added;
++                if paths{
++                    settings.core_minimize_checks=0;settings.core_minimize_conflicts=0;settings.core_exhaust_checks=0;
++                    let (solution,stats)=solve_with_settings(&quiet_env,satcoder::solvers::cadical::Solver::new(),
++                        &problem,30.0,objective,settings,|_,_|{}).unwrap();
++                    assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));observed_paths+=stats.order_paths_added;
++                }
++            }}
++        }
++        assert!(observed_paths>0,"must exercise a learned path and register its cost before re-solving");
++    }
++
+     #[test]
+     fn extracting_initial_cost_fixes_a_feasible_positive_cost_initial_schedule() {
+         let problem=Problem{name:"feasible-initial-positive-cost".into(),

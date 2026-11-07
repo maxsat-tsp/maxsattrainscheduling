@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.16}
+\fancyhead[R]{\small Phiên bản 5.17}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -67,7 +67,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.16, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.17, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -89,26 +89,27 @@ giải 16; không mất ca nào so với hai đối chứng này. Ca \code{track
 202, trong khi bảng Gurobi hội nghị có 206. Không dùng bảng 300 giây để
 tuyên bố thắng một bảng 120 giây.
 
-\textbf{Việc tiếp theo:} theo dõi V18, chỉ thử 13 ca còn lại: 4
-\code{infsteps180}, 9 \code{cont}. V18 giữ cấu hình RC2 của V17, chỉ thêm
-phép kiểm tra chu trình thứ tự. Nếu các lựa chọn bắt một tàu phải chờ
-chính nó qua một chuỗi có thời gian dương, cấm tổ hợp đó. Cờ mặc định tắt
-nên baseline vẫn chạy như trước.
+\textbf{V18 và V19 đã xong:} mỗi phép thử chạy đủ 13 ca còn lại, đều
+chưa giải thêm ca nào. Toàn bộ dữ liệu đã tải về và qua kiểm tra độc lập.
+V19 đã qua 65 test Rust và 96 test Python trên VM. Mốc tốt nhất vẫn là
+V17 với 203/216; chưa lấy các phép thử không cải thiện làm kết quả chính.
 
-VM đã qua 63 test Rust, 94 test Python, kiểm tra lịch và timeout; đang
-chạy trong worktree riêng
-\file{~/projects/order-cycles-v18/maxsattrainscheduling}.
-Dịch vụ \file{maxsat-order-cycles-v18-v3.service} bắt đầu lúc 08:18:58 ngày
-07/11, giờ Việt Nam. Các kiểm thử đã đạt trước khi chạy ca khó. Mỗi ca 300
-giây, 6.000.000 KB RAM; cả vòng gồm kiểm thử và build tối đa 6 giờ.
-Không build hoặc chạy lệnh trùng khi dịch vụ đang hoạt động. Lệnh theo dõi,
-tái tạo và kiểm toán có trong runbook.
+\textbf{Việc tiếp theo là V20:} truyền thời điểm sớm nhất qua cả chuỗi
+thứ tự giữa các tàu. Khi chuỗi lựa chọn buộc một tàu phải vào muộn hơn,
+thêm ngay mốc và mệnh đề có điều kiện tương ứng. Các mốc mới nhận chi phí
+trước lần SAT kế tiếp. Giữ tham số RC2 của V17 và chỉ bật cờ truyền cận;
+tách chi phí V19 vẫn tắt. Sau khi kiểm thử đạt, chỉ chạy 13 ca chưa giải:
+4 \code{infsteps180}, 9 \code{cont}. Không chạy lại baseline trong sàng lọc.
 
-Nếu V18 giải thêm ca, xác nhận lại ba lần rồi kiểm tra các ca V17 từng
-giải được. Khi chưa kiểm tra các ca cũ, chưa cộng ca mới vào 203 để báo
-coverage full. Không ghép ca tốt nhất của nhiều cấu hình. Nếu không có
-ca mới, đọc số chu trình đã loại và thời gian SAT để chọn một thay đổi
-cho vòng sau; vẫn giữ kết quả không cải thiện.
+V20 đã qua 73 test Rust, 97 test Python, hai smoke và kiểm tra timeout;
+đang chạy trong worktree riêng trên VM. Mỗi ca dùng 300 giây,
+6.000.000 KB RAM; một vòng tối đa 6 giờ. Lệnh theo dõi và kiểm toán có
+trong runbook. Không sửa mã hay build trong worktree đang chạy thực nghiệm.
+
+Nếu có ca mới, xác nhận lại ba lần rồi kiểm tra các ca V17 từng giải được.
+Khi chưa kiểm tra các ca cũ, chưa cộng ca mới vào 203 để báo coverage full.
+Nếu không có ca mới, giữ số đo thời gian SAT, cận, số mốc và mệnh đề để
+đánh giá lại hướng cải tiến. Mỗi vòng chỉ thay một thành phần.
 
 Hai ca giải thêm của V16 đã xác nhận đủ ba lần, nhưng V16 mất
 \code{stationA9/cont} khi hồi quy. V17 khôi phục ca này ở 45,46 giây.
@@ -1228,8 +1229,8 @@ dependency, dữ liệu và tham số. Đọc \file{order_cycles_audit.json}:
 \code{newly\_solved} là ca mới; \code{complete} cho biết đã đủ ca;
 \code{errors} phải rỗng. Theo dõi \file{maxsat_order_cycle_checks},
 \file{maxsat_order_cycles_blocked} và \file{maxsat_order_cycle_time}.
-Chưa có kết quả hiệu năng V18 khi khởi chạy; cài xong chưa phải bằng chứng
-tốt hơn baseline.
+V18 đã hoàn tất 13/13 ca ở 300 giây, tất cả timeout hợp lệ. Dữ liệu và
+kiểm toán ở \file{results/sat_research/order_cycles_v18_20261107/complete_13/}.
 
 \section{Bước V19 dự phòng: tách phần chi phí chắc chắn phải trả}
 
@@ -1263,14 +1264,79 @@ Số tiền tách được ghi ở \file{maxsat_initial_cost_offset}.
 Mã \code{20e24a9} đã qua kiểm tra kiểu Rust và 96 test Python trên local.
 Kiểm thử Rust mới so với vét cạn trên ba hàm mục tiêu, gồm các tổ hợp cây
 chi phí thưa, giới hạn objective, hardening, xử lý core và hai SAT backend.
-Các kiểm thử này còn phải chạy native trên VM trước thí nghiệm.
+Các kiểm thử native đã đạt: 65 test Rust, 96 test Python, hai smoke và
+kiểm tra timeout. Cả 13 ca thực nghiệm V19 vẫn timeout ở 300 giây.
 
 V19 chỉ tiếp tục khi V18 đã chạy đủ, qua audit và không có ca mới.
 Nếu V18 có ca mới, giữ lại để xác nhận trước. Khi chạy V19, giữ cấu hình
 V17 và tắt chu trình; chỉ thay phép tách chi phí, rồi thử 13 ca còn lại.
 Script dùng \file{targeted_order_cycles.py} với
 \file{--component initial-cost}; báo cáo là \file{initial_cost_audit.json}.
-Chưa có kết quả hiệu năng V19 khi xếp hàng. Lệnh đầy đủ ở runbook.
+Dữ liệu V19 đã qua kiểm toán độc lập, không giải thêm ca. Lệnh đầy đủ
+được giữ trong runbook để tái tạo.
+
+\section{Bước V20: truyền cận qua một chuỗi thứ tự}
+
+Cấm chu trình chỉ loại các lựa chọn không thể thực hiện. Một chuỗi không
+có chu trình vẫn có thể buộc nhiều tàu phải vào muộn. V20 truyền hệ quả
+này tới cuối chuỗi ngay trong lần kiểm tra model SAT.
+
+Ví dụ, tàu A có thể vào sớm nhất lúc 10 và cần ít nhất 3 giây để rời chỗ
+đang xét. Nếu chọn A rời trước B vào, rồi B cần 2 giây tới lần đi qua C,
+thì C không thể bắt đầu trước 15. Kết luận này phụ thuộc vào lựa chọn
+A trước B; khi đổi lựa chọn, không áp đặt cận 15 bằng mệnh đề đó nữa.
+
+Mỗi cạnh có dạng $t_v\geq t_u+\delta_e$, với $\delta_e\geq0$.
+Xét một đường đi $P$ từ $s$ tới $v$. Gọi $o_1,\ldots,o_m$ là các literal
+thứ tự bật các cạnh của đường đi; cạnh cố định trong tuyến không cần
+literal. Vì $t_s\geq\ell_s$, suy ra
+\[
+ (o_1\land\cdots\land o_m)\ \Longrightarrow\
+ t_v\geq L_P,\qquad L_P=\ell_s+\sum_{e\in P}\delta_e.
+\]
+Gọi $d_v(L_P)$ là biến mốc ``vào lần $v$ không sớm hơn $L_P$''. Thêm
+mệnh đề
+\[
+ \neg o_1\lor\cdots\lor\neg o_m\lor d_v(L_P).
+\]
+Ví dụ trên chỉ cần $\neg o_{AB}\lor d_C(15)$. Đây là một hệ quả của
+thời điểm sớm nhất, điều kiện di chuyển và các thứ tự trên đúng đường đi.
+Mọi lịch hợp lệ theo các lựa chọn đó đều thỏa mệnh đề.
+
+Cách thực hiện:
+\begin{enumerate}
+\item Sau lần SAT với đủ điều kiện chi phí, lấy hướng của các biến thứ
+tự đã có và tạo các cạnh thời gian như V18.
+\item Nếu có chu trình tổng thời gian dương, cấm tổ hợp thứ tự trên chu
+trình. Các nhóm đỉnh nối vòng bằng cạnh thời gian 0 được giữ và nhận
+cùng một cận; truyền tiếp cận qua các nhóm còn lại.
+\item Tính cận $L_v$ và giữ lại đường đi đã chứng minh cận đó. Trong các
+lần đi qua mà model chọn sớm hơn $L_v$, ưu tiên mức tăng chi phí
+$f_v(L_v)-f_v(t_v)$ lớn nhất, rồi chênh lệch thời gian lớn nhất; hòa thì
+chọn chỉ số lần đi qua nhỏ nhất.
+\item Chỉ thêm một mốc và mệnh đề của đường đã chọn. Đăng ký chi phí của
+mốc vào CostTree trước lần SAT tiếp theo. Model vừa bị loại không được
+dùng làm lịch của vòng DDD.
+\item Khi không có cận nào bị vi phạm, tiếp tục kiểm tra xung đột DDD
+như trước.
+\end{enumerate}
+
+Cờ mới là \file{--maxsat-ladder-sc-order-path-cuts true}, mặc định false;
+biến Bash là \file{MAXSATDDD_ORDER_PATH_CUTS=true}. Cờ yêu cầu biến thứ tự
+đang bật và bao gồm kiểm tra chu trình trước khi truyền cận. V20 giữ mọi
+tham số V17, chỉ bật cờ này; \code{extract\_initial\_cost} vẫn false.
+Mã ở \file{order_paths.rs}, \file{resource_orders.rs} và vòng SAT của
+\file{maxsat_ladder_sc/solve.rs}.
+
+Script sàng lọc dùng \file{targeted_order_cycles.py} với
+\file{--component order-paths}; báo cáo \file{order_paths_audit.json}.
+Các số đo cần đọc là \file{maxsat_order_path_checks},
+\file{maxsat_order_paths_added}, \file{maxsat_order_path_new_points},
+\file{maxsat_order_path_guards} và \file{maxsat_order_path_time}.
+Kiểm thử kiểm tra đường đi, chu trình thời gian 0, thời điểm rời thật,
+chuỗi 10.000 đỉnh, mệnh đề đúng với lịch nhỏ vét cạn và chi phí nghiệm
+khi bật/tắt truyền cận trên cả MiniSAT/CaDiCaL. Các kiểm thử native,
+smoke và timeout đã đạt; V20 đang thử trên 13 ca khó.
 
 \section{Nội dung được phép đưa vào bài báo}
 

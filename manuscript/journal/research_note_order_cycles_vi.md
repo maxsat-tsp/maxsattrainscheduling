@@ -1,9 +1,10 @@
 # Hướng dự phòng: loại chu trình thứ tự giữa các tàu
 
-Hướng này đã được cài ở mã `ca96ae5`, cờ mặc định tắt. V18 đã qua 63 test Rust, 94 test Python, kiểm tra lịch và timeout; đang
-chạy trên 13 ca V17 còn chưa giải. Chưa có kết quả
-hiệu năng của V18 khi ghi bản cập nhật này. V17 đạt 203/216; V18 chỉ thêm
-một thay đổi là các mệnh đề loại chu trình có thời gian dương.
+V18 (chu trình) và V19 (tách chi phí) đều đã chạy đủ 13 ca chưa giải,
+qua kiểm toán độc lập và chưa giải thêm ca. Mốc tốt nhất vẫn là V17,
+203/216. V20 đã cài truyền cận theo cả đường đi ở mã `8898caf`, mặc định
+tắt; 73 test Rust và 97 test Python đã đạt native trên VM. Build release, hai lịch có optimum 5526 và timeout đã đạt.
+Dịch vụ V20 bắt đầu đo 13 ca khó lúc 11:40:00 ngày 07/11, giờ Việt Nam.
 
 ## Vấn đề cần kiểm tra
 
@@ -118,11 +119,11 @@ chắn ở lịch sớm nhất vào LB một lần và chỉ mã hóa phần tă
 giới hạn objective, cũng trừ khoản này khỏi UB. Cờ bật xử lý đúng ví dụ
 lịch ban đầu hợp lệ có chi phí dương; đường baseline khi tắt vẫn giữ nguyên.
 Hai kiểm thử mới bao phủ ví dụ này và lịch nhỏ vét cạn cùng các tùy chọn
-RC2/giới hạn objective. Kiểm tra kiểu Rust và 96 test Python đã đạt; kiểm
-thử native còn chờ. Xem công thức và ví dụ dễ đọc trong hướng dẫn sinh viên.
+RC2/giới hạn objective. Native đã đạt 65 test Rust và 96 test Python; cả 13 ca thực nghiệm
+vẫn timeout ở 300 giây. Xem công thức và ví dụ dễ đọc trong hướng dẫn sinh viên.
 Controller chỉ thử hiệu năng V19 nếu V18 đã hoàn tất mà không có ca mới.
 
-## Hướng cần đánh giá tiếp nếu cả hai phép thử chưa tăng coverage
+## V20: truyền cận theo cả đường đi, đã cài và kiểm thử
 
 Có thể dùng chính đồ thị thứ tự để suy ra thời điểm sớm nhất theo cả chuỗi,
 không chỉ tìm chu trình bất khả thi. Với một đường đi từ lần s tới lần v,
@@ -134,7 +135,21 @@ Nếu model hiện tại chọn v sớm hơn mức đó, thêm một mốc tại
 đề có điều kiện tương ứng. Ví dụ A phải đi ít nhất 3 giây tới chỗ gặp B,
 và thứ tự chọn A rời trước B vào, thì có thể truyền cả cận này tới B ngay.
 Điểm mới ở phép thử dự kiến là truyền một chuỗi đầy đủ thay vì đợi DDD
-phát hiện từng vi phạm ở từng cặp mốc. Đây mới là hướng nghiên cứu, chưa
-cài và chưa có số liệu. Phải chứng minh mệnh đề theo các literal trên đúng
-đường đi, xử lý chu trình thời gian 0 và đăng ký chi phí của mốc mới trước
-lần SAT tiếp theo. Không bật đồng thời với một thay đổi khác để sàng lọc.
+phát hiện từng vi phạm ở từng cặp mốc. Mã đã cài trong `order_paths.rs`. Các literal trên đúng đường đi tạo
+điều kiện cho mệnh đề; cận đầu đường là earliest cứng, không lấy thời điểm
+model hiện tại làm một giả định không được ghi lại.
+
+Với các nhóm đỉnh đi tới được lẫn nhau, nếu còn cạnh dương bên trong thì
+cấm chu trình trước. Các cạnh bên trong nhóm còn lại có trọng số 0.
+Chọn cận lớn nhất đi vào nhóm hoặc earliest lớn nhất của nhóm, giữ đường
+chứng minh tới đỉnh đó rồi truyền qua các cạnh 0. Các đường chứng minh là
+các liên kết không bị sửa sau khi tạo, nên cập nhật một cận không làm sai
+đường đã dùng ở một đỉnh khác.
+
+Chỉ thêm một mệnh đề đường đi sau mỗi model đầy đủ. Ưu tiên tăng chi phí,
+rồi tăng thời gian, rồi chỉ số visit. Mốc mới nhận chi phí trước lần SAT
+kế tiếp, và model vừa bị loại không đi vào kiểm tra lịch DDD. Kiểm thử
+vét cạn ba tàu đã kích hoạt mệnh đề đường đi và vẫn giữ optimum trên cả
+ba objective với MiniSAT/CaDiCaL; tùy chọn bound được kiểm tra riêng khi
+có nghiệm đầu vào hợp lệ. V20 giữ tách chi phí tắt để sàng lọc một thành
+phần trên V17. Chưa có kết quả hiệu năng V20 khi khởi chạy.

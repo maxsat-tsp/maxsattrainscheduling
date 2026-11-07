@@ -1,0 +1,7 @@
+{
+  "native_rust_passed": 72,
+  "native_rust_failed": 1,
+  "performance_cases_run": 0,
+  "reason": "The crossing-route test enabled objective bounds although its greedy seed is infeasible. That option correctly rejects an unavailable verified initial upper bound.",
+  "action": "The crossing-route comparison now uses the actual V20 configuration with objective bounds off. Objective-bound interaction is checked separately on the valid-seed residual-cost fixture with path propagation enabled."
+}

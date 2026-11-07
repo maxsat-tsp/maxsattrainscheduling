@@ -202,7 +202,7 @@ phạm ít nhất một phần tử, thử chứng minh phải vi phạm ít nh�
 tử ngay trên bộ đếm của nhóm đó. Chỉ tăng cận sau một chứng minh UNSAT mới;
 SAT hoặc hết ngân sách thì giữ mức đã chứng minh. Đây là bước tối ưu RC2
 tham khảo [tài liệu PySAT](https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.exhaust_core).
-Ví dụ và công thức bảo toàn chi phí ở cuối hướng dẫn sinh viên, bản 5.16.
+Ví dụ và công thức bảo toàn chi phí ở cuối hướng dẫn sinh viên, bản 5.17.
 
 Cờ `--maxsat-ladder-sc-core-exhaust-checks` mặc định 0. V17 đặt 4; mỗi lời
 gọi thêm dùng ngân sách xung đột của cấu hình V16 được chọn. CLI yêu cầu
@@ -280,7 +280,7 @@ python3 results/sat_research/core_exhaustion_v17_20261107/audit_completion.py \
   --reference /thu/muc/giai/nen/186-ca-backend
 ```
 
-## V18: chỉ thử chu trình thứ tự trên 13 ca còn lại
+## V18: đã xong 13 ca, không giải thêm
 
 Nguồn `ca96ae5` thêm cờ `--maxsat-ladder-sc-order-cycle-cuts true`, mặc định
 false. Cờ yêu cầu `resource_orders=true`. Thuật toán chỉ dùng các biến thứ
@@ -324,11 +324,11 @@ Theo dõi `maxsat_order_cycle_checks`, `maxsat_order_cycles_blocked` và
 `maxsat_order_cycle_time` để biết cơ chế có hoạt động và tốn bao lâu.
 
 `newly_solved` chỉ nói về 13 ca thử. Có ca mới thì xác nhận ba lần và chạy
-hồi quy các ca V17 đã giải trước khi tính coverage full của V18. Chưa có
-kết quả V18 khi lập bản ghi khởi chạy này. Không ghép kết quả tốt nhất của
+hồi quy các ca V17 đã giải trước khi tính coverage full của V18. V18 đã hoàn tất 13/13, tất cả timeout hợp lệ. Dữ liệu ở
+`results/sat_research/order_cycles_v18_20261107/complete_13/`. Không ghép kết quả tốt nhất của
 V17 và V18 thành một solver.
 
-## V19 dự phòng: tách chi phí bắt buộc trước khi gọi RC2
+## V19: đã xong 13 ca, không giải thêm
 
 Mã `20e24a9`, cờ `--maxsat-ladder-sc-extract-initial-cost true`, mặc định
 false. Tại mỗi lần đi qua, tính chi phí ở thời điểm sớm nhất đã truyền
@@ -373,7 +373,65 @@ Tên script được giữ để dùng chung phần chọn ca và kiểm toán; 
 Lệnh `audit` tự đọc loại phép thử từ manifest. Resume giữ cùng commit,
 binary, dependency, dữ liệu, CPU, RAM và tham số. Cả dịch vụ tối đa 6 giờ
 kể cả thời gian chờ; không chạy đồng thời hai solver của V18 và V19.
-V19 chưa có kết quả native hoặc hiệu năng khi xếp hàng.
+V19 đã hoàn tất và qua kiểm toán độc lập cả 13 ca: tất cả timeout, chưa
+có ca mới. Native đạt 65 test Rust và 96 test Python; build, hai smoke và
+kiểm tra timeout đều đạt. Dữ liệu đầy đủ ở
+`results/sat_research/initial_cost_v19_20261107/complete_13/`.
+
+## V20: truyền thời điểm sớm nhất qua cả chuỗi thứ tự
+
+Mã `8898caf`, cờ `--maxsat-ladder-sc-order-path-cuts true`, mặc định false.
+Giữ cấu hình V17, chỉ bật cờ này; tách chi phí V19 tắt. Dùng các cạnh
+nối tiếp của tàu và biến thứ tự đã tạo để truyền cận từ earliest tới các
+lần đi qua sau. Nếu model SAT chọn một lần đi qua trước cận đã suy ra,
+thêm một mốc cùng mệnh đề có điều kiện theo đúng đường đi chứng minh.
+Một lần chỉ thêm một mệnh đề; chi phí mốc mới được đăng ký trước lần SAT
+kế tiếp. Kiểm tra chu trình dương và xử lý chu trình thời gian 0 nằm trong
+cùng bước này. Hướng dẫn sinh viên bản 5.17 có công thức và ví dụ.
+
+Native đã đạt **73 test Rust, 97 test Python**. Test lịch ba tàu đã thực
+sự tạo mệnh đề đường đi, kiểm tra optimum vét cạn trên ba objective với
+MiniSAT/CaDiCaL; các tùy chọn objective bound dùng bài có nghiệm sớm hợp lệ.
+Mã trước khi commit và mã release được đối chiếu hash từng file nguồn.
+
+Worktree `~/projects/order-paths-v20/maxsattrainscheduling`. Dịch vụ
+`maxsat-order-paths-v20.service` bắt đầu lúc **11:39:29 ngày 07/11**, giờ
+Việt Nam. Controller build release từ commit cố định, kiểm tra optimum
+5526 khi bật/tắt path cuts, kiểm tra timeout native rồi mới chạy ca khó.
+Mỗi ca 300 giây, 6.000.000 KB RAM, chạy lần lượt trên CPU `0,1,4,5`;
+cả vòng tối đa 6 giờ. Không chạy lại 203 ca đã giải hoặc baseline trong
+vòng sàng lọc này. Dữ liệu khởi chạy ở
+`results/sat_research/order_paths_v20_20261107/`.
+
+```bash
+systemctl status maxsat-order-paths-v20.service --no-pager
+journalctl -u maxsat-order-paths-v20.service -n 30 --no-pager
+```
+
+Lệnh tái tạo/tiếp tục khi dịch vụ đã dừng, sau khi kích hoạt môi trường
+Gurobi và giữ đúng commit/binary đã kiểm tra:
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component order-paths \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary ./target/release/ddd \
+  --build-manifest results/aglr/order-paths-v20-build/manifest.json \
+  --results results/aglr/order-paths-v20-unresolved300 --round-seconds 21000
+python3 quick_scripts/analyze/targeted_order_cycles.py audit \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/order-paths-v20-unresolved300
+```
+
+Runner kiểm tra lại 216 ca nguồn và chọn đúng 13 ca chưa giải. Đọc
+`order_paths_audit.json`, `summary.csv`, `failure.json` nếu có. Cờ và tham
+số phải khớp trong JSON lẫn manifest. Các trường cần theo dõi:
+`maxsat_order_path_checks`, `maxsat_order_paths_added`,
+`maxsat_order_path_new_points`, `maxsat_order_path_guards`,
+`maxsat_order_path_time`; đối chiếu thêm `maxsat_native_sat_time`, số biến
+và số mệnh đề. Có ca mới thì xác nhận ba lần và kiểm tra các ca V17 từng
+giải trước khi thay coverage full. Khởi chạy và đạt test chưa phải kết quả
+hiệu năng V20.
 
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 

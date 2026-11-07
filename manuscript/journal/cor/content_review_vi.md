@@ -38,6 +38,8 @@ V29 (objective bound + transitivity) và V30 (tie-break xác định cho RC2) c�
 đã chạy đủ 13 ca khó bằng MiniSAT ở 300 giây nhưng đều 0/13 ca mới. Chúng
 chỉ là ablation và bằng chứng tái lập, chưa được đưa vào Abstract, Results
 hay Conclusion.
+V31 tắt core exhaustion trên cùng 13 ca khó và cũng không giải thêm ca nào
+(0/13); đây chỉ là ablation chẩn đoán.
 V28 tắt đường tăng cận MiniSAT-only để hai backend thực sự dùng cùng ngân sách.
 Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh
 chạy nằm trong `../experiment_progress_vi.md`, `../experiment_runbook_vi.md`

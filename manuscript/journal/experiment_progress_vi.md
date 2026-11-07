@@ -29,6 +29,11 @@ hai vòng nằm trong `v29_objective_bound_20261107/` và
 `v30_deterministic_assumptions_20261107/`. V30 được giữ vì tính tái lập,
 không được xem là tăng hiệu năng.
 
+**V31 (08-11-2026) tắt core exhaustion và cũng không có gain.** Bốn ca
+`infsteps180` và chín ca `cont` còn lại đều timeout hợp lệ ở 300 giây. Việc
+bỏ bốn lần kiểm tra phụ không tạo ca tối ưu mới; coverage vẫn `203/216`.
+Archive và kiểm toán ở `results/sat_research/v31_no_core_exhaust_20261108/`.
+
 ## Trạng thái mới nhất
 
 **V17 đã chạy đủ toàn bộ dữ liệu và qua kiểm tra độc lập:**

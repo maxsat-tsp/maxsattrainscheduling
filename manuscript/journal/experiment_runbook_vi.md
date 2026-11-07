@@ -30,6 +30,11 @@ loại phụ thuộc vào thứ tự `HashMap`; smoke test tái lập được, 
 vẫn 0/13. Hai archive nằm trong `results/sat_research/`; V30 giữ trong mã
 nguồn vì giúp các lượt sau tái lập, còn V29 chỉ là ablation thất bại.
 
+V31 tắt `core_exhaust_checks` trên cùng 13 ca khó để đo chi phí của bước
+phụ này. Kết quả 0/13 ca mới, tất cả timeout hợp lệ; giữ archive ở
+`results/sat_research/v31_no_core_exhaust_20261108/` và không dùng làm ứng
+viên chính.
+
 ## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 
 **Đã kiểm toán đủ 186/186 ca**, kết thúc lúc 22:33:58 ngày 06/11/2026,

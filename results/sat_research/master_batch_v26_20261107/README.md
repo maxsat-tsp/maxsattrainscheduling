@@ -26,3 +26,8 @@ native timeout with assumptions=full; it is recorded as missing telemetry,
 not filled with zero. Proved results still require the counter and exact
 known optimum. The controller retains the initial absolute round deadline
 across validator-only restarts, so followup cannot reset the six-hour budget.
+
+
+Completed: all 13 pairs timed out validly at 300 seconds, independently
+audited locally. See complete_13/ for the immutable raw archive, regenerated
+summary and separate diagnostic bounds/telemetry CSV. No coverage gain.

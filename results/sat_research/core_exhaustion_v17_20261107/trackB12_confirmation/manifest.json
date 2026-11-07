@@ -1,0 +1,43 @@
+{
+  "schema": "v17-single-gain-confirmation-v1",
+  "solver_source_commit": "43cae7674338e0468db1c7be04c446cddb983eef",
+  "runner_commit": "20e24a94a77198209a91144998ceea3d7a5cc0bc",
+  "binary_sha256": "ca8fef89fb275803ec1934950f509dab2e4e1bf42321a01e7e9d2df18d9f0a88",
+  "definition": {
+    "solver": "maxsat_ddd_ladder_sc",
+    "kind": "exact",
+    "assumptions": "legacy",
+    "backend": "minisat",
+    "sparse_costs": "false",
+    "resource_orders": "true",
+    "order_transitivity": "true",
+    "objective_bound": "false",
+    "residual_hardening": "false",
+    "core_minimize_checks": "4",
+    "core_minimize_conflicts": "100",
+    "core_exhaust_checks": "4"
+  },
+  "dataset_sha256": "170814355a5ff1293d279666b0ee5d6885d6413af6c58efd40114e870c6d5d7d",
+  "reference_manifest_sha256": "85d649952503001f7ca84ddb2efd07dfdc55a151529b1df70e67ad90847a917d",
+  "reference_report_sha256": "fa3be12bbe7f0d834ad3ae2920ea6ae9f479df9f433090f91ae43f0452ac98fb",
+  "reference_raw_sha256": "813723a2612c6ffbc2bedfd7bcdbfd1351b60ebe936d9143048aecc2c08c2a6e",
+  "selection": [
+    {
+      "objective": "cont",
+      "name": "trackB12",
+      "expected_cost": 15182
+    }
+  ],
+  "repeats": 3,
+  "timeout_seconds": 300,
+  "ram_kb": 6000000,
+  "cpu_affinity": [
+    2,
+    3,
+    6,
+    7
+  ],
+  "parallel_context": "V18 unresolved screening on physical CPU group 0,1,4,5; confirmations on disjoint group 2,3,6,7; timings diagnostic only",
+  "script_sha256": "5353834d725a008264fd9dadacdbce8475ac06c8d88b7920d4eabe1643f531bd",
+  "submission_passed": false
+}

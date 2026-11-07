@@ -48,12 +48,13 @@ Nếu V18 có ca mới, phải xác nhận ba lần rồi kiểm tra các ca cũ
 bộ ba; đây là cải tiến RC2/ràng buộc thứ tự, chưa phải kết quả của bộ chọn
 AGLR thích nghi. Chưa đưa các số này vào Abstract, Results hay Conclusion.
 
-**Đang xác nhận riêng `trackB12/cont` của V17:** ba lần với đúng binary và
-tham số V17, timeout 300 giây. Đây là ca V17 giải thêm so với Journal trong
-nhóm 31 cặp. Dùng nhóm lõi vật lý `2,3,6,7`, tách khỏi nhóm V18. Thời gian
-của xác nhận song song chỉ phục vụ chẩn đoán, không ghép vào PAR-2 cuối.
-Dịch vụ `maxsat-v17-trackB12-confirm.service`, bắt đầu lúc **08:32:15
-ngày 07/11**, giới hạn cả vòng 20 phút.
+**`trackB12/cont` của V17 đã xác nhận thành công 3/3 lần.** Mọi lịch đều
+hợp lệ và có cost=LB=UB=15.182. Thời gian 10,65; 4,64; 11,86 giây, median
+10,65 giây. Đã tải về và kiểm toán lại độc lập. Đây là ca giải thêm so với
+Journal trong nhóm 31 cặp. Dùng đúng binary/tham số V17, nhóm lõi vật lý
+`2,3,6,7` tách khỏi nhóm V18. Thời gian xác nhận song song chỉ chẩn đoán,
+không ghép vào PAR-2 cuối. Dữ liệu ở
+`core_exhaustion_v17_20261107/trackB12_confirmation/` trong `results/sat_research/`.
 
 **Đã chuẩn bị V19 nếu V18 không giải thêm:** tách phần chi phí bắt buộc ở
 lịch sớm nhất khỏi các phần chi phí RC2 còn phải tối ưu. Mã `20e24a9`,

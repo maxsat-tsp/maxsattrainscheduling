@@ -192,6 +192,14 @@ fn write_bigm_lp(
     let mut n_constraints = 0usize;
     let mut n_travel = 0usize;
     let mut n_resource = 0usize;
+    // Bound the disjunction coefficient from a constructive serial schedule.
+    // The old fixed 43,200-second value is too small for late valid schedules.
+    let max_earliest = problem.trains.iter().flat_map(|t| t.visits.iter()).map(|v| v.earliest).max().unwrap_or(0);
+    let min_earliest = problem.trains.iter().flat_map(|t| t.visits.iter()).map(|v| v.earliest).min().unwrap_or(0);
+    let total_travel: i64 = problem.trains.iter().flat_map(|t| t.visits.iter()).map(|v| i64::from(v.travel_time)).sum();
+    let max_travel = problem.trains.iter().flat_map(|t| t.visits.iter()).map(|v| i64::from(v.travel_time)).max().unwrap_or(0);
+    let dynamic_big_m = (43_200i64).max(i64::from(max_earliest) + total_travel + max_travel - i64::from(min_earliest) + 1);
+    let big_m = i32::try_from(dynamic_big_m).expect("Big-M coefficient exceeds i32");
 
     writeln!(w, "\\ TRP BigM MILP, exported by export_lp.rs").unwrap();
     writeln!(w, "Minimize").unwrap();
@@ -304,9 +312,9 @@ fn write_bigm_lp(
             " t_{}_{} - t_{}_{} + {} y_{}_{}_{}_{} <= {}",
             t1, v1 + 1,
             t2, v2,
-            BIG_M,
+            big_m,
             t1, v1, t2, v2,
-            BIG_M,
+            big_m,
         ));
         n_resource += 1;
         // y=0: t2 first
@@ -314,7 +322,7 @@ fn write_bigm_lp(
             " t_{}_{} - t_{}_{} - {} y_{}_{}_{}_{} <= 0",
             t2, v2 + 1,
             t1, v1,
-            BIG_M,
+            big_m,
             t1, v1, t2, v2,
         ));
         n_resource += 1;
@@ -356,7 +364,7 @@ fn write_bigm_lp(
                                 " c{}: t_{}_{} - {} thr_{}_{}_{} <= {}",
                                 c_idx,
                                 ti, vi,
-                                BIG_M,
+                                big_m,
                                 ti, vi, threshold,
                                 threshold + aimed,
                             )
@@ -429,7 +437,7 @@ fn write_bigm_lp(
         }
     }
 
-    // BIG_M is a disjunction coefficient, not an absolute time horizon.
+    // big_m is a disjunction coefficient, not an absolute time horizon.
     // Match the native Gurobi formulation: release lower bounds, no extra
     // global time cap. Valid schedules can finish after 43,200 seconds.
     writeln!(w, "Bounds").unwrap();
@@ -836,6 +844,17 @@ mod tests {
         for objective in [DelayCostType::FiniteSteps123, DelayCostType::InfiniteSteps180, DelayCostType::Continuous] {
             exported_bounds_allow_known_schedule(objective, 50_000);
         }
+    }
+
+    #[test]
+    fn late_instances_get_a_disjunction_coefficient_above_the_old_horizon() {
+        let problem = Problem { name: "late".into(), trains: vec![Train { visits: vec![Visit {
+            resource_id: 1, earliest: 50_000, aimed: Some(0), travel_time: 7,
+        }] }], conflicts: vec![] };
+        let path = std::env::temp_dir().join(format!("export-lp-m-{}.lp", std::process::id()));
+        write_bigm_lp(path.to_str().unwrap(), &problem, DelayCostType::Continuous);
+        let text = std::fs::read_to_string(&path).unwrap(); std::fs::remove_file(path).unwrap();
+        assert!(text.contains("50008"), "dynamic M must cover late release plus route travel");
     }
 
     #[test]

@@ -151,9 +151,10 @@ song song chỉ là chẩn đoán, chưa đưa vào bảng chính.
 43.200 giây và dùng hệ số động theo release time/tổng travel. Hai vòng đầu
 bị loại: một nghiệm CPLEX còn overlap tài nguyên; vòng sau dừng vì test hồi
 quy hệ số động chưa đúng. Raw lỗi được giữ riêng, không tính là baseline.
-Vòng thứ ba đang chạy native test và hai ca `trackA1/finsteps123`,
-`stationB12/infsteps180`; chỉ nghiệm có lịch hợp lệ và `cost=lb=ub` mới được
-giữ.
+Vòng thứ ba đã qua 3 test exporter và hai ca: `trackA1/finsteps123`
+cost=lb=ub=23, `stationB12/infsteps180` cost=lb=ub=98 ở 120 giây.
+Đây chỉ là kiểm tra correctness hai ca, chưa phải full CPLEX table; raw và
+manifest ở `results/sat_research/cplex_domain_validation_20261107/`.
 
 **`trackB12/cont` của V17 đã xác nhận thành công 3/3 lần.** Mọi lịch đều
 hợp lệ và có cost=LB=UB=15.182. Thời gian 10,65; 4,64; 11,86 giây, median

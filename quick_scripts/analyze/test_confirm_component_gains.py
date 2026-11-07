@@ -4,6 +4,22 @@ from pathlib import Path
 import confirm_component_gains as follow
 
 class FollowupTests(unittest.TestCase):
+    def test_objective_filtered_gain_regresses_only_the_declared_scope(self):
+        source=dict(objective_filter=['infsteps180'],instances_by_objective=dict(finsteps123=[],infsteps180=['trackA11'],cont=[]))
+        gain=dict(objective='infsteps180',name='trackA11',cost=7,seconds=10)
+        report=dict(complete=True,audit_passed=True,errors=[],newly_solved=[gain])
+        solved=[dict(objective='cont',name='origA1',cost=5),dict(objective='infsteps180',name='origA1',cost=3)]
+        with patch.object(follow,'reference_costs',return_value=({},solved)):
+            _,confirmations,regressions=follow.plan_for(source,report,Path('unused'))
+        self.assertEqual(len(confirmations),3)
+        self.assertEqual(regressions,[dict(stage='regression',repeat=0,**solved[1])])
+        manifest=dict(schema='test',selected_gains=[gain],confirmation_plan=confirmations,regression_plan=regressions,
+            objective_filter=['infsteps180'])
+        completed=[dict(task,retained=True) for task in confirmations+regressions]
+        result=follow.report_for(manifest,completed)
+        self.assertTrue(result['confirmed']);self.assertTrue(result['regression_passed'])
+        self.assertFalse(result['full_reference_regression']);self.assertFalse(result['submission_passed'])
+
     def test_plan_contains_three_repeats_and_only_previously_solved_regressions(self):
         source=dict(instances_by_objective=dict(cont=['origA1'],infsteps180=[],finsteps123=[]))
         gain=dict(objective='cont',name='origA1',cost=7,seconds=10)

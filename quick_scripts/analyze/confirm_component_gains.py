@@ -21,6 +21,9 @@ def plan_for(source,report,reference):
         if gain['objective'] not in source['instances_by_objective'] or gain['name'] not in source['instances_by_objective'][gain['objective']]:
             raise ValueError('gain is outside the locked unresolved selection')
     _,solved=reference_costs(reference)
+    if source.get('objective_filter') is not None:
+        trial.filtered_selection(source['instances_by_objective'],source['objective_filter'])
+        solved=[r for r in solved if r['objective'] in source['objective_filter']]
     confirmations=[dict(stage='confirmation',repeat=r,objective=g['objective'],name=g['name'],cost=g['cost'])
                    for r in [1,2,3] for g in gains]
     regressions=[dict(stage='regression',repeat=0,**r) for r in solved]
@@ -42,6 +45,7 @@ def run(args):
         dataset_sha256=extended.focus.dataset_hash(),timeout_seconds=source['timeout_seconds'],ram_kb=source['ram_kb'],
         cpu_affinity=sorted(os.sched_getaffinity(0)),repeats=3,selected_gains=gains,confirmation_plan=confirmations,regression_plan=regressions,
         script_sha256=extended.focus.sha(Path(__file__)),submission_passed=False)
+    if source.get('objective_filter') is not None:manifest['objective_filter']=source['objective_filter']
     if (root/'manifest.json').exists() and json.loads((root/'manifest.json').read_text())!=manifest:raise ValueError('followup resume would change its source or selection')
     extended.save(root/'manifest.json',manifest)
     runtime=SimpleNamespace(timeout=source['timeout_seconds'],ram_kb=source['ram_kb'],binary=args.binary,method_definitions={'Component-followup':source['definition']})
@@ -70,19 +74,24 @@ def report_for(manifest,records):
     expected=len(manifest['confirmation_plan'])+(len(manifest['regression_plan']) if manifest['selected_gains'] else 0)
     confirmation_complete=len(confirmed)==len(manifest['confirmation_plan'])
     regression_complete=bool(manifest['selected_gains']) and len(regressed)==len(manifest['regression_plan'])
-    return dict(schema=manifest['schema'],selected_gains=manifest['selected_gains'],expected_runs=expected,completed_runs=len(records),
+    report=dict(schema=manifest['schema'],selected_gains=manifest['selected_gains'],expected_runs=expected,completed_runs=len(records),
         complete=len(records)==expected,confirmation_complete=confirmation_complete,
         confirmed=bool(manifest['selected_gains']) and confirmation_complete and all(r['retained'] for r in confirmed),
         regression_complete=regression_complete,regression_passed=regression_complete and all(r['retained'] for r in regressed),
         lost=[dict(objective=r['objective'],name=r['name']) for r in regressed if not r['retained']],
         confirmation_failures=[dict(repeat=r['repeat'],objective=r['objective'],name=r['name']) for r in confirmed if not r['retained']],
         cases=records,errors=[],submission_passed=False,scope='gain confirmations and previously solved-pair regression only; full-table construction and independent audit remain separate')
+    if manifest.get('objective_filter') is not None:
+        report.update(objective_filter=manifest['objective_filter'],full_reference_regression=False,
+            scope='objective-filtered confirmations and regression only; excluded objectives require separate full-table evaluation')
+    return report
 
 def audit_saved(root,source_root,reference):
     audited=trial.audit_saved(source_root,reference);source=json.loads((source_root/'manifest.json').read_text())
     manifest=json.loads((root/'manifest.json').read_text());saved=json.loads((root/'followup_audit.json').read_text())
     gains,confirmations,regressions=plan_for(source,audited,reference)
     if (root/'failure.json').exists():raise ValueError('followup retains a recorded failure')
+    if manifest.get('objective_filter')!=source.get('objective_filter'):raise ValueError('followup objective scope changed')
     for key in ['solver_source_commit','binary_sha256','definition','timeout_seconds','ram_kb','dataset_sha256']:
         if manifest[key]!=source[key]:raise ValueError('followup configuration changed')
     for field,path in [('source_manifest_sha256',source_root/'manifest.json'),

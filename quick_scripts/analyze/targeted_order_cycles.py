@@ -95,10 +95,18 @@ def load_reference(root):
     unresolved={o:[r['name'] for r in records if r['objective']==o and not r['proven']] for o in extended.audit.OBJECTIVES}
     return manifest,unresolved,digests
 
+def filtered_selection(selection,objectives=None):
+    """Keep all objective keys, recording excluded objectives as empty lists."""
+    if objectives is None:return {o:list(names) for o,names in selection.items()}
+    if not objectives or len(set(objectives))!=len(objectives) or not set(objectives)<=set(selection):
+        raise ValueError('objective filter must contain distinct, supported objectives')
+    return {o:list(names) if o in objectives else [] for o,names in selection.items()}
+
 def audit_saved(root,reference):
     verify_snapshot(root)
     source,selection,digests=load_reference(reference)
     manifest=json.loads((root/'manifest.json').read_text());component=manifest.get('component','order-cycles')
+    selection=filtered_selection(selection,manifest.get('objective_filter'))
     saved=json.loads((root/report_name(component)).read_text())
     if manifest['schema']!=schema_for(component) or manifest['instances_by_objective']!=selection:
         raise ValueError('selection differs from unresolved reference pairs')
@@ -139,6 +147,7 @@ def report_for(records,expected,timeout,component='order-cycles'):
 
 def run(args):
     source,selection,digests=load_reference(args.reference)
+    selection=filtered_selection(selection,args.objectives)
     if not any(selection.values()):raise ValueError('no unresolved pairs remain')
     if subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],cwd=extended.REPO).strip():
         raise ValueError('commit the experiment code first')
@@ -156,6 +165,8 @@ def run(args):
         build_manifest_sha256=extended.focus.sha(args.build_manifest),
         salvers=extended.dependency_state(extended.REPO.parent/'salvers'),
         ipamir=extended.dependency_state(extended.REPO.parent/'ipamir-rs'),submission_passed=False)
+    if args.objectives is not None:
+        manifest['objective_filter']=[o for o in selection if o in args.objectives]
     if (root/'manifest.json').exists() and json.loads((root/'manifest.json').read_text())!=manifest:
         raise ValueError('resume would change the source, binary, dataset, dependencies or parameters')
     extended.save(root/'manifest.json',manifest)
@@ -182,6 +193,8 @@ def main():
     parser.add_argument('--build-manifest',type=Path)
     parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths','order-paths-full','order-master','order-master-levels','order-master-levels-full'],default='order-cycles')
     parser.add_argument('--reuse-build',action='store_true',help='reuse the hashed binary while retaining its own source commit')
+    parser.add_argument('--objectives',nargs='+',choices=extended.audit.OBJECTIVES,
+        help='screen only these objectives; excluded pairs remain unresolved and cannot count as gains')
     args=parser.parse_args()
     if args.action=='audit':print(json.dumps(audit_saved(args.results,args.reference),indent=2));return
     if args.binary is None or args.build_manifest is None or not 0<args.round_seconds<=21600:

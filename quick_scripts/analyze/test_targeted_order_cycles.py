@@ -6,6 +6,16 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_objective_filter_preserves_order_and_explicitly_excludes_other_pairs(self):
+        selection=dict(finsteps123=[],infsteps180=['trackA11','trackA12'],cont=['origA8'])
+        before=copy.deepcopy(selection)
+        self.assertEqual(cycles.filtered_selection(selection,['infsteps180']),
+            dict(finsteps123=[],infsteps180=['trackA11','trackA12'],cont=[]))
+        self.assertEqual(selection,before)
+        self.assertEqual(cycles.filtered_selection(selection),selection)
+        for invalid in [[],['typo'],['cont','cont']]:
+            with self.assertRaisesRegex(ValueError,'objective filter'):cycles.filtered_selection(selection,invalid)
+
     def test_full_master_levels_changes_only_the_assumption_schedule(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         self.assertEqual(cycles.candidate_config(source,'order-master-levels-full'),dict(cycles.candidate_config(source,'order-master-levels'),assumptions='full'))

@@ -119,6 +119,14 @@ thật như một kết quả hiệu năng; các lịch tối ưu trả về v�
 chi phí đã biết, và ít nhất một bài thử phải chứng minh đúng optimum.
 Điều kiện mới được ghi rõ, các lượt V22--V24 đã dừng vẫn giữ nguyên.
 
+Ca đầu V26, trackA11/infsteps180, đã xong và kiểm toán local: vẫn timeout
+ở 300 giây. So với V25 trên cùng ca, lời gọi SAT giảm từ 134.327 xuống
+5.642; thời gian đồ thị từ 148,61 xuống 5,74 giây. SAT dùng 293,64 giây;
+cận chẩn đoán từ stdout là 56, so với 30 ở V25, chưa chứng minh optimum.
+Không điền các counter/cận thiếu vào JSON gốc. Lượt mới chỉ xong 1/13
+trong snapshot này; VM tiếp tục các ca còn lại. Raw và audit riêng ở
+`master_batch_v26_20261107/partial_1/` trong `results/sat_research/`.
+
 **V27 dự phòng đã cài, chưa có kết quả native/hiệu năng.** Mã `c1b046f`
 báo ngay chi phí tối thiểu suy ra từ từng lựa chọn thứ tự, chỉ dùng thời
 gian cứng trên tuyến. Local đạt 37 test nhân SAT, 113 Python và typecheck.

@@ -40,6 +40,8 @@ chỉ là ablation và bằng chứng tái lập, chưa được đưa vào Abst
 hay Conclusion.
 V31 tắt core exhaustion trên cùng 13 ca khó và cũng không giải thêm ca nào
 (0/13); đây chỉ là ablation chẩn đoán.
+V33 giảm tần suất heuristic xuống mỗi 8 vòng, telemetry hợp lệ nhưng cũng
+0/13 ca mới; không dùng trong bảng chính.
 V28 tắt đường tăng cận MiniSAT-only để hai backend thực sự dùng cùng ngân sách.
 Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh
 chạy nằm trong `../experiment_progress_vi.md`, `../experiment_runbook_vi.md`

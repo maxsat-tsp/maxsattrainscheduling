@@ -35,6 +35,11 @@ phụ này. Kết quả 0/13 ca mới, tất cả timeout hợp lệ; giữ arch
 `results/sat_research/v31_no_core_exhaust_20261108/` và không dùng làm ứng
 viên chính.
 
+V33 thử gửi nghiệm sang heuristic mỗi 8 vòng bằng alias AGLR ở chế độ
+`legacy`; telemetry xác nhận tham số, nhưng vẫn 0/13 ca mới. Khi chạy tham
+số AGLR, phải dùng alias `maxsat_ddd_ladder_aglr`; alias SC không đọc các
+tham số period. V32 bị loại khỏi hồ sơ vì dùng sai alias.
+
 ## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 
 **Đã kiểm toán đủ 186/186 ca**, kết thúc lúc 22:33:58 ngày 06/11/2026,

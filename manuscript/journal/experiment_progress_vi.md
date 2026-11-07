@@ -34,6 +34,12 @@ không được xem là tăng hiệu năng.
 bỏ bốn lần kiểm tra phụ không tạo ca tối ưu mới; coverage vẫn `203/216`.
 Archive và kiểm toán ở `results/sat_research/v31_no_core_exhaust_20261108/`.
 
+**V33 giảm tần suất heuristic cũng không có gain.** Lượt chạy đúng alias
+AGLR với `aglr_policy=legacy`, `heuristic_period=8` và telemetry đã khóa đủ
+13 ca khó ở 300 giây; tất cả timeout hợp lệ, coverage vẫn `203/216`.
+Archive ở `results/sat_research/v33_heuristic_period8_20261108/`. Lượt V32
+không được tính vì dùng alias không nhận tham số period.
+
 ## Trạng thái mới nhất
 
 **V17 đã chạy đủ toàn bộ dữ liệu và qua kiểm tra độc lập:**

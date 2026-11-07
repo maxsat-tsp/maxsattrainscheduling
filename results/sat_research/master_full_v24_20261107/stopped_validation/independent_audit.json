@@ -1,0 +1,33 @@
+{
+  "audit_passed": true,
+  "validation_passed": false,
+  "performance_screen_runs": 0,
+  "reason": "All-objective validation stopped on a valid 30-second continuous-objective timeout. No V24 hard case ran.",
+  "smokes": [
+    {
+      "objective": "finsteps123",
+      "status": "ok",
+      "proven": true,
+      "seconds": 15.619399932,
+      "cost": 11,
+      "raw_sha256": "56e808841d9e41950d9f6a0b24c418d8a8fb53c85f159eda2152ad2f8dba49fb"
+    },
+    {
+      "objective": "infsteps180",
+      "status": "ok",
+      "proven": true,
+      "seconds": 13.731775735,
+      "cost": 34,
+      "raw_sha256": "f57dfae47349e3ebbe00f1b23ad1fa3106d2a3f18d6551cdb236f6728f84f306"
+    },
+    {
+      "objective": "cont",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 30.000797494,
+      "cost": null,
+      "raw_sha256": "13475b67e490920b22ec3f1b3859af31276649e36ccc609ff171eb514347efac"
+    }
+  ],
+  "archive_sha256": "5fd3aa38d8973080295149f911eb456cf1cf9aec477af21edf8a33d3a919ad85"
+}

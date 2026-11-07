@@ -1,0 +1,29 @@
+{
+  "schema": "core-hardset-completion-launch-v1",
+  "service": "maxsat-core-e4-hardset-complete.service",
+  "started_utc": "2026-11-07T00:37:16Z",
+  "solver_source_commit": "43cae7674338e0468db1c7be04c446cddb983eef",
+  "binary_sha256": "ca8fef89fb275803ec1934950f509dab2e4e1bf42321a01e7e9d2df18d9f0a88",
+  "runner_commit": "438129f7b891a90f74b7ec1ef2907916a106ad88",
+  "expected_runs": 31,
+  "reused_runs": 14,
+  "new_runs": 17,
+  "timeout_seconds": 300,
+  "ram_kb": 6000000,
+  "cpu_affinity": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "worktree": "/home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling",
+  "results": "results/aglr/core-exhaust-v17-hard31",
+  "controller_limit_seconds": 21600,
+  "systemd_limit_seconds": 21630,
+  "scripts": {
+    "complete_hardset.py": "303a45ed8eee7dc5f8a0acf0c60031563c7263e614cc108649b71b80fbb01bd6",
+    "run_hardset_completion.sh": "0c4b94d4552b2e2d83a066a068544c0ddeeb037be8844cc19a1c2d32bcfe971f"
+  },
+  "scope": "31 difficult pairs only; first 14 reused without modifying bytes",
+  "submission_passed": false
+}

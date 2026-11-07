@@ -1,4 +1,27 @@
-# V17 queued: bounded RC2 core exhaustion
+# V17: launch history and completion of the difficult set
+
+The 14-pair trial is complete and independently audited in `complete_14/`.
+It recovered stationA9/cont in 45.4647 seconds; the other 13 cases remained
+timeouts. The solver passed 56 Rust tests, and the updated selection runner
+passed 90 Python tests on the VM. The native binary hash is
+`ca8fef89fb275803ec1934950f509dab2e4e1bf42321a01e7e9d2df18d9f0a88`.
+
+The initial zero-loss regression gate held after stationA9 was lost. All
+16 regression records were independently checked, and the successor runner
+included that loss among the unresolved cases. `followup.json` and
+`run_followup_with_losses.sh` preserve the actual successor execution.
+
+The current completion measures only the other 17 pairs, preserving the
+first 14 unchanged, to assess this configuration on all 31 difficult pairs.
+Service: `maxsat-core-e4-hardset-complete.service`, started at 00:37:16 UTC
+on 2026-11-07. See `hardset_completion_launch.json`, `complete_hardset.py`
+and `run_hardset_completion.sh`. This is still a development evaluation;
+the full 72-instance dataset and submission gate remain separate.
+
+## Initial launch plan
+
+The following records the preparation state before validation and the
+subsequent regression loss. Pending checks below refer to that launch time.
 
 Source and runner: `43cae7674338e0468db1c7be04c446cddb983eef`.
 The service `maxsat-core-exhaust-v17.service` began waiting at

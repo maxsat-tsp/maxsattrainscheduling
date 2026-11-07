@@ -1,0 +1,110 @@
+{
+  "schema": "independent-v16-confirmation-audit-v1",
+  "audit_passed": true,
+  "complete": true,
+  "confirmed": true,
+  "completed_runs": 6,
+  "expected_runs": 6,
+  "submission_passed": false,
+  "scope": "six repeated gains only; no full-dataset or regression claim",
+  "summary": [
+    {
+      "objective": "cont",
+      "name": "origB11",
+      "cost": 75494,
+      "repeats": 3,
+      "median_seconds": 182.249658464,
+      "minimum_seconds": 137.716526263,
+      "maximum_seconds": 205.742379821
+    },
+    {
+      "objective": "cont",
+      "name": "stationB12",
+      "cost": 16909,
+      "repeats": 3,
+      "median_seconds": 5.669950805,
+      "minimum_seconds": 1.754288343,
+      "maximum_seconds": 15.388040558
+    }
+  ],
+  "cases": [
+    {
+      "repeat": 1,
+      "objective": "cont",
+      "name": "origB11",
+      "proven": true,
+      "expected_cost": 75494,
+      "cost": 75494,
+      "seconds": 205.742379821,
+      "reproduced": true,
+      "lb": 75494,
+      "ub": 75494,
+      "raw_sha256": "9e6cef18f9e585c0aec114f841c726e9219d8d0f3d311132c184a9ece560fbe9"
+    },
+    {
+      "repeat": 1,
+      "objective": "cont",
+      "name": "stationB12",
+      "proven": true,
+      "expected_cost": 16909,
+      "cost": 16909,
+      "seconds": 15.388040558,
+      "reproduced": true,
+      "lb": 16909,
+      "ub": 16909,
+      "raw_sha256": "09e017c807d1c82e3e085d34e8e784c56d605926d8d9525adcd2f45c69567a95"
+    },
+    {
+      "repeat": 2,
+      "objective": "cont",
+      "name": "origB11",
+      "proven": true,
+      "expected_cost": 75494,
+      "cost": 75494,
+      "seconds": 137.716526263,
+      "reproduced": true,
+      "lb": 75494,
+      "ub": 75494,
+      "raw_sha256": "8d9a6b73b5bc8bf0edd069abb9f62c41cb01654dca5ec98020b3a2d08e9e0803"
+    },
+    {
+      "repeat": 2,
+      "objective": "cont",
+      "name": "stationB12",
+      "proven": true,
+      "expected_cost": 16909,
+      "cost": 16909,
+      "seconds": 1.754288343,
+      "reproduced": true,
+      "lb": 16909,
+      "ub": 16909,
+      "raw_sha256": "9a43a156e1bc1352595e01e178b7cc96117116b22abee92d317d4909bed64f59"
+    },
+    {
+      "repeat": 3,
+      "objective": "cont",
+      "name": "origB11",
+      "proven": true,
+      "expected_cost": 75494,
+      "cost": 75494,
+      "seconds": 182.249658464,
+      "reproduced": true,
+      "lb": 75494,
+      "ub": 75494,
+      "raw_sha256": "d0d3486278ba0a330e2c59c20bf20bdf0c6b98bfb17994f9919cae7045421a25"
+    },
+    {
+      "repeat": 3,
+      "objective": "cont",
+      "name": "stationB12",
+      "proven": true,
+      "expected_cost": 16909,
+      "cost": 16909,
+      "seconds": 5.669950805,
+      "reproduced": true,
+      "lb": 16909,
+      "ub": 16909,
+      "raw_sha256": "61f5bdb141b78dec8ce2d8082847397cb268b3644d81a030e8a365351320a614"
+    }
+  ]
+}

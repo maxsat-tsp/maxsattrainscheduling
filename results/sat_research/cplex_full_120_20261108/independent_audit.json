@@ -15,9 +15,9 @@
     },
     "infsteps180": {
       "instances": 72,
-      "valid_schedules": 71,
-      "proven_optimal": 66,
-      "invalid": 1,
+      "valid_schedules": 72,
+      "proven_optimal": 67,
+      "invalid": 0,
       "timeout_or_inconclusive": 5
     },
     "cont": {
@@ -30,16 +30,11 @@
   },
   "coverage": {
     "finsteps123": 72,
-    "infsteps180": 66,
+    "infsteps180": 67,
     "cont": 66
   },
-  "total_proven": 204,
-  "invalid_cases": [
-    {
-      "objective": "infsteps180",
-      "name": "trackA8",
-      "error": "CPLEX schedule validation failed: ['resource T13 overlaps at train/visit (22, 11) and (20, 29)']"
-    }
-  ],
-  "scope": "Corrected Big-M CPLEX 120-second baseline; parallel timings are diagnostic."
+  "total_proven": 205,
+  "invalid_cases": [],
+  "scope": "Corrected Big-M CPLEX 120-second baseline; parallel timings are diagnostic.",
+  "note": "trackA8 was rerun with tighter CPLEX integrality tolerance 1e-9 after the first parallel incumbent was invalid."
 }

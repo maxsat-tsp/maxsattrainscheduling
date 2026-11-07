@@ -8,6 +8,19 @@ dùng MiniSAT, vì đây là backend đã thống nhất với đường chạy 
 CaDiCaL không bị xóa; chỉ không dùng chúng để chọn thêm ý tưởng hoặc ghép
 runtime mới.
 
+**Vòng kéo dài V17 ở 600 giây (07-11-2026) không tạo thêm coverage.**
+Tôi chạy lại đúng 13 ca mà V17 chưa chứng minh được ở 300 giây: bốn ca
+`infsteps180` và chín ca `cont`. Cả 13 ca đều đạt giới hạn SAT 600 giây;
+không ca nào có `status=ok`, nghiệm mới hoặc cận mới đủ để chứng minh tối
+ưu. Kiểm toán độc lập không phát hiện lỗi. Coverage vẫn là
+`(72,68,63)`, tổng `203/216`. Raw JSON, log, hash binary và manifest được
+lưu trong `results/sat_research/v17_extended600_20261107/`.
+
+Kết quả này cho thấy tăng thời gian chạy một mình không giải quyết nút thắt:
+telemetry ghi thời gian MiniSAT gần 600 giây ở mọi ca. Vì vậy không mở thêm
+lượt tăng cutoff cho cùng cấu hình; vòng kế tiếp phải thay đúng một thành
+phần mã đã kiểm thử, vẫn dùng MiniSAT. CaDiCaL không được khởi động lại.
+
 ## Trạng thái mới nhất
 
 **V17 đã chạy đủ toàn bộ dữ liệu và qua kiểm tra độc lập:**

@@ -15,6 +15,15 @@ Mốc chính đã được sửa theo camera-ready: **120 giây**, MaxSAT-Defaul
 Có thể dùng lại lượt 150 giây bằng cách tạo bảng dẫn xuất ở cutoff 120 giây.
 Giữ nguyên dữ liệu gốc và ghi rõ đây không phải một lượt chạy lại.
 
+## Vòng kéo dài V17: đã dừng sau 600 giây
+
+Ngày 07-11-2026, V17 được chạy lại bằng MiniSAT trên đúng 13 cặp chưa giải
+ở cutoff 300 giây (4 `infsteps180`, 9 `cont`) với cutoff 600 giây. Cả 13
+cặp đều timeout hợp lệ, không tăng coverage; kết quả kiểm toán nằm ở
+`results/sat_research/v17_extended600_20261107/`. Không chạy lại cutoff cao
+hơn cho cùng cấu hình. Nếu thử tiếp, phải thay một thành phần thuật toán,
+ghi test và telemetry trước khi chạy; không khởi động CaDiCaL.
+
 ## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 
 **Đã kiểm toán đủ 186/186 ca**, kết thúc lúc 22:33:58 ngày 06/11/2026,

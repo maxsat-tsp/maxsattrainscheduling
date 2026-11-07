@@ -30,6 +30,10 @@ không có gain và kết luận backend hòa. Runtime song song vẫn chỉ ch�
 không dùng trong bảng thời gian chính. CPLEX đã qua kiểm tra exporter Big-M mới trên hai ca: cả hai có
 `cost=lb=ub` và lịch hợp lệ. Đây chỉ là correctness sample; full CPLEX table
 vẫn chưa chạy.
+Vòng kéo dài V17 lên 600 giây trên 13 ca chưa giải cũng đã hoàn tất bằng
+MiniSAT: 13/13 timeout hợp lệ, không có ca mới. Coverage giữ ở 203/216;
+không dùng vòng này để thay số liệu trong bản thảo. Bản ghi và kiểm toán ở
+`results/sat_research/v17_extended600_20261107/`.
 V28 tắt đường tăng cận MiniSAT-only để hai backend thực sự dùng cùng ngân sách.
 Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh
 chạy nằm trong `../experiment_progress_vi.md`, `../experiment_runbook_vi.md`

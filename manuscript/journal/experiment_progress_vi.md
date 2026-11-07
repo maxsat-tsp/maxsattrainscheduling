@@ -121,7 +121,7 @@ là kết quả bài thử dễ, chưa phải bằng chứng tăng coverage trê
 Mốc thời gian và mệnh đề khởi tạo được chia sẻ đúng như công thức đã cài.
 Native timeout probe cũng đạt. Không đổi binary trong lượt đang chạy.
 
-**V28 đang chạy đối chiếu backend cùng binary.** Runner `9f32564`
+**V28 đã hoàn tất đối chiếu backend cùng binary.** Runner `9f32564`
 giữ nguyên phương pháp V27, chạy MiniSAT và CaDiCaL trên cùng bốn ca.
 Hai backend dùng cùng ngân sách: bốn lượt thu gọn, bốn lượt tăng cận,
 bỏ giới hạn xung đột riêng (giá trị 0), mỗi instance vẫn 300 giây. Giới

@@ -99,7 +99,8 @@ Các cận đọc từ stdout được để riêng trong CSV, không sửa JSON
 đường và thời gian đồ thị cho thấy cần giảm số lần giải lại và đưa thêm
 thông tin chi phí vào SAT sớm hơn; chưa có bằng chứng coverage mới.
 
-**V26 đã qua kiểm thử native; đang mở sàng lọc 13 ca sau sửa validator.** Mã `984e221` bổ sung mọi điều kiện
+**V26 đã qua kiểm thử native và bắt đầu sàng lọc 13 ca lúc 14:29:53
+ngày 07/11, giờ Việt Nam, sau sửa validator.** Mã `984e221` bổ sung mọi điều kiện
 chi phí bị lịch SAT vi phạm thay vì chỉ một điều kiện. Mỗi điều kiện vẫn
 có chứng minh từ đường thời gian; chi phí mốc mới được thêm trước SAT
 kế tiếp. Native đã đạt 78 test Rust và 111 test Python. Hai bài thử bậc thang

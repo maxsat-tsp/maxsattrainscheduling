@@ -95,8 +95,7 @@ fn main() {
 
     let (lp_path, stats) = match solver.as_str() {
         "bigm" => {
-            // BigM dùng lazy constraints (CPLEX LP Lazy Constraints section),
-            // tương đương Gurobi BigMLazy callback. Eager đã bỏ.
+            // Export all resource conflicts as ordinary constraints.
             let path = format!(
                 "{}/{}_bigm_{}.lp",
                 out_dir,
@@ -183,8 +182,8 @@ fn write_bigm_lp(
     // CPLEX presolve interactions cho ra nghiệm vi phạm constraint
     // (verified bằng InstanceB8 addtracktime: t_0_18=5524 > t_1_35=5518
     // dù y_0_17_1_35=1 enforce t_0_18 <= t_1_35).
-    // Eager: tất cả 2*|pairs| BigM conflicts ở Subject To, CPLEX bắt buộc
-    // thoả mọi constraint trong LP relaxation -> correctness 100%.
+    // Eager: all resource conflicts belong to the original model.
+    // Returned schedules still require independent feasibility checks.
     let lazy_conflicts = false;
     let f = File::create(path).expect("create .lp");
     let mut w = BufWriter::new(f);
@@ -430,14 +429,16 @@ fn write_bigm_lp(
         }
     }
 
-    // ───── Bounds ─────
+    // BIG_M is a disjunction coefficient, not an absolute time horizon.
+    // Match the native Gurobi formulation: release lower bounds, no extra
+    // global time cap. Valid schedules can finish after 43,200 seconds.
     writeln!(w, "Bounds").unwrap();
     for (ti, train) in problem.trains.iter().enumerate() {
         for (vi, visit) in train.visits.iter().enumerate() {
             writeln!(
                 w,
-                " {} <= t_{}_{} <= {}",
-                visit.earliest, ti, vi, BIG_M
+                " {} <= t_{}_{}",
+                visit.earliest, ti, vi
             )
             .unwrap();
             n_vars += 1;
@@ -449,7 +450,7 @@ fn write_bigm_lp(
         for (ti, train) in problem.trains.iter().enumerate() {
             for (vi, visit) in train.visits.iter().enumerate() {
                 if visit.aimed.is_some() {
-                    writeln!(w, " 0 <= delay_{}_{} <= {}", ti, vi, BIG_M).unwrap();
+                    writeln!(w, " 0 <= delay_{}_{}", ti, vi).unwrap();
                     n_vars += 1;
                 }
             }
@@ -780,5 +781,65 @@ fn write_terms<W: Write>(w: &mut W, terms: &[String]) {
     }
     if !line.trim().is_empty() {
         writeln!(w, "{}", line).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ddd::problem::{Train, Visit};
+
+    // Evaluate the emitted bounds as inequalities against a known feasible
+    // schedule. This reproduces the excluded-schedule defect independently
+    // of a MILP solver's optimum/status or LP text formatting.
+    fn exported_bounds_allow_known_schedule(objective: DelayCostType, aimed: i32) {
+        let problem = Problem {
+            name: "late-valid-schedule".into(),
+            trains: vec![Train { visits: vec![Visit {
+                resource_id: 1, earliest: 50_000, aimed: Some(aimed), travel_time: 0,
+            }] }], conflicts: vec![],
+        };
+        let schedule = vec![vec![50_000, 50_000]];
+        let cost = problem.verify_solution(&schedule, objective).unwrap();
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let path = std::env::temp_dir().join(format!("export-lp-bounds-{}-{stamp}.lp", std::process::id()));
+        write_bigm_lp(path.to_str().unwrap(), &problem, objective);
+        let lp = std::fs::read_to_string(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        let mut bounds = false;
+        let mut inspected = 0;
+        for line in lp.lines() {
+            if line.trim() == "Bounds" { bounds = true; continue; }
+            if !bounds { continue; }
+            if ["Binary", "General", "Generals", "End"].contains(&line.trim()) { break; }
+            let parts = line.split_whitespace().collect::<Vec<_>>();
+            if parts.is_empty() { continue; }
+            assert!(parts.len() == 3 || parts.len() == 5);
+            let value = match parts[2] {
+                "t_0_0" => 50_000.0,
+                "delay_0_0" => cost as f64,
+                name => panic!("unexpected bounded variable: {name}"),
+            };
+            let lower: f64 = parts[0].parse().unwrap();
+            assert!(value >= lower, "known schedule violates exported lower bound");
+            if parts.len() == 5 {
+                let upper: f64 = parts[4].parse().unwrap();
+                assert!(value <= upper, "exporter excluded a valid schedule at {value}");
+            }
+            inspected += 1;
+        }
+        assert_eq!(inspected, if matches!(objective, DelayCostType::Continuous) { 2 } else { 1 });
+    }
+
+    #[test]
+    fn feasible_arrivals_after_twelve_hours_remain_in_the_model() {
+        for objective in [DelayCostType::FiniteSteps123, DelayCostType::InfiniteSteps180, DelayCostType::Continuous] {
+            exported_bounds_allow_known_schedule(objective, 50_000);
+        }
+    }
+
+    #[test]
+    fn continuous_delay_is_not_capped_by_the_disjunction_coefficient() {
+        exported_bounds_allow_known_schedule(DelayCostType::Continuous, 0);
     }
 }

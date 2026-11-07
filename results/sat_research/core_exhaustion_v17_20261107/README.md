@@ -11,12 +11,18 @@ The initial zero-loss regression gate held after stationA9 was lost. All
 included that loss among the unresolved cases. `followup.json` and
 `run_followup_with_losses.sh` preserve the actual successor execution.
 
-The current completion measures only the other 17 pairs, preserving the
-first 14 unchanged, to assess this configuration on all 31 difficult pairs.
-Service: `maxsat-core-e4-hardset-complete.service`, started at 00:37:16 UTC
-on 2026-11-07. See `hardset_completion_launch.json`, `complete_hardset.py`
-and `run_hardset_completion.sh`. This is still a development evaluation;
-the full 72-instance dataset and submission gate remain separate.
+Both completions are now finished and independently audited in
+`complete_31/` and `full_216/`. On 31 difficult pairs, V17 proves 18 optima,
+versus 17 for MaxSAT-Journal and 16 for CSOnet, losing no solved baseline
+case. On all 216 pairs it proves (72,68,63), total 203. The full completion
+reuses the 31 original cases unchanged and measures only the other 185.
+It finished at 00:56:57 UTC on 2026-11-07. This does not yet establish
+superiority to all MILP methods at the same cutoff.
+
+See `audit_completion.py` for read-only reconstruction, `snapshot_completion.py`
+for archival and the retained controllers `complete_hardset.py` and
+`complete_full_dataset.py`. Run audits from the repository root, using an
+extracted parent snapshot and the archived V14 backend reference.
 
 ## Initial launch plan
 

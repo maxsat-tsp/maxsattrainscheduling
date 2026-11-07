@@ -1,0 +1,446 @@
+{
+  "schema": "completed-core-hardset-v1",
+  "expected_runs": 31,
+  "completed_runs": 31,
+  "complete": true,
+  "errors": [],
+  "summary": [
+    {
+      "tag": "Core-E4-hard31",
+      "objective": "cont",
+      "instances": 26,
+      "proven_optimal": 17,
+      "not_proven": 9,
+      "median_solved_seconds": 0.921365897,
+      "par2_seconds": 218.94375875903845,
+      "mean_selected_growth": 0.0,
+      "policy": "",
+      "result_source": "independently-audited-json",
+      "min_growth": "",
+      "fraction": "",
+      "max_wait": "",
+      "rescue_progress": "bound-or-heuristic",
+      "heuristic_period": "1",
+      "heuristic_min_gap": "0",
+      "use_objective_bound": "false",
+      "filter_duplicates": "false",
+      "assumptions": "legacy",
+      "backend": "minisat",
+      "sparse_costs": "false",
+      "resource_orders": "true",
+      "order_transitivity": "true",
+      "objective_bound": "false",
+      "residual_hardening": "false",
+      "conference_coverage": "",
+      "coverage_delta": "",
+      "conference_par2_seconds": "",
+      "conference_par2": "",
+      "par2_delta_seconds": "",
+      "par2_delta": "",
+      "paired_runtime_seconds": "",
+      "paired_runtime": "",
+      "paired_instances": 0
+    },
+    {
+      "tag": "Core-E4-hard31",
+      "objective": "infsteps180",
+      "instances": 5,
+      "proven_optimal": 1,
+      "not_proven": 4,
+      "median_solved_seconds": 44.76123334,
+      "par2_seconds": 488.95224666800004,
+      "mean_selected_growth": 0.0,
+      "policy": "",
+      "result_source": "independently-audited-json",
+      "min_growth": "",
+      "fraction": "",
+      "max_wait": "",
+      "rescue_progress": "bound-or-heuristic",
+      "heuristic_period": "1",
+      "heuristic_min_gap": "0",
+      "use_objective_bound": "false",
+      "filter_duplicates": "false",
+      "assumptions": "legacy",
+      "backend": "minisat",
+      "sparse_costs": "false",
+      "resource_orders": "true",
+      "order_transitivity": "true",
+      "objective_bound": "false",
+      "residual_hardening": "false",
+      "conference_coverage": "",
+      "coverage_delta": "",
+      "conference_par2_seconds": "",
+      "conference_par2": "",
+      "par2_delta_seconds": "",
+      "par2_delta": "",
+      "paired_runtime_seconds": "",
+      "paired_runtime": "",
+      "paired_instances": 0
+    }
+  ],
+  "comparisons": [
+    {
+      "baseline": "Orders-Transitive",
+      "paired_completed": 31,
+      "candidate_optimal": 18,
+      "baseline_optimal": 16,
+      "gained": [
+        [
+          "cont",
+          "origB11"
+        ],
+        [
+          "cont",
+          "stationB12"
+        ]
+      ],
+      "lost": []
+    },
+    {
+      "baseline": "CSOnet",
+      "paired_completed": 31,
+      "candidate_optimal": 18,
+      "baseline_optimal": 16,
+      "gained": [
+        [
+          "cont",
+          "stationB12"
+        ],
+        [
+          "cont",
+          "trackB12"
+        ]
+      ],
+      "lost": []
+    },
+    {
+      "baseline": "MaxSAT-Journal",
+      "paired_completed": 31,
+      "candidate_optimal": 18,
+      "baseline_optimal": 17,
+      "gained": [
+        [
+          "cont",
+          "trackB12"
+        ]
+      ],
+      "lost": []
+    }
+  ],
+  "reused_runs": 14,
+  "newly_measured_runs": 17,
+  "case_bounds": [
+    {
+      "objective": "infsteps180",
+      "name": "trackA11",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.002512323,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "infsteps180",
+      "name": "trackA12",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.002115016,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "infsteps180",
+      "name": "stationA8",
+      "status": "ok",
+      "proven": true,
+      "seconds": 44.76123334,
+      "cost": 161,
+      "lb": 161,
+      "ub": 161
+    },
+    {
+      "objective": "infsteps180",
+      "name": "stationA11",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.004322869,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "infsteps180",
+      "name": "stationA12",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.00391939,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "origA8",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.00819567,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "origA11",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.099226481,
+      "cost": 3331,
+      "lb": 3331,
+      "ub": 3331
+    },
+    {
+      "objective": "cont",
+      "name": "origA12",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.921365897,
+      "cost": 4247,
+      "lb": 4247,
+      "ub": 4247
+    },
+    {
+      "objective": "cont",
+      "name": "origB7",
+      "status": "ok",
+      "proven": true,
+      "seconds": 7.221776964,
+      "cost": 65828,
+      "lb": 65828,
+      "ub": 65828
+    },
+    {
+      "objective": "cont",
+      "name": "origB11",
+      "status": "ok",
+      "proven": true,
+      "seconds": 197.589455615,
+      "cost": 75494,
+      "lb": 75494,
+      "ub": 75494
+    },
+    {
+      "objective": "cont",
+      "name": "trackA2",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.504912376,
+      "cost": 6859,
+      "lb": 6859,
+      "ub": 6859
+    },
+    {
+      "objective": "cont",
+      "name": "trackA8",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.014532419,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "trackA9",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.388841989,
+      "cost": 6305,
+      "lb": 6305,
+      "ub": 6305
+    },
+    {
+      "objective": "cont",
+      "name": "trackA11",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.016341924,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "trackA12",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.016116896,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "trackB7",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.125166435,
+      "cost": 56119,
+      "lb": 56119,
+      "ub": 56119
+    },
+    {
+      "objective": "cont",
+      "name": "trackB9",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.018480795,
+      "cost": 8593,
+      "lb": 8593,
+      "ub": 8593
+    },
+    {
+      "objective": "cont",
+      "name": "trackB11",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.085942387,
+      "cost": 68844,
+      "lb": 68844,
+      "ub": 68844
+    },
+    {
+      "objective": "cont",
+      "name": "trackB12",
+      "status": "ok",
+      "proven": true,
+      "seconds": 11.178921698,
+      "cost": 15182,
+      "lb": 15182,
+      "ub": 15182
+    },
+    {
+      "objective": "cont",
+      "name": "stationA1",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.008132356,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "stationA2",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.009759732,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "stationA8",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.012592242,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "stationA9",
+      "status": "ok",
+      "proven": true,
+      "seconds": 45.46472988,
+      "cost": 7655,
+      "lb": 7655,
+      "ub": 7655
+    },
+    {
+      "objective": "cont",
+      "name": "stationA10",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.602104465,
+      "cost": 6565,
+      "lb": 6565,
+      "ub": 6565
+    },
+    {
+      "objective": "cont",
+      "name": "stationA11",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.012756348,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "stationA12",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.012144154,
+      "cost": null,
+      "lb": null,
+      "ub": null
+    },
+    {
+      "objective": "cont",
+      "name": "stationB1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 4.351699017,
+      "cost": 4246,
+      "lb": 4246,
+      "ub": 4246
+    },
+    {
+      "objective": "cont",
+      "name": "stationB4",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.964473611,
+      "cost": 62616,
+      "lb": 62616,
+      "ub": 62616
+    },
+    {
+      "objective": "cont",
+      "name": "stationB7",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.866142937,
+      "cost": 59333,
+      "lb": 59333,
+      "ub": 59333
+    },
+    {
+      "objective": "cont",
+      "name": "stationB11",
+      "status": "ok",
+      "proven": true,
+      "seconds": 1.5091631319999999,
+      "cost": 72973,
+      "lb": 72973,
+      "ub": 72973
+    },
+    {
+      "objective": "cont",
+      "name": "stationB12",
+      "status": "ok",
+      "proven": true,
+      "seconds": 20.645324056,
+      "cost": 16909,
+      "lb": 16909,
+      "ub": 16909
+    }
+  ],
+  "submission_passed": false,
+  "scope": "complete 31-pair difficult set only; not the full dataset"
+}

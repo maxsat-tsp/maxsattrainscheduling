@@ -130,6 +130,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_order_cycle_cuts: Option<bool>,
 
+    /// Learn conditional earliest-time bounds across resource-order paths (default false).
+    #[structopt(long)]
+    maxsat_ladder_sc_order_path_cuts: Option<bool>,
+
     /// Charge unavoidable earliest-time costs before RC2 (default false).
     #[structopt(long)]
     maxsat_ladder_sc_extract_initial_cost: Option<bool>,
@@ -530,7 +534,7 @@ fn solve_sc_with_backend(
     counting_solver::reset_counts();
     output("maxsat_backend".to_string(), backend.into());
     match backend {
-        "minisat" if settings.core_minimize_checks>0 || settings.order_cycle_cuts || settings.extract_initial_cost => {
+        "minisat" if settings.core_minimize_checks>0 || settings.order_cycle_cuts || settings.order_path_cuts || settings.extract_initial_cost => {
             let solver=minisat_deadline::Solver::new(timeout);
             output("maxsat_backend_signature".to_string(),solver.signature().to_string().into());
             output("maxsat_sat_timeout_mode".to_string(),"native-watchdog-deadline".into());
@@ -687,6 +691,7 @@ fn main() {
         resource_orders: opt.maxsat_ladder_sc_resource_orders.unwrap_or(false),
         order_transitivity: opt.maxsat_ladder_sc_order_transitivity.unwrap_or(false),
         order_cycle_cuts: opt.maxsat_ladder_sc_order_cycle_cuts.unwrap_or(false),
+        order_path_cuts: opt.maxsat_ladder_sc_order_path_cuts.unwrap_or(false),
         extract_initial_cost: opt.maxsat_ladder_sc_extract_initial_cost.unwrap_or(false),
         use_objective_bound: opt.maxsat_ladder_sc_use_objective_bound.unwrap_or(false),
         residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),

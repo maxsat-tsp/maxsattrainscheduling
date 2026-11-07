@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test only unresolved full-dataset pairs with temporal order-cycle cuts."""
+"""Test one optional MaxSAT component on unresolved full-dataset pairs."""
 from __future__ import annotations
 import argparse,json,os,subprocess,time
 from pathlib import Path
@@ -12,20 +12,20 @@ def candidate_config(source,component='order-cycles'):
     config=source['definition']
     if config.get('solver')!='maxsat_ddd_ladder_sc' or config.get('resource_orders')!='true':
         raise ValueError('cycle cuts require the existing resource-order candidate')
-    field={'order-cycles':'order_cycle_cuts','initial-cost':'extract_initial_cost'}.get(component)
+    field={'order-cycles':'order_cycle_cuts','initial-cost':'extract_initial_cost','order-paths':'order_path_cuts'}.get(component)
     if field is None:raise ValueError('unsupported single-component experiment')
     if config.get(field,'false')!='false':
         raise ValueError('reference already enables the component being tested')
     return dict(config,**{field:'true'})
 
 def schema_for(component):
-    return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1'}[component]
+    return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1','order-paths':'targeted-order-paths-v1'}[component]
 
 def report_name(component):
-    return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json'}[component]
+    return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json','order-paths':'order_paths_audit.json'}[component]
 
 def tag_for(component):
-    return TAG if component=='order-cycles' else 'Initial-Cost'
+    return {'order-cycles':TAG,'initial-cost':'Initial-Cost','order-paths':'Order-Paths'}[component]
 
 def load_reference(root):
     manifest=json.loads((root/'manifest.json').read_text());saved=json.loads((root/'full_audit.json').read_text())
@@ -140,7 +140,7 @@ def main():
     parser.add_argument('--reference',type=Path,required=True);parser.add_argument('--results',type=Path,required=True)
     parser.add_argument('--binary',type=Path);parser.add_argument('--round-seconds',type=int,default=21600)
     parser.add_argument('--build-manifest',type=Path)
-    parser.add_argument('--component',choices=['order-cycles','initial-cost'],default='order-cycles')
+    parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths'],default='order-cycles')
     args=parser.parse_args()
     if args.action=='audit':print(json.dumps(audit_saved(args.results,args.reference),indent=2));return
     if args.binary is None or args.build_manifest is None or not 0<args.round_seconds<=21600:

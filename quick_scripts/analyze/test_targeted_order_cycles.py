@@ -6,6 +6,25 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_whole_path_trial_changes_only_one_flag_and_checks_its_execution(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        config=cycles.candidate_config(source,'order-paths')
+        self.assertEqual(config,dict(source['definition'],order_path_cuts='true'))
+        self.assertNotIn('extract_initial_cost',config)
+        self.assertEqual(cycles.schema_for('order-paths'),'targeted-order-paths-v1')
+        self.assertEqual(cycles.report_name('order-paths'),'order_paths_audit.json')
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw);args=SimpleNamespace(binary=root/'ddd',timeout=300,ram_kb=6000000,method_definitions={'test':config})
+            with patch.object(extended,'execute') as execute:
+                extended.run_case('test','cont','origA1',args,root)
+                self.assertEqual(execute.call_args.args[4]['MAXSATDDD_ORDER_PATH_CUTS'],'true')
+            solve=dict(status='timeout',total_time=300,timeout_seconds=300,process_exit_code=0)
+            solve.update({'maxsat_'+k:v for k,v in config.items() if k not in ('solver','kind')})
+            extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertFalse(extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
+            solve['maxsat_order_path_cuts']=False;extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertIn('maxsat_order_path_cuts differs from the locked configuration',extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
+
     def test_initial_cost_changes_one_component_without_enabling_cycles(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         config=cycles.candidate_config(source,'initial-cost')

@@ -108,6 +108,8 @@ pub struct MaxSatDddLadderScSettings {
     pub order_transitivity: bool,
     /// Lazily forbid positive temporal cycles among existing resource orders.
     pub order_cycle_cuts: bool,
+    /// Propagate conditional earliest times through complete temporal paths.
+    pub order_path_cuts: bool,
     /// Charge unavoidable earliest-time costs directly; encode only residuals.
     pub extract_initial_cost: bool,
     /// Restrict original weighted cost terms by a verified feasible upper bound.
@@ -146,6 +148,7 @@ impl Default for MaxSatDddLadderScSettings {
             resource_orders: false,
             order_transitivity: false,
             order_cycle_cuts: false,
+            order_path_cuts: false,
             extract_initial_cost: false,
             use_objective_bound: false,
             residual_hardening: false,

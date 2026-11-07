@@ -11,6 +11,7 @@ pub(super) struct ResourceOrders<L: Lit> {
     transitivity: bool,
     neighbors: BTreeMap<u32, BTreeSet<u32>>,
     cycle_clauses: HashSet<Vec<Bool<L>>>,
+    path_clauses: HashSet<(usize,i32,Vec<Bool<L>>)>,
 }
 
 impl<L: Lit> ResourceOrders<L> {
@@ -21,7 +22,35 @@ impl<L: Lit> ResourceOrders<L> {
             transitivity,
             neighbors: BTreeMap::new(),
             cycle_clauses: HashSet::new(),
+            path_clauses: HashSet::new(),
         }
+    }
+
+    pub fn separate_path(
+        &mut self,topology:&super::order_paths::Topology,model_times:&[i32],
+        mut value:impl FnMut(Bool<L>)->bool,priority:impl Fn(usize,i32,i32)->usize,
+    )->Result<Option<super::order_paths::Cut<L>>,String>{
+        let mut edges=topology.edges();let mut pairs=self.bits.iter().collect::<Vec<_>>();
+        pairs.sort_unstable_by_key(|(key,_)|**key);
+        for (&(a,b),&bit) in pairs{
+            let (first,second,guard)=if value(bit){(a,b,bit)}else{(b,a,!bit)};
+            edges.push(topology.ordered(first as usize,second as usize,guard));
+        }
+        let cut=super::order_paths::separate(topology,edges,model_times,priority)?;
+        match &cut{
+            Some(super::order_paths::Cut::Cycle(clause))=>{
+                if !self.cycle_clauses.insert(clause.clone()){
+                    return Err("SAT model violates an already encoded temporal cycle".into());
+                }
+            }
+            Some(super::order_paths::Cut::Path{visit,time,prefix})=>{
+                if !self.path_clauses.insert((*visit,*time,prefix.clone())){
+                    return Err("SAT model violates an already encoded temporal path".into());
+                }
+            }
+            None=>{}
+        }
+        Ok(cut)
     }
 
     pub fn separate_cycle(

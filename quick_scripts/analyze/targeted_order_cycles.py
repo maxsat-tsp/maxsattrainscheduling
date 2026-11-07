@@ -45,6 +45,11 @@ def experiment_config(source,component,backend=None,core_conflicts=None):
     if core_conflicts is not None:
         if type(core_conflicts) is not int or not 0<=core_conflicts<=2**31-1:raise ValueError('invalid core conflict budget')
         config['core_minimize_conflicts']=str(core_conflicts)
+        if core_conflicts==0:
+            # The native core-exhaustion path is intentionally MiniSAT-only
+            # and requires a positive conflict budget. Backend contrasts with
+            # an unlimited minimization budget must disable that path equally.
+            config['core_exhaust_checks']='0'
     if config.get('backend')=='cadical' and int(config.get('core_minimize_checks','0'))>0 and int(config.get('core_minimize_conflicts','0'))!=0:
         raise ValueError('the conflict cap is MiniSAT-specific; explicitly use a common zero (unlimited) cap')
     return config

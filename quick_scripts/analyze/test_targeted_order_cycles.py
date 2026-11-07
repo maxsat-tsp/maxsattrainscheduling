@@ -13,7 +13,7 @@ class CycleTrialTests(unittest.TestCase):
         self.assertEqual(cycles.experiment_config(source,'order-master-seeds'),base)
         mini=cycles.experiment_config(source,'order-master-seeds','minisat',0)
         cadi=cycles.experiment_config(source,'order-master-seeds','cadical',0)
-        self.assertEqual(mini,dict(base,backend='minisat',core_minimize_conflicts='0'))
+        self.assertEqual(mini,dict(base,backend='minisat',core_minimize_conflicts='0',core_exhaust_checks='0'))
         self.assertEqual(cadi,dict(mini,backend='cadical'));self.assertEqual(source,before)
         for backend,budget in [('typo',0),('minisat',-1),('cadical',True),('minisat',2**31),('cadical',100),('cadical',None)]:
             with self.assertRaises(ValueError):cycles.experiment_config(source,'order-master-seeds',backend,budget)

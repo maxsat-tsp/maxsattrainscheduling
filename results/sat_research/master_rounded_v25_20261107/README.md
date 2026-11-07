@@ -19,3 +19,8 @@ Run serial on CPUs 0,1,4,5, 300 seconds and 6,000,000 KB. On gains, confirm
 three times and regress only the 68 solved rounded-objective pairs. A
 scoped regression explicitly cannot claim full-reference coverage or
 submission success; excluded objectives require separate locked evaluation.
+
+
+Completed: four valid 300-second timeouts, no new optimum. See complete_4/
+for the immutable raw snapshot, independent local audit, source manifests,
+setup/followup archive and explicitly diagnostic bounds/telemetry CSV.

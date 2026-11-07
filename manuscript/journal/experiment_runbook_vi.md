@@ -677,6 +677,8 @@ và assumptions=full của V24. Không build lại. Bài thử infsteps180 V24
 validator chỉ kiểm tra lại khi resume thay vì ghi đè. Lượt đo thật là
 `maxsat-master-rounded-v25-screen.service`, bắt đầu 14:01:46 ngày 07/11,
 giờ Việt Nam, trong `~/projects/master-rounded-v25/maxsattrainscheduling`.
+Lượt đã xong 4/4 ca, đều timeout hợp lệ, chưa có gain; raw và kiểm toán
+local nằm trong `results/sat_research/master_rounded_v25_20261107/complete_4/`.
 Hai lần lỗi thiết lập trước đó không có ca khó; giữ `preflight-failed/`
 và log dịch vụ để truy vết.
 
@@ -713,8 +715,7 @@ của V24. Chi phí mọi mốc mới được đăng ký trước SAT kế ti�
 đường mặc định CSOnet.
 
 Controller `maxsat-master-batch-v26.service` ở worktree
-`~/projects/master-batch-v26/maxsattrainscheduling`, chờ V25 kết thúc rồi
-mới test native và build release. Local đã đạt 36 test nhân SAT, 111 test
+`~/projects/master-batch-v26/maxsattrainscheduling`, đã bắt đầu test native/build sau khi V25 kết thúc. Local đã đạt 36 test nhân SAT, 111 test
 Python và Rust typecheck; chưa thay thế kiểm thử solver đầy đủ trên VM.
 Cả service tối đa 6 giờ, kể cả thời gian chờ. Đo tuần tự CPU 0,1,4,5,
 300 giây và 6.000.000 KB mỗi ca.

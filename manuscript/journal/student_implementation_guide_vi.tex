@@ -113,11 +113,12 @@ này thành 0/13. V23 dùng chung mốc cho những thời điểm có cùng m�
 \code{infsteps180} timeout ở 30 giây, nên chưa chạy ca khó. V24 dùng
 nguyên binary và gửi đủ điều kiện chi phí: hai bài thử bậc thang giải
 đúng ở 15,62 và 13,73 giây; bài \code{cont} vẫn timeout ở 30 giây. V24
-chưa chạy ca khó. V25 thử riêng bốn ca \code{infsteps180} còn thiếu;
-không xem chín ca \code{cont} bị loại khỏi lượt chạy là đã giải được.
+chưa chạy ca khó. V25 đã chạy đủ bốn ca \code{infsteps180} còn thiếu: đều timeout hợp lệ
+ở 300 giây, chưa có ca mới. Không xem chín ca \code{cont} bị loại khỏi
+lượt chạy là đã giải được.
 
 V26 đã cài cách thêm cùng lúc các ràng buộc chi phí còn thiếu từ một
-lịch. Bản này được xếp chạy sau V25, qua kiểm thử native trước khi đo
+lịch. Bản này đã bắt đầu build/test sau V25, phải qua native trước khi đo
 hiệu năng. Mỗi ca khó giữ 300 giây và 6.000.000 KB; mỗi vòng tối đa 6 giờ.
 V27 là hướng dự phòng, chỉ được mở nếu V26 không có ca mới sau kiểm toán.
 Không sửa binary đang chạy. Lệnh ở runbook.

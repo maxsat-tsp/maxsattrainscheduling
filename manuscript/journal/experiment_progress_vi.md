@@ -86,16 +86,20 @@ Cả ba bản ghi được kiểm toán độc lập và lưu trong
 `results/sat_research/master_full_v24_20261107/stopped_validation/`.
 Không có lượt hard-case nào của V24, nên không ghi thành 0/13.
 
-**V25 chỉ thử bốn ca infsteps180 còn thiếu, giữ đúng binary V24.** Runner
-`7b752c4` khóa phạm vi theo objective và tự kiểm tra các ca bị loại. Lượt
-sàng lọc thực sự bắt đầu **14:01:46 ngày 07/11**, giờ Việt Nam, ở dịch vụ
-`maxsat-master-rounded-v25-screen`. Hai lần khởi động trước dừng vì đường
-dẫn thư viện trong worktree và điều kiện dùng lại log; lỗi và dữ liệu
-kiểm tra ban đầu được giữ riêng. Không có phép đo ca khó nào từ hai lần
-đó được tính vào lượt sàng lọc. Bốn ca là trackA11, trackA12, stationA11,
-stationA12, mỗi ca 300 giây, 6.000.000 KB, CPU 0,1,4,5.
+**V25 đã xong 4/4 ca infsteps180, chưa giải thêm.** Runner `7b752c4`
+giữ nguyên binary V24; mọi ca timeout hợp lệ ở 300 giây. Toàn bộ raw,
+nguồn binary, phạm vi chọn ca và hash đã được kiểm toán độc lập trên local,
+lưu tại `results/sat_research/master_rounded_v25_20261107/complete_4/`.
+Không có gain nên không chạy xác nhận hoặc hồi quy; báo cáo followup không
+được hiểu là PASS. Hai lần lỗi thiết lập ban đầu được giữ riêng cùng probe.
 
-**V26 đã cài, xếp chạy sau V25.** Mã `984e221` bổ sung mọi điều kiện
+Trên trackA11, V25 tạo 132.265 đường trong 300 giây, với cận chẩn đoán
+LB=30, UB=244; khoảng 144,56 giây SAT và 148,61 giây phân tích đồ thị.
+Các cận đọc từ stdout được để riêng trong CSV, không sửa JSON gốc. Số
+đường và thời gian đồ thị cho thấy cần giảm số lần giải lại và đưa thêm
+thông tin chi phí vào SAT sớm hơn; chưa có bằng chứng coverage mới.
+
+**V26 đã bắt đầu build/test native sau khi V25 hoàn tất.** Mã `984e221` bổ sung mọi điều kiện
 chi phí bị lịch SAT vi phạm thay vì chỉ một điều kiện. Mỗi điều kiện vẫn
 có chứng minh từ đường thời gian; chi phí mốc mới được thêm trước SAT
 kế tiếp. Kiểm tra local đạt 36 test nhân SAT, 111 test Python và typecheck

@@ -23,3 +23,11 @@ Screen only four infsteps180 pairs at 300 seconds and 6,000,000 KB, serial
 CPUs 0,1,4,5; six-hour cap includes waiting. If gains occur, confirm three
 times and regress the 68 solved rounded-objective pairs. Scoped followup
 cannot claim full coverage or submission success.
+
+
+Validator revision: assess existing smoke/probe JSON without rerunning it.
+An absent partial-SAT counter is accepted only for an independently valid
+native timeout with assumptions=full; it is recorded as missing telemetry,
+not filled with zero. Proved results still require the counter and exact
+known optimum. The controller retains the initial absolute round deadline
+across validator-only restarts, so followup cannot reset the six-hour budget.

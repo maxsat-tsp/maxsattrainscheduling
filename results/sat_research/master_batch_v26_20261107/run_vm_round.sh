@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Preserve the original round deadline across validator-only restarts.
+round_deadline_epoch=1794056633
 source /home/tuyenkv/.cargo/env
 source /home/tuyenkv/miniconda3/etc/profile.d/conda.sh
 conda activate gurobi
@@ -24,7 +26,7 @@ python3 quick_scripts/analyze/targeted_order_cycles.py run --component order-mas
  --results "$trial_root" --round-seconds 7200
 python3 quick_scripts/analyze/targeted_order_cycles.py audit --reference "$reference" --results "$trial_root" \
  > results/aglr/master-batch-v26-independent-audit.json
-remaining_seconds=$((21600 - SECONDS - 60))
+remaining_seconds=$((round_deadline_epoch - $(date -u +%s) - 60))
 if (( remaining_seconds > 390 )); then
     python3 quick_scripts/analyze/confirm_component_gains.py --trial "$trial_root" --reference "$reference" \
       --binary "$binary" --results results/aglr/master-batch-v26-followup --round-seconds "$remaining_seconds"

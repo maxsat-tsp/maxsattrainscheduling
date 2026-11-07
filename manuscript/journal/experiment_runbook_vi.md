@@ -715,8 +715,11 @@ của V24. Chi phí mọi mốc mới được đăng ký trước SAT kế ti�
 đường mặc định CSOnet.
 
 Controller `maxsat-master-batch-v26.service` ở worktree
-`~/projects/master-batch-v26/maxsattrainscheduling`, đã bắt đầu test native/build sau khi V25 kết thúc. Local đã đạt 36 test nhân SAT, 111 test
-Python và Rust typecheck; chưa thay thế kiểm thử solver đầy đủ trên VM.
+`~/projects/master-batch-v26/maxsattrainscheduling`, đã bắt đầu test native/build sau khi V25 kết thúc. Native đã đạt 78 test Rust và 111 Python. Hai bài thử bậc thang có
+đúng optimum ở 5,48 và 7,82 giây; cont timeout hợp lệ. Dữ liệu và kiểm
+toán local ở `master_batch_v26_20261107/native_validation/` trong
+`results/sat_research/`. Validator đã sửa việc đọc trường telemetry thiếu
+khi native timeout; dùng lại raw đã có, không suy đoán counter bằng 0.
 Cả service tối đa 6 giờ, kể cả thời gian chờ. Đo tuần tự CPU 0,1,4,5,
 300 giây và 6.000.000 KB mỗi ca.
 

@@ -18,3 +18,11 @@ Screen all 13 V17 unresolved pairs, serial on CPUs 0,1,4,5, 300 seconds and
 6,000,000 KB each. The six-hour service cap includes the queue wait. Audit,
 three repeats of gains and 203 solved-pair regression remain mandatory
 before constructing a new full table. submission_passed remains false.
+
+
+Validator revision: assess existing smoke/probe JSON without rerunning it.
+An absent partial-SAT counter is accepted only for an independently valid
+native timeout with assumptions=full; it is recorded as missing telemetry,
+not filled with zero. Proved results still require the counter and exact
+known optimum. The controller retains the initial absolute round deadline
+across validator-only restarts, so followup cannot reset the six-hour budget.

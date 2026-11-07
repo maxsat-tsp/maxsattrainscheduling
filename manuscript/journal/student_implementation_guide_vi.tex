@@ -118,8 +118,9 @@ chưa chạy ca khó. V25 đã chạy đủ bốn ca \code{infsteps180} còn thi
 lượt chạy là đã giải được.
 
 V26 đã cài cách thêm cùng lúc các ràng buộc chi phí còn thiếu từ một
-lịch. Bản này đã bắt đầu build/test sau V25, phải qua native trước khi đo
-hiệu năng. Mỗi ca khó giữ 300 giây và 6.000.000 KB; mỗi vòng tối đa 6 giờ.
+lịch. Bản này đã qua 78 test Rust và 111 test Python trên VM; hai bài
+thử bậc thang giải đúng ở 5,48 và 7,82 giây. Bài liên tục vẫn timeout
+ở 30 giây, chưa có kết quả mới trên ca khó. Mỗi ca khó giữ 300 giây và 6.000.000 KB; mỗi vòng tối đa 6 giờ.
 V27 là hướng dự phòng, chỉ được mở nếu V26 không có ca mới sau kiểm toán.
 Không sửa binary đang chạy. Lệnh ở runbook.
 

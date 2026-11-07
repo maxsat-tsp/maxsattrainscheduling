@@ -99,13 +99,15 @@ Các cận đọc từ stdout được để riêng trong CSV, không sửa JSON
 đường và thời gian đồ thị cho thấy cần giảm số lần giải lại và đưa thêm
 thông tin chi phí vào SAT sớm hơn; chưa có bằng chứng coverage mới.
 
-**V26 đã bắt đầu build/test native sau khi V25 hoàn tất.** Mã `984e221` bổ sung mọi điều kiện
+**V26 đã qua kiểm thử native; đang mở sàng lọc 13 ca sau sửa validator.** Mã `984e221` bổ sung mọi điều kiện
 chi phí bị lịch SAT vi phạm thay vì chỉ một điều kiện. Mỗi điều kiện vẫn
 có chứng minh từ đường thời gian; chi phí mốc mới được thêm trước SAT
-kế tiếp. Kiểm tra local đạt 36 test nhân SAT, 111 test Python và typecheck
-Rust. Phải qua toàn bộ kiểm thử native trên VM trước ca khó; chưa báo
-native đạt khi service còn chờ. Không build hoặc chạy đo V26 khi V25
-đang đo. Cả vòng có giới hạn 6 giờ, gồm thời gian chờ.
+kế tiếp. Native đã đạt 78 test Rust và 111 test Python. Hai bài thử bậc thang
+giải đúng ở 5,48 và 7,82 giây, số điều kiện thêm cùng lúc cao nhất là
+28 và 29; bài cont timeout hợp lệ sau khoảng 30 giây. Kiểm toán local
+đã xác nhận cả ba raw và hash log test. Validator ban đầu đọc một trường
+telemetry không được ghi khi native timeout; đã sửa để dùng lại raw,
+giữ rõ trường thiếu, không điền 0 và không chạy lại phép đo. V26 chỉ build sau khi V25 đã dừng. Cả vòng có giới hạn 6 giờ, gồm thời gian chờ.
 
 Nếu V25 có gain, script xác nhận ba lần rồi hồi quy 68 ca infsteps180 đã
 giải; đó chỉ là hồi quy theo objective. V26 sàng lọc đủ 13 ca chưa giải;

@@ -22,18 +22,23 @@ for objective in ['finsteps123','infsteps180','cont']:
  cost=json.loads((reference/'cases'/objective/'origA1'/f'{objective}.json').read_text())[0]['solves'][0]['cost']
  args=SimpleNamespace(timeout=30,ram_kb=6000000,binary=binary,method_definitions={'Smoke':cfg})
  case=Path('results/aglr')/f'master-seeds-v27-smoke-{objective}'
- e.run_case('Smoke',objective,'origA1',args,case);r=e.assess_case(case,'Smoke',objective,'origA1',30,cfg)
+ if not (case/f'{objective}.json').exists():e.run_case('Smoke',objective,'origA1',args,case)
+ r=e.assess_case(case,'Smoke',objective,'origA1',30,cfg)
  assert not r['errors'] and r['status'] in ('ok','timeout'),r
  if r['proven']:assert r['solve']['cost']==r['solve']['lb']==r['solve']['ub']==cost
- assert r['solve']['maxsat_partial_sat_calls']==0
- assert r['solve']['maxsat_resource_order_rows']==0
+ for counter in ['maxsat_partial_sat_calls','maxsat_resource_order_rows']:
+  if counter in r['solve']:
+   assert r['solve'][counter]==0
+  else:
+   assert r['status']=='timeout' and not r['proven'] and r['solve']['maxsat_assumptions']=='full'
  checks.append(dict(objective=objective,status=r['status'],proven=r['proven'],seconds=r['time'],cost=r['solve'].get('cost'),expected_cost=cost,
-  raw_sha256=e.focus.sha(case/f'{objective}.json'),max_batch=r['solve'].get('maxsat_order_master_max_batch'),seed_clauses=r['solve'].get('maxsat_order_master_seed_clauses',0),seed_points=r['solve'].get('maxsat_order_master_seed_points',0)))
+  raw_sha256=e.focus.sha(case/f'{objective}.json'),partial_calls_telemetry_available='maxsat_partial_sat_calls' in r['solve'],max_batch=r['solve'].get('maxsat_order_master_max_batch'),seed_clauses=r['solve'].get('maxsat_order_master_seed_clauses',0),seed_points=r['solve'].get('maxsat_order_master_seed_points',0)))
  e.save(root/'validation_progress.json',dict(smokes=checks,passed=False))
 assert any(r['proven'] for r in checks),'all real-case smokes timed out; stop before expensive screening'
 assert any(r['seed_clauses']>0 for r in checks),'initial cost seeding was not exercised'
 args.timeout=2;case=Path('results/aglr/master-seeds-v27-hard-probe')
-e.run_case('Smoke','infsteps180','stationA11',args,case);probe=e.assess_case(case,'Smoke','infsteps180','stationA11',2,cfg)
+if not (case/'infsteps180.json').exists():e.run_case('Smoke','infsteps180','stationA11',args,case)
+probe=e.assess_case(case,'Smoke','infsteps180','stationA11',2,cfg)
 assert not probe['errors'] and probe['status'] in ('timeout','ok') and probe['solve']['process_exit_code']==0
 assert probe['solve']['maxsat_sat_timeout_mode']=='native-watchdog-deadline'
 e.save(root/'validation.json',dict(passed=True,smokes=checks,hard_probe_status=probe['status'],

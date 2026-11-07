@@ -1,0 +1,954 @@
+   Compiling libc v0.2.180
+   Compiling proc-macro2 v1.0.105
+   Compiling quote v1.0.43
+   Compiling unicode-ident v1.0.22
+   Compiling memchr v2.7.6
+   Compiling version_check v0.9.5
+   Compiling syn v2.0.114
+   Compiling glob v0.3.3
+   Compiling shlex v1.3.0
+   Compiling clang-sys v1.8.1
+   Compiling jobserver v0.1.35
+   Compiling aho-corasick v1.1.4
+   Compiling regex-syntax v0.8.8
+   Compiling find-msvc-tools v0.1.9
+   Compiling cc v1.2.62
+   Compiling regex-automata v0.4.13
+   Compiling cfg-if v1.0.4
+   Compiling libloading v0.8.9
+   Compiling regex v1.12.2
+   Compiling anyhow v1.0.100
+   Compiling nom v5.1.3
+   Compiling syn v1.0.109
+   Compiling zmij v1.0.12
+   Compiling atty v0.2.14
+   Compiling unicode-width v0.1.14
+   Compiling log v0.4.29
+   Compiling serde_core v1.0.228
+   Compiling textwrap v0.11.0
+   Compiling bitflags v1.3.2
+   Compiling bindgen v0.58.1
+   Compiling serde_json v1.0.149
+   Compiling strsim v0.8.0
+   Compiling vec_map v0.8.2
+   Compiling rustix v1.1.3
+   Compiling ansi_term v0.12.1
+   Compiling termcolor v1.4.1
+   Compiling getrandom v0.3.4
+   Compiling serde v1.0.228
+   Compiling humantime v2.3.0
+   Compiling env_logger v0.8.4
+   Compiling clap v2.34.0
+   Compiling cexpr v0.4.0
+   Compiling which v3.1.1
+   Compiling lazycell v1.3.0
+   Compiling minimal-lexical v0.2.1
+   Compiling num-conv v0.1.0
+   Compiling rustc-hash v1.1.0
+   Compiling lazy_static v1.5.0
+   Compiling thiserror v2.0.18
+   Compiling once_cell v1.21.3
+   Compiling either v1.15.0
+   Compiling linux-raw-sys v0.11.0
+   Compiling powerfmt v0.2.0
+   Compiling time-core v0.1.6
+   Compiling itoa v1.0.17
+   Compiling bitflags v2.10.0
+   Compiling peeking_take_while v0.1.2
+   Compiling deranged v0.5.5
+   Compiling time-macros v0.2.24
+   Compiling nom v7.1.3
+   Compiling thiserror-impl v2.0.18
+   Compiling serde_derive v1.0.228
+   Compiling proc-macro-error-attr v1.0.4
+   Compiling is-terminal v0.4.17
+   Compiling errno v0.3.14
+   Compiling cpu-time v1.0.0
+   Compiling bindgen v0.72.1
+   Compiling signal-hook v0.3.18
+   Compiling fastrand v2.3.0
+   Compiling num_threads v0.1.7
+   Compiling time v0.3.44
+   Compiling tempfile v3.24.0
+   Compiling itertools v0.10.5
+   Compiling signal-hook-registry v1.4.8
+   Compiling colored v1.9.4
+   Compiling cexpr v0.6.0
+   Compiling minisat v0.5.0 (https://github.com/luteberget/minisat-rs.git?rev=26396130fb86072c64ba18bad9867b4964dea389#26396130)
+   Compiling itertools v0.14.0
+   Compiling cadical v0.1.16
+   Compiling proc-macro-error v1.0.4
+   Compiling csv-core v0.1.13
+   Compiling rustc-hash v2.1.1
+   Compiling autocfg v1.5.0
+   Compiling ryu v1.0.22
+   Compiling bitflags v0.8.2
+   Compiling dimacs v0.2.0
+   Compiling csv v1.4.0
+   Compiling num-traits v0.2.19
+   Compiling rustsat v0.7.5
+   Compiling simple_logger v1.16.0
+   Compiling cmake v0.1.57
+   Compiling os_pipe v1.2.3
+   Compiling bitfield v0.13.2
+   Compiling quick-error v1.2.3
+   Compiling grb-sys2 v0.1.1
+   Compiling sattrait v0.1.0 (/home/tuyenkv/projects/master-batch-v26/salvers/sattrait)
+   Compiling unicode-segmentation v1.12.0
+   Compiling heck v0.3.3
+   Compiling dpllt v0.1.0 (/home/tuyenkv/projects/master-batch-v26/salvers/dpllt)
+warning: unnecessary transmute
+  --> /home/tuyenkv/projects/master-batch-v26/salvers/dpllt/src/clausedb.rs:81:32
+   |
+81 |                 .push(unsafe { std::mem::transmute::<f32, u32>(0.0) });
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unnecessary_transmutes)]` on by default
+help: replace this with
+   |
+81 -                 .push(unsafe { std::mem::transmute::<f32, u32>(0.0) });
+81 +                 .push(unsafe { f32::to_bits(0.0) });
+   |
+
+warning: eliding a lifetime that's named elsewhere is confusing
+   --> /home/tuyenkv/projects/master-batch-v26/salvers/dpllt/src/clausedb.rs:194:10
+    |
+192 |         &'a mut self,
+    |          -- the lifetime is named here
+193 |         header_addr: ClauseHeaderOffset,
+194 |     ) -> &mut ClauseHeaderOffset {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^ the same lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: consistently use `'a`
+    |
+194 |     ) -> &'a mut ClauseHeaderOffset {
+    |           ++
+
+warning: `dpllt` (lib) generated 2 warnings (run `cargo fix --lib -p dpllt` to apply 2 suggestions)
+   Compiling humantime v1.3.0
+   Compiling sigchld v0.2.4
+   Compiling rustsat-glucose v0.7.5
+   Compiling grb v1.3.0
+   Compiling cstr-enum-derive v0.1.0
+   Compiling log v0.3.9
+   Compiling ipamir-rs v0.1.0 (/home/tuyenkv/projects/master-batch-v26/ipamir-rs)
+   Compiling clock_ticks v0.1.1
+   Compiling hprof v0.1.3
+   Compiling env_logger v0.7.1
+   Compiling cstr-enum v1.0.0
+   Compiling structopt-derive v0.4.18
+   Compiling shared_child v1.1.1
+   Compiling grb-macro v0.1.0
+   Compiling xmlparser v0.13.6
+   Compiling iana-time-zone v0.1.64
+   Compiling fnv v1.0.7
+   Compiling convert_case v0.4.0
+   Compiling smallvec v1.15.1
+   Compiling derive_more v0.99.20
+   Compiling chrono v0.4.44
+   Compiling roxmltree v0.14.1
+   Compiling duct v0.13.7
+   Compiling structopt v0.3.26
+warning: hiding a lifetime that's elided elsewhere is confusing
+  --> /home/tuyenkv/projects/master-batch-v26/ipamir-rs/src/lib.rs:67:9
+   |
+67 |         &mut self,
+   |         ^^^^^^^^^ the lifetime is elided here
+...
+70 |     ) -> MaxSatResult {
+   |          ^^^^^^^^^^^^ the same lifetime is hidden here
+   |
+   = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+   = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+   |
+70 |     ) -> MaxSatResult<'_> {
+   |                      ++++
+
+warning: `ipamir-rs` (lib) generated 1 warning (run `cargo fix --lib -p ipamir-rs` to apply 1 suggestion)
+   Compiling pretty_env_logger v0.4.0
+   Compiling typed-index-collections v3.4.0
+   Compiling satcoder v0.2.0 (/home/tuyenkv/projects/master-batch-v26/salvers/satcoder)
+warning: private item shadows public glob re-export
+ --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/solvers/dpllt.rs:1:26
+  |
+1 | use crate::{SatInstance, SatSolver, SatSolverWithCore, SatResult, SatResultWithCore, Bool, SatModel};
+  |                          ^^^^^^^^^
+  |
+note: the name `SatSolver` in the type namespace is supposed to be publicly re-exported here
+ --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/solvers/dpllt.rs:3:9
+  |
+3 | pub use dpllt::*;
+  |         ^^^^^^^^
+note: but the private item here shadows it
+ --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/solvers/dpllt.rs:1:26
+  |
+1 | use crate::{SatInstance, SatSolver, SatSolverWithCore, SatResult, SatResultWithCore, Bool, SatModel};
+  |                          ^^^^^^^^^
+  = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `model_eq::*`
+ --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/symbolic/mod.rs:6:9
+  |
+6 | pub use model_eq::*;
+  |         ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated constant `std::usize::MAX`: replaced by the `MAX` associated constant on this type
+   --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/symbolic/unary.rs:166:51
+    |
+166 |         self.add_truncate(sat, other, std::usize::MAX)
+    |                                                   ^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated constant `std::usize::MAX`: replaced by the `MAX` associated constant on this type
+   --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/symbolic/unary.rs:240:49
+    |
+240 |         Self::sum_truncate(sat, xs, std::usize::MAX)
+    |                                                 ^^^
+
+warning: use of deprecated method `itertools::Itertools::fold1`: Use `Iterator::reduce` instead
+   --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/constraints/mddlinear.rs:371:10
+    |
+371 |         .fold1(|a, b| a.intersect(&b))
+    |          ^^^^^
+
+warning: unused variable: `c`
+  --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/constraints/mddlinear.rs:51:28
+   |
+51 |     if groups.iter().map(|(c, us)| us.len()).max().unwrap() < 10 {
+   |                            ^ help: if this is intentional, prefix it with an underscore: `_c`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/constraints/mddlinear.rs:196:9
+    |
+196 |     let mut mdd = Mdd {
+    |         ----^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/solvers/cadical.rs:103:14
+    |
+103 |     fn solve(&mut self) -> SatResult<Self::Lit> {
+    |              ^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here
+    |              |
+    |              the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+103 |     fn solve(&mut self) -> SatResult<'_, Self::Lit> {
+    |                                      +++
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> /home/tuyenkv/projects/master-batch-v26/salvers/satcoder/src/solvers/cadical.rs:118:9
+    |
+118 |         &mut self,
+    |         ^^^^^^^^^ the lifetime is elided here
+119 |         assumptions: impl IntoIterator<Item = Bool>,
+120 |     ) -> SatResultWithCore<Self::Lit> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+    |
+120 |     ) -> SatResultWithCore<'_, Self::Lit> {
+    |                            +++
+
+   Compiling idl v0.1.0 (/home/tuyenkv/projects/master-batch-v26/salvers/idl)
+warning: `satcoder` (lib) generated 9 warnings (run `cargo fix --lib -p satcoder` to apply 5 suggestions)
+   Compiling ddd v0.1.0 (/home/tuyenkv/projects/master-batch-v26/maxsattrainscheduling)
+warning: unused imports: `Bool`, `SatSolverWithCore`, `constraints::Totalizer`, and `prelude::SymbolicModel`
+  --> src/solvers/ddd/maxsat_ladder_abstract.rs:15:5
+   |
+15 |     constraints::Totalizer, prelude::SymbolicModel, Bool, SatInstance, SatSolverWithCore,
+   |     ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^               ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `ddd::shared::costtree::CostTree`
+  --> src/solvers/ddd/maxsat_ladder_abstract.rs:95:22
+   |
+95 | use crate::solvers::{ddd::shared::costtree::CostTree, SolverError};
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `HashSet`
+ --> src/solvers/ddd/shared/common.rs:4:38
+  |
+4 |     collections::{BTreeMap, HashMap, HashSet},
+  |                                      ^^^^^^^
+
+warning: unused import: `ResourceInterval`
+  --> src/solvers/ddd/shared/common.rs:11:13
+   |
+11 |     debug::{ResourceInterval, SolverAction},
+   |             ^^^^^^^^^^^^^^^^
+
+warning: unused import: `typed_index_collections::TiVec`
+ --> src/solvers/legacy/maxsat_ddd.rs:4:5
+  |
+4 | use typed_index_collections::TiVec;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `serde::Serialize`
+ --> src/solvers/legacy/maxsat_ti.rs:1:5
+  |
+1 | use serde::Serialize;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `BufRead`, `BufReader`, `Read`, and `fmt::Display`
+ --> src/solvers/legacy/maxsat_ti.rs:4:5
+  |
+4 |     fmt::Display,
+  |     ^^^^^^^^^^^^
+5 |     io::{BufRead, BufReader, Read},
+  |          ^^^^^^^  ^^^^^^^^^  ^^^^
+
+warning: unused import: `External`
+  --> src/solvers/legacy/maxsat_ti.rs:11:20
+   |
+11 |     maxsatsolver::{External, MaxSatSolver},
+   |                    ^^^^^^^^
+
+warning: unused import: `SatInstance`
+  --> src/solvers/ddd/maxsat_ladder_abstract.rs:15:59
+   |
+15 |     constraints::Totalizer, prelude::SymbolicModel, Bool, SatInstance, SatSolverWithCore,
+   |                                                           ^^^^^^^^^^^
+
+warning: unused variable: `arg0`
+   --> src/maxsatsolver.rs:207:29
+    |
+207 |             Self::Totalizer(arg0, arg1) => f.debug_tuple("Totalizer").field(arg1).finish(),
+    |                             ^^^^ help: if this is intentional, prefix it with an underscore: `_arg0`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `timeout`
+   --> src/maxsatsolver.rs:302:9
+    |
+302 |         timeout: Option<f64>,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_timeout`
+
+warning: variable does not need to be mutable
+   --> src/maxsatsolver.rs:560:17
+    |
+560 |             let mut obj_val = i32::MIN;
+    |                 ----^^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `obj_val`
+   --> src/maxsatsolver.rs:560:17
+    |
+560 |             let mut obj_val = i32::MIN;
+    |                 ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_obj_val`
+
+warning: variable does not need to be mutable
+    --> src/solvers/ddd/incremental_sat.rs:1706:13
+     |
+1706 |         let mut try_seed_pair =
+     |             ----^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable `n_timepoints` is assigned to, but never used
+    --> src/solvers/ddd/incremental_sat.rs:1565:9
+     |
+1565 |     let mut n_timepoints = 0usize;
+     |         ^^^^^^^^^^^^^^^^
+     |
+     = note: consider using `_n_timepoints` instead
+
+warning: variable `n_conflict_constraints` is assigned to, but never used
+    --> src/solvers/ddd/incremental_sat.rs:1566:9
+     |
+1566 |     let mut n_conflict_constraints = 0usize;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: consider using `_n_conflict_constraints` instead
+
+warning: value assigned to `n_timepoints` is never read
+    --> src/solvers/ddd/incremental_sat.rs:2363:13
+     |
+2363 |             n_timepoints += 1;
+     |             ^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `n_timepoints` is never read
+    --> src/solvers/ddd/incremental_sat.rs:1590:13
+     |
+1590 |             n_timepoints += 1;
+     |             ^^^^^^^^^^^^^^^^^ this value is reassigned later and never used
+...
+1606 |                         n_timepoints += 1;
+     |                         ----------------- `n_timepoints` is overwritten here before the previous value is read
+
+warning: value assigned to `n_timepoints` is never read
+    --> src/solvers/ddd/incremental_sat.rs:1606:25
+     |
+1606 |                         n_timepoints += 1;
+     |                         ^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `n_conflict_constraints` is never read
+    --> src/solvers/ddd/incremental_sat.rs:2242:17
+     |
+2242 |                 n_conflict_constraints += 1;
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+    --> src/solvers/ddd/puresat.rs:1445:13
+     |
+1445 |         let mut try_seed_pair =
+     |             ----^^^^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable `n_timepoints` is assigned to, but never used
+    --> src/solvers/ddd/puresat.rs:1301:9
+     |
+1301 |     let mut n_timepoints = 0usize;
+     |         ^^^^^^^^^^^^^^^^
+     |
+     = note: consider using `_n_timepoints` instead
+
+warning: variable `n_conflict_constraints` is assigned to, but never used
+    --> src/solvers/ddd/puresat.rs:1302:9
+     |
+1302 |     let mut n_conflict_constraints = 0usize;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: consider using `_n_conflict_constraints` instead
+
+warning: value assigned to `n_timepoints` is never read
+    --> src/solvers/ddd/puresat.rs:2156:13
+     |
+2156 |             n_timepoints += 1;
+     |             ^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `n_timepoints` is never read
+    --> src/solvers/ddd/puresat.rs:1326:13
+     |
+1326 |             n_timepoints += 1;
+     |             ^^^^^^^^^^^^^^^^^ this value is reassigned later and never used
+...
+1342 |                         n_timepoints += 1;
+     |                         ----------------- `n_timepoints` is overwritten here before the previous value is read
+
+warning: value assigned to `n_timepoints` is never read
+    --> src/solvers/ddd/puresat.rs:1342:25
+     |
+1342 |                         n_timepoints += 1;
+     |                         ^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `n_conflict_constraints` is never read
+    --> src/solvers/ddd/puresat.rs:1996:17
+     |
+1996 |                 n_conflict_constraints += 1;
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: unused variable: `problem`
+   --> src/solvers/ddd/shared/common.rs:146:16
+    |
+146 |     pub fn new(problem: &Problem, solver: &mut impl SatInstance<L>) -> Self {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_problem`
+
+warning: unused variable: `solver`
+   --> src/solvers/ddd/shared/common.rs:146:35
+    |
+146 |     pub fn new(problem: &Problem, solver: &mut impl SatInstance<L>) -> Self {
+    |                                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_solver`
+
+warning: unused variable: `problem`
+   --> src/solvers/ddd/shared/common.rs:153:36
+    |
+153 |     pub fn extract_solution(&self, problem: &Problem) -> Vec<Vec<i32>> {
+    |                                    ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_problem`
+
+warning: unused variable: `solver`
+   --> src/solvers/ddd/shared/common.rs:160:9
+    |
+160 |         solver: &mut impl SatInstance<L>,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_solver`
+
+warning: unused variable: `sol`
+   --> src/solvers/ddd/shared/common.rs:161:9
+    |
+161 |         sol: &[Vec<i32>],
+    |         ^^^ help: if this is intentional, prefix it with an underscore: `_sol`
+
+warning: unused variable: `model`
+   --> src/solvers/ddd/shared/common.rs:169:35
+    |
+169 |     pub fn apply_model(&mut self, model: &impl satcoder::prelude::SymbolicModel<L>) {
+    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_model`
+
+warning: variable does not need to be mutable
+   --> src/solvers/ddd/shared/common.rs:180:9
+    |
+180 |         mut on_action: impl FnMut(SolverAction),
+    |         ----^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `solver`
+   --> src/solvers/ddd/shared/common.rs:177:9
+    |
+177 |         solver: &mut impl SatInstance<L>,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_solver`
+
+warning: unused variable: `problem`
+   --> src/solvers/ddd/shared/common.rs:178:9
+    |
+178 |         problem: &Problem,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_problem`
+
+warning: unused variable: `stats`
+   --> src/solvers/ddd/shared/common.rs:179:9
+    |
+179 |         stats: &mut SolveStats,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_stats`
+
+warning: unused variable: `on_action`
+   --> src/solvers/ddd/shared/common.rs:180:9
+    |
+180 |         mut on_action: impl FnMut(SolverAction),
+    |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_action`
+
+warning: variable does not need to be mutable
+   --> src/solvers/ddd/shared/common.rs:195:9
+    |
+195 |         mut on_cost: impl FnMut(CostTerm<L>),
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `solver`
+   --> src/solvers/ddd/shared/common.rs:191:9
+    |
+191 |         solver: &mut impl SatInstance<L>,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_solver`
+
+warning: unused variable: `problem`
+   --> src/solvers/ddd/shared/common.rs:192:9
+    |
+192 |         problem: &Problem,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_problem`
+
+warning: unused variable: `delay_cost_type`
+   --> src/solvers/ddd/shared/common.rs:193:9
+    |
+193 |         delay_cost_type: DelayCostType,
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_delay_cost_type`
+
+warning: unused variable: `mode`
+   --> src/solvers/ddd/shared/common.rs:194:9
+    |
+194 |         mode: CostMode,
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_mode`
+
+warning: unused variable: `on_cost`
+   --> src/solvers/ddd/shared/common.rs:195:9
+    |
+195 |         mut on_cost: impl FnMut(CostTerm<L>),
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_cost`
+
+warning: variable does not need to be mutable
+  --> src/solvers/legacy/maxsat_ddd.rs:21:5
+   |
+21 |     mut output_stats: impl FnMut(String, serde_json::Value),
+   |     ----^^^^^^^^^^^^
+   |     |
+   |     help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> src/solvers/legacy/maxsat_ddd.rs:32:9
+   |
+32 |     let mut n_new_intervals = 0;
+   |         ----^^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `visit_idx`
+   --> src/solvers/legacy/maxsat_ddd.rs:172:24
+    |
+172 |                 .map(|(visit_idx, v)| {
+    |                        ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_visit_idx`
+
+warning: unused variable: `env`
+  --> src/solvers/legacy/maxsat_ddd.rs:16:5
+   |
+16 |     env: &grb::Env,
+   |     ^^^ help: if this is intentional, prefix it with an underscore: `_env`
+
+warning: unused variable: `output_stats`
+  --> src/solvers/legacy/maxsat_ddd.rs:21:5
+   |
+21 |     mut output_stats: impl FnMut(String, serde_json::Value),
+   |     ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_output_stats`
+
+warning: unused variable: `n_new_intervals`
+  --> src/solvers/legacy/maxsat_ddd.rs:32:9
+   |
+32 |     let mut n_new_intervals = 0;
+   |         ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_n_new_intervals`
+
+warning: variable `n_traveltime` is assigned to, but never used
+  --> src/solvers/legacy/maxsat_ddd.rs:33:9
+   |
+33 |     let mut n_traveltime = 0;
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = note: consider using `_n_traveltime` instead
+
+warning: unused variable: `x`
+   --> src/solvers/legacy/maxsat_ddd.rs:169:17
+    |
+169 |             let x = occupations[train_idx]
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_x`
+
+warning: value assigned to `n_traveltime` is never read
+   --> src/solvers/legacy/maxsat_ddd.rs:377:25
+    |
+377 |                         n_traveltime += 1;
+    |                         ^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: variable does not need to be mutable
+   --> src/solvers/legacy/maxsat_ddd.rs:842:9
+    |
+842 |     let mut solver_time = std::time::Duration::ZERO;
+    |         ----^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `time_out`
+   --> src/solvers/legacy/maxsat_ddd.rs:890:42
+    |
+890 | ...                   .map(|(time, time_out)| {
+    |                                    ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_time_out`
+
+warning: unused variable: `env`
+   --> src/solvers/legacy/maxsat_ddd.rs:834:5
+    |
+834 |     env: &grb::Env,
+    |     ^^^ help: if this is intentional, prefix it with an underscore: `_env`
+
+warning: unused variable: `visit`
+  --> src/solvers/legacy/maxsat_ti.rs:73:25
+   |
+73 |         for (visit_idx, visit) in train.visits.iter().enumerate() {
+   |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_visit`
+
+warning: variable does not need to be mutable
+   --> src/solvers/legacy/maxsat_ti.rs:192:5
+    |
+192 |     mut solver: impl MaxSatSolver,
+    |     ----^^^^^^
+    |     |
+    |     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/solvers/legacy/maxsat_ti.rs:202:9
+    |
+202 |     let mut solver_time = std::time::Duration::ZERO;
+    |         ----^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `output_stats`
+   --> src/solvers/legacy/maxsat_ti.rs:197:5
+    |
+197 |     output_stats: impl FnMut(String, serde_json::Value),
+    |     ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_output_stats`
+
+warning: unused variable: `start_time`
+   --> src/solvers/legacy/maxsat_ti.rs:201:9
+    |
+201 |     let start_time = std::time::Instant::now();
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `solver_time`
+   --> src/solvers/legacy/maxsat_ti.rs:202:9
+    |
+202 |     let mut solver_time = std::time::Duration::ZERO;
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_solver_time`
+
+warning: value assigned to `logged_incumbent` is never read
+   --> src/solvers/milp/bigm.rs:487:25
+    |
+487 |                         logged_incumbent = Some(ub_cost);
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `visit`
+  --> src/solvers/milp/milp_ti.rs:73:25
+   |
+73 |         for (visit_idx, visit) in train.visits.iter().enumerate() {
+   |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_visit`
+
+warning: variable does not need to be mutable
+   --> src/solvers/milp/milp_ti.rs:218:9
+    |
+218 |     let mut solver_time = std::time::Duration::ZERO;
+    |         ----^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `output_stats`
+   --> src/solvers/milp/milp_ti.rs:213:5
+    |
+213 |     output_stats: impl FnMut(String, serde_json::Value),
+    |     ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_output_stats`
+
+warning: unused variable: `start_time`
+   --> src/solvers/milp/milp_ti.rs:217:9
+    |
+217 |     let start_time = std::time::Instant::now();
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `solver_time`
+   --> src/solvers/milp/milp_ti.rs:218:9
+    |
+218 |     let mut solver_time = std::time::Duration::ZERO;
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_solver_time`
+
+warning: value assigned to `logged_incumbent` is never read
+   --> src/solvers/milp/mipdddpack.rs:457:25
+    |
+457 |                         logged_incumbent = Some(ub_cost);
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `res_id`
+   --> src/solvers/util/heuristic.rs:351:14
+    |
+351 |         for (res_id, res) in resource_usage.iter().enumerate() {
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_res_id`
+
+warning: unused variable: `case_idx`
+   --> src/solvers/util/heuristic.rs:428:25
+    |
+428 |             'case: for (case_idx, (ts, (n1, n2), cost_increase)) in cases.iter_mut().enumerate() {
+    |                         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_case_idx`
+
+warning: value assigned to `old_cost` is never read
+   --> src/solvers/util/heuristic.rs:444:40
+    |
+444 |                       let mut old_cost = (-1, -1);
+    |                                          ^^^^^^^^ this value is reassigned later and never used
+...
+447 | /                         old_cost = (
+448 | |                             train.visit_delay_cost(delay_cost_type, vi as usize, *this_t) as i32,
+449 | |                             train.visit_delay_cost(tiebreak_obj, vi as usize, *this_t) as i32,
+450 | |                         );
+    | |_________________________- `old_cost` is overwritten here before the previous value is read
+
+warning: value assigned to `new_cost` is never read
+   --> src/solvers/util/heuristic.rs:445:40
+    |
+445 |                       let mut new_cost = (-1, -1);
+    |                                          ^^^^^^^^ this value is reassigned later and never used
+...
+451 | /                         new_cost = (
+452 | |                             train.visit_delay_cost(delay_cost_type, vi as usize, new_time) as i32,
+453 | |                             train.visit_delay_cost(tiebreak_obj, vi as usize, new_time) as i32,
+454 | |                         );
+    | |_________________________- `new_cost` is overwritten here before the previous value is read
+
+warning: variable does not need to be mutable
+  --> src/lib.rs:14:9
+   |
+14 |     let mut printed = false;
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `last_core_size`
+  --> src/lib.rs:18:17
+   |
+18 |             let last_core_size = core.len();
+   |                 ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_last_core_size`
+
+warning: variable does not need to be mutable
+  --> src/lib.rs:49:9
+   |
+49 |     let mut trimmed = false;
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: method `take_interrupted` is never used
+   --> src/solvers/ddd/incremental_sat.rs:164:8
+    |
+137 | impl NativeSolver {
+    | ----------------- method in this implementation
+...
+164 |     fn take_interrupted(&mut self) -> bool {
+    |        ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `inject_solution_timepoints_sat` is never used
+    --> src/solvers/ddd/incremental_sat.rs:1197:4
+     |
+1197 | fn inject_solution_timepoints_sat<L: satcoder::Lit>(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `take_interrupted` is never used
+   --> src/solvers/ddd/puresat.rs:150:8
+    |
+123 | impl NativeSolver {
+    | ----------------- method in this implementation
+...
+150 |     fn take_interrupted(&mut self) -> bool {
+    |        ^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `take_interrupted` are never used
+   --> src/solvers/ddd/puresat.rs:307:8
+    |
+306 | impl TrackedSolver {
+    | ------------------ associated items in this implementation
+307 |     fn new() -> Self {
+    |        ^^^
+...
+378 |     fn take_interrupted(&mut self) -> bool {
+    |        ^^^^^^^^^^^^^^^^
+
+warning: function `inject_solution_timepoints_sat` is never used
+   --> src/solvers/ddd/puresat.rs:987:4
+    |
+987 | fn inject_solution_timepoints_sat<L: satcoder::Lit>(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `vars` is never read
+  --> src/solvers/milp/binarizedbigm.rs:15:5
+   |
+14 | struct TimeIndexedVar {
+   |        -------------- field in this struct
+15 |     vars: Vec<(i32, grb::Var)>,
+   |     ^^^^
+
+warning: field `problem` is never read
+   --> src/solvers/milp/binarizedbigm.rs:451:5
+    |
+450 | struct ConflictInformation<'a> {
+    |        ------------------- field in this struct
+451 |     problem: &'a Problem,
+    |     ^^^^^^^
+
+warning: `ddd` (lib test) generated 83 warnings (run `cargo fix --lib -p ddd --tests` to apply 57 suggestions)
+    Finished `release` profile [optimized] target(s) in 1m 43s
+warning: the following packages contain code that will be rejected by a future version of Rust: bitflags v0.8.2
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/lib.rs (target/release/deps/ddd-c31d982d45065086)
+
+running 78 tests
+test problem::tests::verify_solution_accepts_entry_at_earliest ... ok
+test problem::tests::verify_solution_accepts_touching_half_open_intervals ... ok
+test problem::tests::verify_solution_rejects_entry_before_earliest ... ok
+test problem::tests::verify_solution_rejects_one_second_resource_overlap ... ok
+test solvers::ddd::incremental_sat::maxsat_backend_tests::glucose_maxsat_core_contains_assumptions_with_the_correct_polarity ... ok
+test solvers::ddd::maxsat_ladder_sc::aglr::tests::filter_actions_before_budget_but_keep_different_times ... ok
+test solvers::ddd::maxsat_ladder_sc::aglr::tests::growth_counts_each_clause_and_each_distinct_new_point_once ... ok
+test solvers::ddd::maxsat_ladder_sc::aglr::tests::rescue_and_all_scanned_select_every_candidate ... ok
+test solvers::ddd::maxsat_ladder_sc::aglr::tests::selection_is_deterministic_and_rewards_shared_points ... ok
+test solvers::ddd::maxsat_ladder_sc::aglr::tests::waiting_candidate_becomes_mandatory_and_may_overflow_budget ... ok
+test solvers::ddd::maxsat_ladder_sc::backend_tests::cadical_is_native_and_cores_keep_the_assumption_polarity ... ok
+test solvers::ddd::maxsat_ladder_sc::core_exhaust::tests::native_proofs_preserve_every_feasible_weighted_assignment ... ok
+test solvers::ddd::maxsat_ladder_sc::core_exhaust::tests::only_new_unsat_proofs_raise_the_floor_and_budgets_are_respected ... ok
+test solvers::ddd::maxsat_ladder_sc::core_minimize::tests::low_weight_redundancy_is_removed_only_after_a_real_unsat_proof ... ok
+test solvers::ddd::maxsat_ladder_sc::core_minimize::tests::malformed_solver_cores_fail_instead_of_changing_the_cost_bound ... ok
+test solvers::ddd::maxsat_ladder_sc::core_minimize::tests::sat_deletion_budget_and_expired_deadline_preserve_the_proved_core ... ok
+test solvers::ddd::maxsat_ladder_sc::hardening::tests::equality_is_not_hardened_and_tightening_is_deterministic ... ok
+test solvers::ddd::maxsat_ladder_sc::hardening::tests::every_assignment_within_the_weighted_budget_survives ... ok
+test solvers::ddd::maxsat_ladder_sc::hardening::tests::inconsistent_verified_bounds_fail_instead_of_restricting_the_model ... ok
+test solvers::ddd::maxsat_ladder_sc::hardening::tests::residual_weights_after_a_core_keep_every_original_feasible_budget_assignment ... ok
+test solvers::ddd::maxsat_ladder_sc::order_cycles::tests::dag_and_zero_cycles_are_allowed_but_positive_cycle_is_separated ... ok
+test solvers::ddd::maxsat_ladder_sc::order_cycles::tests::every_enumerated_feasible_route_respects_the_cycle_cut ... ok
+test solvers::ddd::maxsat_ladder_sc::order_cycles::tests::exact_exit_detects_cycle_that_entry_plus_travel_misses ... ok
+test solvers::ddd::maxsat_ladder_sc::order_cycles::tests::four_node_cycle_needs_no_triangle_and_is_deterministic ... ok
+test solvers::ddd::maxsat_ladder_sc::order_cycles::tests::invalid_fixed_cycles_and_guards_are_rejected ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::batch_paths_keep_each_proof_and_deterministic_priority ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::canonical_cost_threshold_is_the_first_point_of_each_plateau ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::complete_schedule_and_cost_only_witnesses_respect_zero_components ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::exact_exit_and_fixed_route_edges_use_actual_travel_weights ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::long_chain_uses_iterative_linear_propagation_and_checked_times ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::objective_increase_precedes_large_time_shift_at_a_dummy_visit ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::path_clause_preserves_every_small_feasible_guarded_assignment ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::positive_cycle_is_blocked_before_path_propagation ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::whole_path_yields_exact_bound_and_only_its_required_guards ... ok
+test solvers::ddd::maxsat_ladder_sc::order_paths::tests::zero_cycles_propagate_external_and_earliest_bounds_without_false_conflicts ... ok
+test solvers::ddd::maxsat_ladder_sc::resource_orders::tests::a_single_refinement_projects_to_the_original_overlap_clause ... ok
+test solvers::ddd::maxsat_ladder_sc::resource_orders::tests::closing_triangles_creates_no_new_pairs_or_duplicate_clauses ... ok
+test solvers::ddd::maxsat_ladder_sc::resource_orders::tests::reversed_and_repeated_pairs_reuse_the_same_order_and_rows ... ok
+test solvers::ddd::maxsat_ladder_sc::resource_orders::tests::several_thresholds_preserve_both_orders_of_every_feasible_schedule ... ok
+test solvers::ddd::maxsat_ladder_sc::resource_orders::tests::temporal_cycle_cut_blocks_only_impossible_orders_and_respects_exact_exit ... ok
+test solvers::ddd::maxsat_ladder_sc::resource_orders::tests::triangle_truth_table_removes_exactly_the_two_cyclic_orientations ... ok
+test solvers::ddd::maxsat_ladder_sc::resource_orders::tests::triangles_preserve_every_feasible_three_occupation_schedule ... ok
+test solvers::ddd::maxsat_ladder_sc::settings::assumption_tests::assumption_schedules_reach_the_full_set_without_skipping_termination ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::assumption_strategies_match_enumeration_with_travel_and_resource_conflicts ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::bounded_core_minimization_matches_exhaustive_three_train_optimum ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::extracting_initial_cost_fixes_a_feasible_positive_cost_initial_schedule ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::initial_cost_residuals_preserve_exhaustive_optima_and_verified_bounds ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::legacy_and_aglr_match_exhaustive_optimum_on_tiny_problem ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::order_master_crossing_routes_match_exhaustive_time_schedules ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::order_master_matches_exhaustive_optima_with_final_occupations_and_constant_costs ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::residual_hardening_actually_fixes_an_expensive_alternative_and_preserves_optimum ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::temporal_cycle_cuts_match_exhaustive_two_route_optima ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::temporal_paths_match_exhaustive_cross_route_optima_with_cost_registration ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::aglr_end_to_end_tests::transitive_resource_orders_match_exhaustive_three_train_optimum ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::binary_objective_tests::bound_preserves_cost_tree_choices_when_thresholds_arrive_out_of_order ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::binary_objective_tests::comparator_and_subtraction_match_exhaustive_truth_tables ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::binary_objective_tests::incremental_weighted_bound_handles_zero_large_terms_and_tightening ... ok
+test solvers::ddd::maxsat_ladder_sc::solve::binary_objective_tests::sparse_cost_tree_matches_all_threshold_subsets_and_bounds ... ok
+test solvers::ddd::shared::precedence::tests::test_both_resource_orders_infeasible ... ok
+test solvers::ddd::shared::precedence::tests::test_chain_earliest_propagates ... ok
+test solvers::ddd::shared::precedence::tests::test_forced_order_detected ... ok
+test solvers::ddd::shared::precedence::tests::test_forced_order_detected_when_resource_pair_is_reversed ... ok
+test solvers::ddd::shared::precedence::tests::test_forced_order_propagates_both_bounds ... ok
+test solvers::ddd::shared::precedence::tests::test_multiple_forced_orders_propagate_across_trains ... ok
+test solvers::ddd::shared::precedence::tests::test_tighten_ub_continuous ... ok
+test solvers::ddd::shared::precedence::tests::test_tighten_ub_infinite_steps_180 ... ok
+test solvers::ddd::shared::precedence::tests::test_tighten_ub_skips_visit_without_aimed_time ... ok
+test solvers::ddd::shared::refinement::tests::budget_counts_distinct_new_points ... ok
+test solvers::ddd::shared::refinement::tests::fallback_selects_oldest_when_budget_is_zero ... ok
+test solvers::ddd::shared::refinement::tests::old_package_is_not_starved_by_budget ... ok
+test solvers::util::cadical_deadline::tests::models_cores_and_incremental_clauses_match_the_original_adapter ... ok
+test solvers::util::cadical_deadline::tests::native_unknown_becomes_a_deadline_not_a_false_unsat_core ... ok
+test solvers::util::cadical_deadline::tests::the_budget_is_not_reset_between_sat_queries ... ok
+test solvers::util::minisat_deadline::tests::a_limited_core_check_preserves_the_solver_for_an_unlimited_main_query ... ok
+test solvers::util::minisat_deadline::tests::a_native_interruption_does_not_become_false_unsat ... ok
+test solvers::util::minisat_deadline::tests::assumptions_cores_models_and_added_clauses_remain_correct ... ok
+test solvers::util::minisat_deadline::tests::dropping_a_solver_cancels_its_timer_before_deleting_native_state ... ok
+test solvers::util::minisat_deadline::tests::global_deadline_is_not_reset_by_another_query ... ok
+
+test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+

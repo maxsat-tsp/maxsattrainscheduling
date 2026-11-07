@@ -1,0 +1,41 @@
+{
+  "audit_passed": true,
+  "smokes": [
+    {
+      "objective": "finsteps123",
+      "status": "ok",
+      "proven": true,
+      "cost": 11,
+      "seconds": 5.477245915,
+      "max_batch": 28,
+      "partial_counter_available": true,
+      "raw_sha256": "a96f18a5e68d0f4e7efc594d2502ecedaccc4de1c831461dd167ed3f1ab52adb"
+    },
+    {
+      "objective": "infsteps180",
+      "status": "ok",
+      "proven": true,
+      "cost": 34,
+      "seconds": 7.822832023,
+      "max_batch": 29,
+      "partial_counter_available": true,
+      "raw_sha256": "12b27fc319731fb8e285469aefc8e178c8c59cc87ec0b7c7c67ff8abff22cef2"
+    },
+    {
+      "objective": "cont",
+      "status": "timeout",
+      "proven": false,
+      "cost": null,
+      "seconds": 30.0180155,
+      "max_batch": null,
+      "partial_counter_available": false,
+      "raw_sha256": "54899870b045f71920b2ece42c08574c1992bd6371da50749a2cddac0be8f8d2"
+    }
+  ],
+  "rust_tests_passed": 78,
+  "python_tests_passed": 111,
+  "binary_sha256": "6a0573da56a16fec83a8b2a926e49c001660331a17788c9d91cfd9c15884aa60",
+  "archive_sha256": "c7b0db5eccfd853559a7f8d845f2188bb6d9a8754a2fc0a0e408beb3ab76cbef",
+  "submission_passed": false,
+  "validator_issue": "The original validator required a counter that can be absent on native timeout. Assess the saved timeout, retaining the missing telemetry instead of inventing a zero."
+}

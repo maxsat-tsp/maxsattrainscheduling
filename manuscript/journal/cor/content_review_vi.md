@@ -2,10 +2,35 @@
 
 **Tệp:** `manuscript/journal/cor/main.tex`
 
-**Ngày rà soát:** 05-11-2026
+**Ngày cập nhật tình trạng thực nghiệm:** 07-11-2026
 
-**Trạng thái:** Methods đã khớp với mã AGLR; kết quả hội nghị đã được kiểm tra
-làm mốc chi phí; chưa có kết quả AGLR để nộp.
+**Trạng thái:** chưa đủ căn cứ kết luận vượt toàn bộ SOTA. Kết quả full tốt
+nhất là V17 `(72,68,63)` ở 300 giây, đã kiểm toán đủ 216 ca. V17 cải tiến
+RC2/ràng buộc thứ tự trên nhánh refinement legacy, không phải bằng chứng
+hiệu quả của bộ chọn AGLR trong Methods hiện tại.
+
+**Mốc mới ngày 07-11-2026:** trên cùng 31 ca khó ở 300 giây, V17 giải
+18, Journal 17, CSOnet 16; không mất ca so với hai đối chứng MaxSAT. Tính
+ở 120 giây, V17 đạt `(72,68,62)`, tổng 202; bảng Gurobi hội nghị là
+`(72,67,67)`, tổng 206. Vì vậy chưa dùng kết quả này để viết rằng đã vượt
+mọi baseline. Bộ MiniSAT/CaDiCaL đã có đối chứng chung cho ba phương
+pháp; giữ RC2 và SAT backend là hai thành phần khác nhau.
+
+V18--V21 hoàn tất 13 ca chưa giải mỗi lượt, chưa tăng coverage. V22--V24
+dừng tại bài thử thật trước ca khó; lịch tối ưu trả về đều qua kiểm tra.
+V25 đang thử riêng bốn ca infsteps180; V26 đã cài cách thêm nhiều mệnh đề
+chi phí từ một lịch và xếp chạy sau V25, phải qua test native trước đo.
+Số liệu tạm thời không thay thế bảng full. Chi tiết, công thức và lệnh
+chạy nằm trong `../experiment_progress_vi.md`, `../experiment_runbook_vi.md`
+và hướng dẫn sinh viên phiên bản 5.20.
+
+Theo yêu cầu đã chốt, runtime hội nghị có thể dùng theo giả định cùng
+phần cứng, bỏ qua khác biệt nhỏ về phiên bản; vẫn giữ rõ nguồn và timeout.
+Đây là cập nhật quy tắc sử dụng số liệu, không suy đoán metadata còn thiếu.
+Abstract, Results, Conclusion trong main.tex chưa sửa trong đợt này.
+
+Các mục dưới giữ lịch sử rà soát ngày 05-11; những nhận xét chưa có lượt
+chạy hoặc chưa dùng runtime hội nghị được thay thế bởi tình trạng trên.
 
 **Cập nhật thực nghiệm 05-11-2026:** đã chạy screen/promote trên 24 instance
 phát triển, tốt nhất `(24,22,19)`. Hai lượt cũ có crash sau khi ghi JSON mà
@@ -52,11 +77,11 @@ thông tin máy và hash của tệp chạy.
 
 | Mức | Vấn đề | Việc cần hoàn tất |
 |---|---|---|
-| P0 | Chưa có kết quả AGLR trên máy thực nghiệm. | Chạy `screen`, `promote`, `full`, rồi `confirm` nếu qua cổng. |
-| P0 | Chưa xác nhận `legacy` tái tạo CSOnet trên môi trường cuối. | So objective và trạng thái tối ưu; lưu commit, binary hash và log. |
-| P0 | Baseline CPLEX có thể thiếu hoặc khác môi trường. | Chạy lại hoặc chỉ dùng dữ liệu có nguồn gốc rõ ràng, `valid=true`, cận khớp và giới hạn tài nguyên tương đương. |
-| P0 | Thời gian hội nghị thiếu thông tin máy và hash của tệp chạy. | Chạy lại CSOnet cùng máy, timeout và giới hạn tài nguyên với AGLR; chỉ dùng dữ liệu cũ để kiểm tra chi phí. |
-| P0 | Abstract và Results trống. | Chỉ viết sau khi `gate.passed=true` và lượt xác nhận hoàn tất. |
+| P0 | Phương pháp Methods và bằng chứng tốt nhất chưa cùng một cấu hình. | V17 là cải tiến RC2/legacy; chỉ viết kết luận theo phương pháp đã có kết quả full, hoặc hoàn tất chứng cứ riêng cho bộ chọn AGLR. |
+| P0 | Bảng so sánh cùng 300 giây chưa đủ bốn baseline. | Hoàn tất/kiểm toán Journal, CSOnet, Big-M Gurobi và CPLEX tại cùng cutoff; giữ riêng bảng hội nghị 120 giây. |
+| P0 | Chưa vượt toàn bộ SOTA theo coverage. | V17 full 203 ở 300 giây, còn Gurobi công bố 206 ở 120 giây; chưa tuyên bố vượt mọi MILP. |
+| P0 | V25/V26 chưa có bảng full và xác nhận. | Chạy ca chưa giải; chỉ xác nhận/hồi quy nếu có gain, rồi kiểm toán bảng đủ 216 ca của cấu hình đã khóa. |
+| P0 | Abstract và Results chưa có bằng chứng cuối. | Chỉ viết sau khi đủ bảng đối chứng và xác nhận; không dùng kết quả thử nhanh hoặc ghép cấu hình theo từng ca. |
 | P1 | CRediT, competing interests, funding và acknowledgements chưa xác nhận. | Các tác giả chốt trước khi nộp. |
 
 ## Kiểm tra diễn đạt

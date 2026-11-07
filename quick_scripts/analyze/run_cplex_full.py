@@ -80,9 +80,27 @@ def main() -> int:
         for objective, name in tasks:
             case = root / "cases" / "BigM-CPLEX" / objective / name
             result_file = case / f"{objective}.json"
+            invalid_marker = case / "invalid.json"
+            if invalid_marker.exists():
+                print(f"worker={args.worker_index} reusing invalid marker {objective}/{name}", flush=True)
+                continue
             if not result_file.exists():
                 print(f"worker={args.worker_index} running {objective}/{name}", flush=True)
-                extended.run_case("BigM-CPLEX", objective, name, runtime, case)
+                try:
+                    extended.run_case("BigM-CPLEX", objective, name, runtime, case)
+                except ValueError as error:
+                    # Keep the CPLEX log, LP and solution for diagnosis, but
+                    # do not let one invalid incumbent stop the full table.
+                    case.mkdir(parents=True, exist_ok=True)
+                    invalid_marker.write_text(json.dumps({
+                        "objective": objective,
+                        "name": name,
+                        "status": "invalid",
+                        "timeout_seconds": args.timeout,
+                        "error": str(error),
+                    }, indent=2) + "\n")
+                    print(f"worker={args.worker_index} INVALID {objective}/{name}: {error}", flush=True)
+                    continue
             record = extended.assess_case(case, "BigM-CPLEX", objective, name,
                                           args.timeout, extended.METHODS["BigM-CPLEX"])
             if record["errors"]:

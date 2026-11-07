@@ -46,6 +46,14 @@ không được tính vì dùng alias không nhận tham số period.
 `results/sat_research/v34_random_polarity_20261108/`; không dùng backend này
 cho bảng chính.
 
+**Baseline Big-M CPLEX đã chạy đủ 216 ca ở 120 giây.** Với exporter đã sửa,
+CPLEX chứng minh `finsteps123` 72/72, `infsteps180` 66/72 và `cont` 66/72,
+tổng 204/216. Có 11 ca trả lịch hợp lệ nhưng cận chưa khớp; riêng
+`infsteps180/trackA8` trả lịch chồng tài nguyên và được đánh dấu
+`invalid_solution`. Raw snapshot, CSV và audit nằm ở
+`results/sat_research/cplex_full_120_20261108/`. Không dùng ca invalid hoặc
+cận chưa khớp để tuyên bố tối ưu.
+
 ## Trạng thái mới nhất
 
 **V17 đã chạy đủ toàn bộ dữ liệu và qua kiểm tra độc lập:**

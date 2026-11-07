@@ -44,6 +44,11 @@ V34 là ablation MiniSAT random-polarity. Alias được kiểm tra signature v�
 chạy đủ 13 ca khó, nhưng không giải thêm ca nào; sinh viên chỉ dùng nó để
 tái tạo đối chứng, không dùng thay MiniSAT chuẩn trong bảng submission.
 
+Baseline CPLEX corrected đã hoàn tất 216 ca ở 120 giây. Dùng các CSV trong
+`results/sat_research/cplex_full_120_20261108/cplex_csv/`; auditor yêu cầu
+`valid=true` cho lịch và chỉ tính tối ưu khi `cost=lb=ub`. Một dòng
+`invalid_solution` và các dòng cận chưa khớp phải giữ nguyên, không sửa tay.
+
 ## Đối chứng MiniSAT và CaDiCaL: đã hoàn tất
 
 **Đã kiểm toán đủ 186/186 ca**, kết thúc lúc 22:33:58 ngày 06/11/2026,

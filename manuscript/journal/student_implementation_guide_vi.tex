@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.15}
+\fancyhead[R]{\small Phiên bản 5.16}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -67,7 +67,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.15, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.16, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -1229,6 +1229,47 @@ dependency, dữ liệu và tham số. Đọc \file{order_cycles_audit.json}:
 \file{maxsat_order_cycles_blocked} và \file{maxsat_order_cycle_time}.
 Chưa có kết quả hiệu năng V18 khi khởi chạy; cài xong chưa phải bằng chứng
 tốt hơn baseline.
+
+\section{Bước V19 dự phòng: tách phần chi phí chắc chắn phải trả}
+
+Gọi $\ell_v$ là thời điểm sớm nhất của lần đi qua $v$, sau khi truyền
+điều kiện di chuyển dọc tuyến tàu. Gọi $f_v(t)$ là chi phí khi vào lúc $t$.
+Mọi lịch hợp lệ có $t_v\geq\ell_v$, nên luôn phải trả ít nhất
+$c_v=f_v(\ell_v)$. Đặt $C_0=\sum_v c_v$. Ta viết lại đúng cùng chi phí:
+\[
+ \operatorname{cost}(t)=C_0+\sum_v\bigl(f_v(t_v)-c_v\bigr).
+\]
+Vì các hàm chi phí không giảm theo thời gian, các hạng trong tổng bên
+phải không âm. Cộng $C_0$ vào cận dưới ngay từ đầu, rồi cho RC2 tối ưu
+phần tăng thêm. Không cần dùng các core chỉ để phát hiện lại khoản chi
+phí đã biết này.
+
+Ví dụ, ba tàu cùng có thể vào sớm nhất lúc 5, với thời điểm dự kiến là
+1, 2 và 3. Phần bắt buộc của chi phí liên tục là $4+3+2=9$.
+Nếu lịch cuối cho các tàu vào lúc 5, 7 và 9, chi phí đầy đủ là
+$4+5+6=15$. Phần RC2 còn phải tính là $0+2+4=6$, cộng lại vẫn là 15.
+
+Khi cài, thay chi phí đưa vào CostTree bằng $f_v(t)-c_v$ và đặt LB ban đầu
+bằng $C_0$. Nếu có nghiệm hợp lệ chi phí $U$, giới hạn của phần còn lại
+là $U-C_0$. Chi phí lịch, LB và UB báo ra ngoài vẫn là số đầy đủ. Phải
+trừ cùng khoản $C_0$ khi khởi tạo hoặc siết giới hạn objective; nếu chỉ
+trừ ở một nơi sẽ tính sai. Phép tách cũng xử lý đúng bài nhỏ có lịch ban
+đầu đã hợp lệ nhưng chi phí dương.
+
+Cờ \file{--maxsat-ladder-sc-extract-initial-cost true} mặc định false;
+biến Bash là \file{MAXSATDDD_EXTRACT_INITIAL_COST=true}.
+Số tiền tách được ghi ở \file{maxsat_initial_cost_offset}.
+Mã \code{20e24a9} đã qua kiểm tra kiểu Rust và 96 test Python trên local.
+Kiểm thử Rust mới so với vét cạn trên ba hàm mục tiêu, gồm các tổ hợp cây
+chi phí thưa, giới hạn objective, hardening, xử lý core và hai SAT backend.
+Các kiểm thử này còn phải chạy native trên VM trước thí nghiệm.
+
+V19 chỉ tiếp tục khi V18 đã chạy đủ, qua audit và không có ca mới.
+Nếu V18 có ca mới, giữ lại để xác nhận trước. Khi chạy V19, giữ cấu hình
+V17 và tắt chu trình; chỉ thay phép tách chi phí, rồi thử 13 ca còn lại.
+Script dùng \file{targeted_order_cycles.py} với
+\file{--component initial-cost}; báo cáo là \file{initial_cost_audit.json}.
+Chưa có kết quả hiệu năng V19 khi xếp hàng. Lệnh đầy đủ ở runbook.
 
 \section{Nội dung được phép đưa vào bài báo}
 

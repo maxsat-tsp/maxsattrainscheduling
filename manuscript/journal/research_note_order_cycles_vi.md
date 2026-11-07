@@ -110,3 +110,31 @@ lần đi qua cuối khi tìm xung đột. Vì vậy bài nhỏ đối chứng d
 kiểm thử kernel vẫn xét cả trường hợp lần đi qua cuối có thời gian dương.
 Hai lần kiểm thử dừng được lưu nguyên log; chưa chạy ca hiệu năng nào
 trước khi chúng được giải quyết.
+
+## Phép thử V19 tách chi phí ban đầu
+
+Đã cài cờ riêng, mặc định tắt, ở mã `20e24a9`. Cộng phần chi phí chắc
+chắn ở lịch sớm nhất vào LB một lần và chỉ mã hóa phần tăng thêm. Nếu dùng
+giới hạn objective, cũng trừ khoản này khỏi UB. Cờ bật xử lý đúng ví dụ
+lịch ban đầu hợp lệ có chi phí dương; đường baseline khi tắt vẫn giữ nguyên.
+Hai kiểm thử mới bao phủ ví dụ này và lịch nhỏ vét cạn cùng các tùy chọn
+RC2/giới hạn objective. Kiểm tra kiểu Rust và 96 test Python đã đạt; kiểm
+thử native còn chờ. Xem công thức và ví dụ dễ đọc trong hướng dẫn sinh viên.
+Controller chỉ thử hiệu năng V19 nếu V18 đã hoàn tất mà không có ca mới.
+
+## Hướng cần đánh giá tiếp nếu cả hai phép thử chưa tăng coverage
+
+Có thể dùng chính đồ thị thứ tự để suy ra thời điểm sớm nhất theo cả chuỗi,
+không chỉ tìm chu trình bất khả thi. Với một đường đi từ lần s tới lần v,
+các cạnh đều bật bởi các lựa chọn thứ tự o1,...,om, ta có:
+
+    (o1 và ... và om) suy ra t_v >= earliest_s + tổng thời gian trên đường.
+
+Nếu model hiện tại chọn v sớm hơn mức đó, thêm một mốc tại v và một mệnh
+đề có điều kiện tương ứng. Ví dụ A phải đi ít nhất 3 giây tới chỗ gặp B,
+và thứ tự chọn A rời trước B vào, thì có thể truyền cả cận này tới B ngay.
+Điểm mới ở phép thử dự kiến là truyền một chuỗi đầy đủ thay vì đợi DDD
+phát hiện từng vi phạm ở từng cặp mốc. Đây mới là hướng nghiên cứu, chưa
+cài và chưa có số liệu. Phải chứng minh mệnh đề theo các literal trên đúng
+đường đi, xử lý chu trình thời gian 0 và đăng ký chi phí của mốc mới trước
+lần SAT tiếp theo. Không bật đồng thời với một thay đổi khác để sàng lọc.

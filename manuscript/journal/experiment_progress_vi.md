@@ -48,6 +48,24 @@ Nếu V18 có ca mới, phải xác nhận ba lần rồi kiểm tra các ca cũ
 bộ ba; đây là cải tiến RC2/ràng buộc thứ tự, chưa phải kết quả của bộ chọn
 AGLR thích nghi. Chưa đưa các số này vào Abstract, Results hay Conclusion.
 
+**Đang xác nhận riêng `trackB12/cont` của V17:** ba lần với đúng binary và
+tham số V17, timeout 300 giây. Đây là ca V17 giải thêm so với Journal trong
+nhóm 31 cặp. Dùng nhóm lõi vật lý `2,3,6,7`, tách khỏi nhóm V18. Thời gian
+của xác nhận song song chỉ phục vụ chẩn đoán, không ghép vào PAR-2 cuối.
+Dịch vụ `maxsat-v17-trackB12-confirm.service`, bắt đầu lúc **08:32:15
+ngày 07/11**, giới hạn cả vòng 20 phút.
+
+**Đã chuẩn bị V19 nếu V18 không giải thêm:** tách phần chi phí bắt buộc ở
+lịch sớm nhất khỏi các phần chi phí RC2 còn phải tối ưu. Mã `20e24a9`,
+cờ `--maxsat-ladder-sc-extract-initial-cost` mặc định false. Kiểm tra kiểu
+Rust và 96 test Python đạt trên local; kiểm thử Rust native còn chờ.
+Controller chỉ tiếp tục sau khi V18 xong, qua audit và không có ca mới.
+Nếu V18 có ca mới, giữ kết quả để xác nhận trước, không tự đổi cấu hình.
+V19 tắt chu trình, dùng cấu hình V17 và chỉ thêm phép tách chi phí; không
+sửa binary hoặc thư mục V18 đang chạy. Mỗi vòng gồm cả chờ, kiểm thử,
+build và chạy tối đa 6 giờ. Chi tiết ở runbook và
+`results/sat_research/initial_cost_v19_20261107/`.
+
 ## Diễn biến V16 và V17 đã hoàn tất
 
 **V16 giải thêm hai ca nhưng mất một ca cũ khi hồi quy.** Hai cấu hình
@@ -115,7 +133,7 @@ khôi phục. Vì vậy chưa quy kết việc khôi phục chỉ cho cơ chế 
 Hướng dự phòng về chu trình thứ tự được ghi trong
 `research_note_order_cycles_vi.md`; mã đã cài và kiểm thử; V18 chưa có kết quả hiệu năng khi khởi chạy.
 
-Hướng dẫn sinh viên bản 5.15 có công thức, ví dụ và lệnh chạy hiện tại.
+Hướng dẫn sinh viên bản 5.16 có công thức, ví dụ và lệnh chạy hiện tại.
 Bản thảo COR giữ số liệu chính cho đến khi hoàn tất kiểm tra và đánh giá full.
 
 ## Chi tiết các lượt V16 và đối chứng backend

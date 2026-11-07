@@ -1,0 +1,21 @@
+{
+  "source_commit": "20e24a9",
+  "service": "maxsat-initial-cost-v19.service",
+  "started_at_utc": "2026-11-07T01:29:28Z",
+  "worktree": "/home/tuyenkv/projects/initial-cost-v19/maxsattrainscheduling",
+  "stage": "waiting-for-v18",
+  "prerequisite": "maxsat-order-cycles-v18-v3.service",
+  "condition": "V18 complete, independently audited, zero newly solved pairs",
+  "maximum_round_seconds": 21600,
+  "timeout_seconds": 300,
+  "ram_kb": 6000000,
+  "cpu_affinity": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "expected_runs_if_condition_passes": 13,
+  "native_validation_pending": true,
+  "submission_passed": false
+}

@@ -202,7 +202,7 @@ phạm ít nhất một phần tử, thử chứng minh phải vi phạm ít nh�
 tử ngay trên bộ đếm của nhóm đó. Chỉ tăng cận sau một chứng minh UNSAT mới;
 SAT hoặc hết ngân sách thì giữ mức đã chứng minh. Đây là bước tối ưu RC2
 tham khảo [tài liệu PySAT](https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.exhaust_core).
-Ví dụ và công thức bảo toàn chi phí ở cuối hướng dẫn sinh viên, bản 5.15.
+Ví dụ và công thức bảo toàn chi phí ở cuối hướng dẫn sinh viên, bản 5.16.
 
 Cờ `--maxsat-ladder-sc-core-exhaust-checks` mặc định 0. V17 đặt 4; mỗi lời
 gọi thêm dùng ngân sách xung đột của cấu hình V16 được chọn. CLI yêu cầu
@@ -327,6 +327,53 @@ Theo dõi `maxsat_order_cycle_checks`, `maxsat_order_cycles_blocked` và
 hồi quy các ca V17 đã giải trước khi tính coverage full của V18. Chưa có
 kết quả V18 khi lập bản ghi khởi chạy này. Không ghép kết quả tốt nhất của
 V17 và V18 thành một solver.
+
+## V19 dự phòng: tách chi phí bắt buộc trước khi gọi RC2
+
+Mã `20e24a9`, cờ `--maxsat-ladder-sc-extract-initial-cost true`, mặc định
+false. Tại mỗi lần đi qua, tính chi phí ở thời điểm sớm nhất đã truyền
+dọc tuyến. Tổng này là phần chắc chắn phải trả; cộng một lần vào LB và
+chỉ mã hóa phần tăng thêm. Khi dùng giới hạn objective, trừ cùng phần
+bắt buộc khỏi UB trước khi giới hạn phần chi phí còn lại. Công thức và
+ví dụ số nằm trong hướng dẫn sinh viên.
+
+Worktree riêng `~/projects/initial-cost-v19/maxsattrainscheduling`, dịch vụ
+`maxsat-initial-cost-v19.service`. Controller chờ V18 kết thúc và kiểm toán
+lại đủ 13 ca. Chỉ tiếp tục nếu V18 không có ca mới. Nếu có ca mới, ghi quyết
+định giữ để xác nhận vào `initial-cost-v19-decision.json` rồi kết thúc;
+không chạy một cải tiến mới trước khi xử lý kết quả tốt hơn.
+
+Sau điều kiện trên, chạy toàn bộ test Rust/Python, build release, kiểm tra
+optimum 5526 trên `origA1/cont` khi bật/tắt tách chi phí, kiểm tra phần
+chi phí ban đầu tương ứng 4799/0, và kiểm tra timeout native. Chỉ khi tất
+cả đạt mới chạy 13 ca V17 chưa giải ở 300 giây. Biến thứ tự, core và các
+tham số V17 giữ nguyên; không bật chu trình V18 trong phép thử này.
+
+```bash
+systemctl status maxsat-initial-cost-v19.service --no-pager
+journalctl -u maxsat-initial-cost-v19.service -n 30 --no-pager
+```
+
+Lệnh chạy riêng khi không còn dịch vụ ghi vào cùng thư mục:
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component initial-cost \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary ./target/release/ddd \
+  --build-manifest results/aglr/initial-cost-v19-build/manifest.json \
+  --results results/aglr/initial-cost-v19-unresolved300 --round-seconds 14000
+python3 quick_scripts/analyze/targeted_order_cycles.py audit \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/initial-cost-v19-unresolved300
+```
+
+Tên script được giữ để dùng chung phần chọn ca và kiểm toán; tham số
+`--component initial-cost` khóa phép thử mới và ghi `initial_cost_audit.json`.
+Lệnh `audit` tự đọc loại phép thử từ manifest. Resume giữ cùng commit,
+binary, dependency, dữ liệu, CPU, RAM và tham số. Cả dịch vụ tối đa 6 giờ
+kể cả thời gian chờ; không chạy đồng thời hai solver của V18 và V19.
+V19 chưa có kết quả native hoặc hiệu năng khi xếp hàng.
 
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 

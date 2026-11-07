@@ -202,7 +202,7 @@ phạm ít nhất một phần tử, thử chứng minh phải vi phạm ít nh�
 tử ngay trên bộ đếm của nhóm đó. Chỉ tăng cận sau một chứng minh UNSAT mới;
 SAT hoặc hết ngân sách thì giữ mức đã chứng minh. Đây là bước tối ưu RC2
 tham khảo [tài liệu PySAT](https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.exhaust_core).
-Ví dụ và công thức bảo toàn chi phí ở cuối hướng dẫn sinh viên, bản 5.17.
+Ví dụ và công thức bảo toàn chi phí ở cuối hướng dẫn sinh viên, bản 5.18.
 
 Cờ `--maxsat-ladder-sc-core-exhaust-checks` mặc định 0. V17 đặt 4; mỗi lời
 gọi thêm dùng ngân sách xung đột của cấu hình V16 được chọn. CLI yêu cầu
@@ -387,7 +387,7 @@ lần đi qua sau. Nếu model SAT chọn một lần đi qua trước cận đ�
 thêm một mốc cùng mệnh đề có điều kiện theo đúng đường đi chứng minh.
 Một lần chỉ thêm một mệnh đề; chi phí mốc mới được đăng ký trước lần SAT
 kế tiếp. Kiểm tra chu trình dương và xử lý chu trình thời gian 0 nằm trong
-cùng bước này. Hướng dẫn sinh viên bản 5.17 có công thức và ví dụ.
+cùng bước này. Hướng dẫn sinh viên bản 5.18 có công thức và ví dụ.
 
 Native đã đạt **73 test Rust, 97 test Python**. Test lịch ba tàu đã thực
 sự tạo mệnh đề đường đi, kiểm tra optimum vét cạn trên ba objective với
@@ -485,6 +485,264 @@ tất, kèm manifest và hash từng file. Sau khi giải nén vào thư mục m
 lệnh `audit` ở trên kiểm tra cả hash bản chụp và nội dung kết quả. Bản
 chụp V20 đầu tiên có 2/13 ca và đã qua kiểm toán độc lập trong `progress_2/`;
 hai ca đều timeout, không phải kết quả cuối của V20.
+
+## V22: SAT chọn thứ tự, đồ thị tính lịch
+
+**Trạng thái cuối:** native đạt 76 test Rust và 106 test Python. Smoke
+`origA1/finsteps123` chứng minh đúng cost 11 ở 18,72 giây; `infsteps180`
+timeout hợp lệ ở 30 giây. Controller dừng trước ca khó. Dữ liệu ở
+`results/sat_research/order_master_v22_20261107/stopped_validation/`;
+không ghi thành 0/13. Các lệnh dưới giữ để tái tạo, không chạy trùng với
+lượt mới. V23 phía sau sửa cách dùng chung ngưỡng chi phí.
+
+V20 và V21 đã hoàn tất 13/13 ca, không giải thêm. Dữ liệu đã qua kiểm toán
+độc lập, ở `complete_13/` trong hai thư mục thực nghiệm tương ứng. Mốc tốt
+nhất full vẫn là V17 (72,68,63), tổng 203/216.
+
+Mã V22 `38f9aea` bật một biểu diễn riêng: `order_master=true`. SAT có đủ
+biến thứ tự cho các cặp khác tàu dùng tài nguyên xung đột; đồ thị tính
+lịch sớm nhất theo các hướng. Chỉ thêm ngưỡng ở lần đi qua có mức phạt
+tăng, không thêm mốc chỉ vì thời gian của một nút không có phạt tăng.
+Vòng RC2, CostTree và xử lý core được tái sử dụng. Nếu lịch hợp lệ có chi
+phí bằng LB thì chứng minh tối ưu; dữ liệu hội nghị chỉ được script đọc
+sau khi solver chạy xong. Hướng dẫn sinh viên 5.18 có công thức và ví dụ.
+
+Cờ `--maxsat-ladder-sc-order-master true` mặc định false, biến Bash
+`MAXSATDDD_ORDER_MASTER=true`; alias `maxsat_order_graph` tự bật master
+và biến thứ tự. Baseline mặc định giữ nguyên. Chế độ master không tạo
+hàng xung đột theo thời gian hoặc bộ ba ban đầu; số đo rows/triangles
+bằng 0 dù cờ bộ ba từ cấu hình nguồn còn được ghi để truy vết. Nó cũng
+tắt luồng heuristic cũ; lịch đồ thị mới là nguồn UB và phải được kiểm tra.
+
+76 test Rust đã đạt native trên VM. Có vét cạn ba hàm mục tiêu với
+MiniSAT/CaDiCaL, occupation cuối dương, chi phí ban đầu dương, sparse và
+giới hạn objective. Controller chạy lại 106 test Python, build release,
+kiểm tra `origA1` ở ba objective, alias và timeout trước ca khó. Hash các
+file Rust trong release phải khớp bản đã chạy native.
+
+Worktree `~/projects/order-master-v22/maxsattrainscheduling`, dịch vụ
+`maxsat-order-master-v22.service`. Mỗi ca 300 giây, 6.000.000 KB RAM,
+chạy lần lượt trên CPU `0,1,4,5`; cả service tối đa 6 giờ.
+
+```bash
+systemctl status maxsat-order-master-v22.service --no-pager
+journalctl -u maxsat-order-master-v22.service -n 30 --no-pager
+```
+
+Khi dịch vụ đã dừng, lệnh chạy tiếp giữ đúng source/binary/manifest là:
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component order-master \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary ./target/release/ddd \
+  --build-manifest results/aglr/order-master-v22-build/manifest.json \
+  --results results/aglr/order-master-v22-unresolved300 --round-seconds 7200
+python3 quick_scripts/analyze/targeted_order_cycles.py audit \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/order-master-v22-unresolved300
+```
+
+Đọc `order_master_audit.json` và `failure.json` nếu có. Theo dõi
+`maxsat_order_master_models`, `maxsat_order_master_schedules`, số cặp thứ
+tự, số mệnh đề đường đi, biến SAT, thời gian đồ thị và SAT. Sàng lọc chỉ
+có 13 ca; chưa chạy full lại trong bước này.
+
+Controller tự chuyển sang `confirm_component_gains.py` sau khi đủ 13 ca
+và audit đạt. Không có ca mới thì ghi quyết định và kết thúc. Có ca mới
+thì xác nhận ba lần với đúng binary/cấu hình; chỉ khi tất cả lặp lại
+thành công mới hồi quy 203 ca V17 đã giải. Mọi ca bị mất vẫn giữ trong
+báo cáo. Thời gian chờ, build, sàng lọc, xác nhận và hồi quy cùng chịu
+giới hạn 6 giờ; không đủ thời gian thì giữ phần đã xong và chưa báo full.
+
+Lệnh xác nhận/hồi quy riêng, khi không còn dịch vụ đang ghi dữ liệu:
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/confirm_component_gains.py \
+  --trial results/aglr/order-master-v22-unresolved300 \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary ./target/release/ddd \
+  --results results/aglr/order-master-v22-followup --round-seconds 14000
+python3 quick_scripts/analyze/confirm_component_gains.py --audit \
+  --trial results/aglr/order-master-v22-unresolved300 \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/order-master-v22-followup
+```
+
+Đọc `followup_audit.json`: `confirmed`, `regression_complete`,
+`regression_passed`, `lost`, `complete`. Auditor dựng lại kế hoạch từ
+trial nguồn, kiểm tra hash, provenance và từng nghiệm; không chỉ tin số
+đếm tổng. Cả hai báo cáo vẫn để `submission_passed=false`. Sau khi có
+bằng chứng mới đủ và audit độc lập, dựng bảng full 216 cặp của một cấu
+hình, không ghép ca tốt nhất của nhiều cấu hình.
+
+## V23: dùng chung một ngưỡng cho mỗi mức phạt trong master
+
+**Trạng thái cuối:** test native đạt 77 Rust, 107 Python; smoke
+finsteps123 có đúng cost 11 ở 27,78 giây, nhưng infsteps180 timeout hợp lệ
+ở 30 giây. Dừng trước 13 ca khó. Giữ các lệnh và dữ liệu để tái tạo;
+V24 dùng nguyên binary, chỉ đổi lịch gửi điều kiện.
+
+Mã `d8e2509`, cờ `--maxsat-ladder-sc-order-master-cost-levels true`, mặc
+định false và yêu cầu master bật. Mỗi đường chứng minh cận L chỉ tạo biến
+ở thời điểm đầu tiên có cùng chi phí với L, chặn dưới bởi earliest. Ví dụ
+aimed=0, `infsteps180`: L=200 và L=280 đều dùng mốc 181. Với chi phí liên
+tục dương, mốc vẫn là L. Giữ RC2 và lịch gửi `legacy` của V22 để đối chứng
+đúng một thay đổi. Công thức và ví dụ ở hướng dẫn sinh viên 5.20.
+
+Native đã qua **77 test Rust và 107 test Python**. Mốc đại diện được kiểm
+tra trên mọi thời điểm nhỏ của ba dạng chi phí, earliest nằm trong bậc,
+biên i32; master bật/tắt chuẩn hóa vẫn giữ optimum vét cạn với cả MiniSAT
+và CaDiCaL. Controller tiếp tục kiểm tra `origA1` ở cả ba objective, alias
+và timeout native trước khi chạy bất kỳ ca khó nào.
+
+Worktree `~/projects/master-levels-v23/maxsattrainscheduling`, dịch vụ
+`maxsat-master-levels-v23.service`, bắt đầu **13:34:56 ngày 07/11**, giờ
+Việt Nam. Mỗi ca 300 giây, 6.000.000 KB RAM,
+chạy lần lượt trên CPU `0,1,4,5`. Cả service tối đa 6 giờ, gồm build,
+kiểm tra, sàng lọc và xác nhận/hồi quy nếu có ca mới. Nếu thử nhanh không
+đạt thì dừng, giữ bản ghi và không báo thành 0/13.
+
+```bash
+systemctl status maxsat-master-levels-v23.service --no-pager
+journalctl -u maxsat-master-levels-v23.service -n 30 --no-pager
+```
+
+Khi service đã dừng, lệnh tái tạo/tiếp tục với cùng nguồn và binary là:
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component order-master-levels \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary ./target/release/ddd \
+  --build-manifest results/aglr/master-levels-v23-build/manifest.json \
+  --results results/aglr/master-levels-v23-unresolved300 --round-seconds 7200
+python3 quick_scripts/analyze/targeted_order_cycles.py audit \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/master-levels-v23-unresolved300
+```
+
+Đọc `order_master_levels_audit.json`. Xác nhận/hồi quy dùng script và
+quy tắc V22, đổi đường dẫn trial thành `master-levels-v23-unresolved300`,
+thư mục followup thành `master-levels-v23-followup`. Chỉ khi ba lần xác
+nhận mọi gain đạt mới chạy 203 ca hồi quy. Theo dõi `confirmed`,
+`regression_passed`, `lost` và `complete`; báo cáo không tự báo submission
+PASS. Không ghép thời gian hoặc ca tốt nhất giữa V22 và V23.
+
+## V24: master dùng ngưỡng đại diện và gửi đủ điều kiện chi phí
+
+Runner `080edb7` dùng lại solver `d8e2509` và build manifest của V23.
+Chỉ đổi `assumptions=legacy` thành `full`; không build một bản Rust mới.
+77 test Rust của binary V23 vẫn áp dụng, runner chạy thêm 108 test Python.
+V24 đã dừng trước ca khó: finsteps123 và infsteps180 giải đúng ở 15,62
+và 13,73 giây; cont timeout hợp lệ ở 30 giây. Raw và kiểm toán riêng ở
+`results/sat_research/master_full_v24_20261107/stopped_validation/`.
+Các smoke V23 vẫn giữ, không đổi nhãn thành V24.
+
+Worktree `~/projects/master-full-v24/maxsattrainscheduling`, dịch vụ
+`maxsat-master-full-v24.service`. Controller và validator được giữ trong
+`results/sat_research/master_full_v24_20261107/`. Cùng 300 giây và
+6.000.000 KB mỗi ca, chạy tuần tự trên CPU `0,1,4,5`; cả service tối đa
+6 giờ. Nếu có gain thì xác nhận ba lần và hồi quy trong thời gian còn lại.
+
+```bash
+systemctl status maxsat-master-full-v24.service --no-pager
+journalctl -u maxsat-master-full-v24.service -n 30 --no-pager
+```
+
+Lệnh tái tạo sàng lọc V24, nếu chủ động mở lượt đủ ba objective. Lượt đã
+chạy thực tế dừng tại thử nhanh; lệnh dưới chưa được chạy cho V24:
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component order-master-levels-full --reuse-build \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary /home/tuyenkv/projects/master-levels-v23/maxsattrainscheduling/target/release/ddd \
+  --build-manifest /home/tuyenkv/projects/master-levels-v23/maxsattrainscheduling/results/aglr/master-levels-v23-build/manifest.json \
+  --results results/aglr/master-full-v24-unresolved300 --round-seconds 7200
+python3 quick_scripts/analyze/targeted_order_cycles.py audit \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/master-full-v24-unresolved300
+```
+
+Báo cáo `order_master_levels_full_audit.json` giữ đúng commit binary và
+commit runner riêng. Xác nhận/hồi quy đọc `followup_audit.json` như V22.
+Trạng thái khởi chạy không chứng minh hiệu năng hoặc coverage mới.
+
+## V25: chỉ bốn ca infsteps180 chưa giải
+
+Runner `7b752c4`, solver source `d8e2509`; giữ nguyên binary, cost-levels
+và assumptions=full của V24. Không build lại. Bài thử infsteps180 V24
+được kiểm tra và dùng lại đúng hash. Probe timeout native đã có raw,
+validator chỉ kiểm tra lại khi resume thay vì ghi đè. Lượt đo thật là
+`maxsat-master-rounded-v25-screen.service`, bắt đầu 14:01:46 ngày 07/11,
+giờ Việt Nam, trong `~/projects/master-rounded-v25/maxsattrainscheduling`.
+Hai lần lỗi thiết lập trước đó không có ca khó; giữ `preflight-failed/`
+và log dịch vụ để truy vết.
+
+```bash
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component order-master-levels-full --reuse-build --objectives infsteps180 \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary /home/tuyenkv/projects/master-levels-v23/maxsattrainscheduling/target/release/ddd \
+  --build-manifest /home/tuyenkv/projects/master-levels-v23/maxsattrainscheduling/results/aglr/master-levels-v23-build/manifest.json \
+  --results results/aglr/master-rounded-v25-unresolved300 --round-seconds 7200
+python3 quick_scripts/analyze/targeted_order_cycles.py audit \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --results results/aglr/master-rounded-v25-unresolved300
+```
+
+Manifest có `objective_filter=["infsteps180"]`; hai objective còn lại có
+danh sách rỗng. Bộ kiểm toán vẫn đọc đủ 216 raw V17 để xác định chính xác
+bốn ca chưa giải. Không đổi danh sách khi resume và không tự xem những
+ca bị loại là đã giải được.
+
+Nếu có gain, `confirm_component_gains.py` chạy ba lần xác nhận rồi hồi
+quy 68 ca infsteps180 đã giải. Báo cáo giữ
+`full_reference_regression=false`, `submission_passed=false`. Chưa được
+cộng gain vào 203 hoặc dùng thời gian ghép từ nhiều cấu hình để báo full.
+
+## V26: thêm nhiều điều kiện chi phí từ cùng một lịch
+
+Mã `984e221` thêm cờ mặc định tắt
+`--maxsat-ladder-sc-order-master-batch-cuts true`; biến Bash
+`MAXSATDDD_ORDER_MASTER_BATCH_CUTS=true`. Mỗi lần đồ thị cho lịch hợp lệ,
+bổ sung mọi lần đi qua có chi phí cao hơn model SAT. Các mệnh đề đều có
+chứng minh đường đi riêng, giữ chuẩn hóa ngưỡng V23 và assumptions=full
+của V24. Chi phí mọi mốc mới được đăng ký trước SAT kế tiếp. Không đổi
+đường mặc định CSOnet.
+
+Controller `maxsat-master-batch-v26.service` ở worktree
+`~/projects/master-batch-v26/maxsattrainscheduling`, chờ V25 kết thúc rồi
+mới test native và build release. Local đã đạt 36 test nhân SAT, 111 test
+Python và Rust typecheck; chưa thay thế kiểm thử solver đầy đủ trên VM.
+Cả service tối đa 6 giờ, kể cả thời gian chờ. Đo tuần tự CPU 0,1,4,5,
+300 giây và 6.000.000 KB mỗi ca.
+
+Validator V26 ghi rõ cách kiểm tra: bộ test vét cạn phải đạt; mọi bài
+thử thật phải có trạng thái hợp lệ; mọi bài có chứng minh tối ưu phải
+khớp đáp án; ít nhất một bài thử có optimum; việc thêm nhiều điều kiện
+phải thực sự xảy ra. Timeout hợp lệ ở bài thử thật được giữ là kết quả
+hiệu năng, không tự báo lỗi thuật toán. Khác biệt so với cổng dừng sớm
+V22--V24 được lưu trong `validation.json`; không sửa các kết quả cũ.
+
+```bash
+systemctl status maxsat-master-batch-v26.service --no-pager
+journalctl -u maxsat-master-batch-v26.service -n 20 --no-pager
+taskset -c 0,1,4,5 python3 quick_scripts/analyze/targeted_order_cycles.py run \
+  --component order-master-batch \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --binary ./target/release/ddd \
+  --build-manifest results/aglr/master-batch-v26-build/manifest.json \
+  --results results/aglr/master-batch-v26-unresolved300 --round-seconds 7200
+```
+
+Chỉ dùng lệnh run sau khi validation đạt, service đã dừng và ở đúng
+commit/binary đã khóa. Báo cáo `order_master_batch_audit.json` không thể
+báo submission PASS. Theo dõi số lời gọi SAT, mệnh đề đường đi, mốc mới,
+thời gian SAT/đồ thị và `maxsat_order_master_max_batch`. Nếu có gain,
+controller tự xác nhận ba lần rồi hồi quy 203 ca; đủ dữ liệu mới lập
+bảng full. Không cộng thời gian các lần chạy khác nhau.
 
 ## Đối chiếu RC2 và lịch sử lượt năm phương pháp ở 300 giây
 

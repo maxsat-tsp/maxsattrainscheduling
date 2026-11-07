@@ -46,37 +46,71 @@ chưa khép khoảng cách giữa cận và nghiệm. Tách chi phí V19 cũng c
 chứng minh thêm optimum. Bảng `v18_v19_diagnostics.csv` giữ các số đo và
 cận đọc từ log; các cận này chỉ dùng chẩn đoán, không sửa JSON gốc.
 
-**V20 đang chạy trên VM:** chuyển sang truyền thời điểm sớm nhất qua
-cả chuỗi lựa chọn thứ tự. Khi một chuỗi buộc lần đi qua v phải bắt đầu
-muộn hơn, thêm mốc và mệnh đề có điều kiện đó ngay. Chi phí của mốc mới
-phải được mã hóa trước lần SAT kế tiếp. Cơ chế cũng xử lý chu trình dương
-và giữ chu trình thời gian 0. Chỉ bật một cờ mới trên cấu hình V17; tách
-chi phí V19 vẫn tắt. Đã qua 73 test Rust, 97 test Python, hai smoke có optimum 5526 và
-kiểm tra timeout native. Mã `8898caf`, dịch vụ
-`maxsat-order-paths-v20.service`, bắt đầu **11:39:29 ngày 07/11**, giờ
-Việt Nam; đo ca khó từ 11:40:00. Chỉ chạy 13 ca chưa giải, 300 giây và
-6.000.000 KB mỗi ca, trên CPU `0,1,4,5`, cả vòng tối đa 6 giờ. Binary:
-`b888e424572ad22cfa145a8f57381eab9354e81a2dcd13b059bb8564535bf340`.
-Dữ liệu ở worktree `~/projects/order-paths-v20/maxsattrainscheduling`,
-thư mục `results/aglr/order-paths-v20-unresolved300/`.
+**V20 và V21 đều đã hoàn tất 13/13 ca, chưa giải thêm.** Toàn bộ 26
+kết quả đã tải về, xác minh hash và kiểm toán độc lập; đều timeout hợp lệ.
+Dữ liệu ở `complete_13/` trong `order_paths_v20_20261107/` và
+`order_paths_full_v21_20261107/`, thuộc `results/sat_research/`.
 
-**V21 đối chứng cách gửi điều kiện, cùng binary với V20.** Ca đầu của
-V20 (`trackA11/infsteps180`) timeout, có 40.606 lời gọi SAT, 4.155 lần
-kiểm tra đồ thị và 4.081 mệnh đề đường đi. V17 dùng 1.542 lời gọi SAT
-trên ca này. Tìm đường chỉ tốn 1,61 giây. Vì số lời gọi tăng mạnh, V21
-đổi đúng một tham số: gửi toàn bộ điều kiện chi phí từ đầu thay cho tăng
-mỗi lần 20 điều kiện. Không sửa thuật toán hoặc build lại binary.
+Gửi toàn bộ điều kiện giảm tổng lời gọi SAT trên 13 ca từ **297.623**
+(V20) xuống **60.813** (V21), nhưng vẫn không tăng coverage. Hai lượt tạo
+16.137 và 21.386 mệnh đề đường đi; thời gian phân tích đường đi lần lượt
+6,19 và 8,49 giây trong cả bộ ca. Phần lớn thời gian còn nằm ở SAT. Các
+số đo và cận chẩn đoán được giữ trong `v20_v21_diagnostics.csv`, không sửa
+JSON gốc. Timings của sàng lọc song song được giữ riêng.
 
-Mã runner `4b4d80f`, solver vẫn `8898caf` và cùng hash binary V20.
-99 test Python trên VM, smoke cost 5526 ở cả hai cách gửi và timeout
-native đều đạt. Smoke mới có 0 lời gọi SAT với một phần điều kiện, đúng
-cấu hình; kết quả này chưa phải cải thiện coverage. Dịch vụ
-`maxsat-order-paths-full-v21.service` bắt đầu **11:50:15 ngày 07/11**, đo
-ca khó từ 11:50:20. CPU `2,3,6,7` tách nhóm vật lý với V20; mỗi ca cùng
-300 giây và 6.000.000 KB RAM, mỗi vòng tối đa 6 giờ. Chỉ sàng lọc 13 ca
-chưa giải. Timings khi hai lượt chạy cùng lúc dùng chẩn đoán; lượt full
-cho bài báo vẫn chạy tuần tự. Dữ liệu khởi chạy ở
-`results/sat_research/order_paths_full_v21_20261107/`.
+**V22 đã cài và qua 76 test Rust, 106 test Python, nhưng dừng ở thử
+nhanh trước ca khó.** `origA1/finsteps123` chứng minh đúng cost=LB=UB=11
+ở 18,72 giây; `origA1/infsteps180` timeout hợp lệ ở 30 giây. Controller
+dừng trước sàng lọc, nên không ghi thành 0/13. Hai bản ghi đã kiểm toán
+độc lập trong `results/sat_research/order_master_v22_20261107/stopped_validation/`.
+
+Biểu diễn V22 để SAT chọn đủ các thứ tự và đồ thị tính lịch, chỉ thêm
+ngưỡng ở lần đi qua có chi phí; vẫn dùng RC2 của CSOnet. Số đo cho thấy
+nhiều mốc thời gian khác nhau cùng mang một mức phạt bậc thang.
+
+**V23 đã qua 77 test Rust và 107 test Python, nhưng cũng dừng tại thử nhanh:** với mỗi mức chi phí c, dùng mốc đầu tiên
+đạt c thay vì mốc thời gian bất kỳ trên cùng bậc. Ví dụ hàm làm tròn
+180 giây: thời điểm 200 và 280 đều có mức phạt 2, cùng dùng mốc 181
+khi aimed=0. Mọi mệnh đề vẫn được chứng minh bởi đường thời gian và giữ
+đúng chi phí. Chỉ thay cách dùng chung mốc trên V22, chưa đổi lịch gửi
+điều kiện hay tham số RC2. Cờ mặc định tắt. Native đạt 77 test Rust và 107 test Python. Mã
+`d8e2509`, dịch vụ `maxsat-master-levels-v23.service`, bắt đầu **13:34:56
+ngày 07/11**, giờ Việt Nam. Worktree riêng
+`~/projects/master-levels-v23/maxsattrainscheduling`. Smoke `finsteps123` chứng minh đúng cost 11 ở 27,78 giây, nhưng
+`infsteps180` timeout hợp lệ ở 30 giây. Chưa chạy ca khó; cùng 300 giây, 6.000.000 KB và tối đa 6 giờ mỗi vòng.
+
+**V24 đã dừng trước ca khó.** Dùng nguyên binary V23 và chỉ gửi đủ điều
+kiện chi phí, V24 chứng minh đúng optimum hai bài thử: finsteps123=11 ở
+15,62 giây, infsteps180=34 ở 13,73 giây. Bài cont timeout hợp lệ ở 30 giây.
+Cả ba bản ghi được kiểm toán độc lập và lưu trong
+`results/sat_research/master_full_v24_20261107/stopped_validation/`.
+Không có lượt hard-case nào của V24, nên không ghi thành 0/13.
+
+**V25 chỉ thử bốn ca infsteps180 còn thiếu, giữ đúng binary V24.** Runner
+`7b752c4` khóa phạm vi theo objective và tự kiểm tra các ca bị loại. Lượt
+sàng lọc thực sự bắt đầu **14:01:46 ngày 07/11**, giờ Việt Nam, ở dịch vụ
+`maxsat-master-rounded-v25-screen`. Hai lần khởi động trước dừng vì đường
+dẫn thư viện trong worktree và điều kiện dùng lại log; lỗi và dữ liệu
+kiểm tra ban đầu được giữ riêng. Không có phép đo ca khó nào từ hai lần
+đó được tính vào lượt sàng lọc. Bốn ca là trackA11, trackA12, stationA11,
+stationA12, mỗi ca 300 giây, 6.000.000 KB, CPU 0,1,4,5.
+
+**V26 đã cài, xếp chạy sau V25.** Mã `984e221` bổ sung mọi điều kiện
+chi phí bị lịch SAT vi phạm thay vì chỉ một điều kiện. Mỗi điều kiện vẫn
+có chứng minh từ đường thời gian; chi phí mốc mới được thêm trước SAT
+kế tiếp. Kiểm tra local đạt 36 test nhân SAT, 111 test Python và typecheck
+Rust. Phải qua toàn bộ kiểm thử native trên VM trước ca khó; chưa báo
+native đạt khi service còn chờ. Không build hoặc chạy đo V26 khi V25
+đang đo. Cả vòng có giới hạn 6 giờ, gồm thời gian chờ.
+
+Nếu V25 có gain, script xác nhận ba lần rồi hồi quy 68 ca infsteps180 đã
+giải; đó chỉ là hồi quy theo objective. V26 sàng lọc đủ 13 ca chưa giải;
+nếu có gain thì xác nhận ba lần và hồi quy 203 ca. Mọi báo cáo này vẫn
+`submission_passed=false` cho tới khi lập và kiểm toán bảng full cùng
+đối chứng. Bộ kiểm tra của V26 chấp nhận timeout hợp lệ trong bài thử
+thật như một kết quả hiệu năng; các lịch tối ưu trả về vẫn phải khớp
+chi phí đã biết, và ít nhất một bài thử phải chứng minh đúng optimum.
+Điều kiện mới được ghi rõ, các lượt V22--V24 đã dừng vẫn giữ nguyên.
 
 **`trackB12/cont` của V17 đã xác nhận thành công 3/3 lần.** Mọi lịch đều
 hợp lệ và có cost=LB=UB=15.182. Thời gian 10,65; 4,64; 11,86 giây, median
@@ -86,7 +120,7 @@ Journal trong nhóm 31 cặp. Dùng đúng binary/tham số V17, nhóm lõi vậ
 không ghép vào PAR-2 cuối. Dữ liệu ở
 `core_exhaustion_v17_20261107/trackB12_confirmation/` trong `results/sat_research/`.
 
-Các phiên bản V17--V20 giữ refinement `legacy`, cải tiến RC2 hoặc ràng
+Các phiên bản V17--V26 giữ refinement `legacy`, cải tiến RC2 hoặc ràng
 buộc thứ tự, nên chưa dùng kết quả làm bằng chứng cho bộ chọn AGLR thích
 nghi. Mốc tốt nhất hiện tại vẫn là **203/216**. Chưa cập nhật Abstract,
 Results hoặc Conclusion thành kết luận vượt toàn bộ SOTA.
@@ -158,7 +192,7 @@ khôi phục. Vì vậy chưa quy kết việc khôi phục chỉ cho cơ chế 
 Hướng dự phòng về chu trình thứ tự được ghi trong
 `research_note_order_cycles_vi.md`; mã đã cài và kiểm thử; V18 chưa có kết quả hiệu năng khi khởi chạy.
 
-Hướng dẫn sinh viên bản 5.17 có công thức, ví dụ và lệnh chạy hiện tại.
+Hướng dẫn sinh viên bản 5.18 có công thức, ví dụ và lệnh chạy hiện tại.
 Bản thảo COR giữ số liệu chính cho đến khi hoàn tất kiểm tra và đánh giá full.
 
 ## Chi tiết các lượt V16 và đối chứng backend

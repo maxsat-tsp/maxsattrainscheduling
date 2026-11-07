@@ -1,15 +1,21 @@
 # Hướng dự phòng: SAT chọn thứ tự, đồ thị tính thời gian
 
-Đây là thiết kế để xem xét nếu V20/V21 hoàn tất mà vẫn không tăng coverage.
-Chưa cài solver này và chưa có kết quả hiệu năng. V17 vẫn là mốc đã kiểm
-tra đủ dữ liệu, 203/216. V20/V21 đang chạy; cần đọc kết quả trước khi chuyển.
+Biểu diễn này đã cài ở `38f9aea`. Native đạt 76 test Rust và 106 test
+Python, nhưng V22 dừng tại thử nhanh: finsteps123 có optimum đúng ở 18,72
+giây, infsteps180 timeout hợp lệ ở 30 giây. Chưa chạy ca khó. Mốc full tốt
+nhất vẫn là V17, 203/216.
+
+V23 ở mã `d8e2509` chuẩn hóa các thời điểm có cùng mức phạt về mốc đầu
+bậc. Đã qua 77 test Rust và 107 test Python, nhưng bài thử infsteps180 timeout
+ở 30 giây nên chưa chạy ca khó. Đây là sửa biểu diễn
+chi phí trong master, không cùng lúc thay RC2 hoặc cách gửi điều kiện.
 
 ## Vì sao xem xét đổi biểu diễn
 
 V18 và V19 đều không giải thêm trong 13 ca còn lại. Truyền cận V20 tạo
 nhiều mốc và gọi SAT rất nhiều. V21 đã giảm số lời gọi trên ca đầu từ
-40.606 xuống 7.893 nhưng ca đó vẫn timeout. Vì vậy, nếu hết vòng vẫn
-không có gain, cần xem xét bỏ các biến thời gian không trực tiếp tạo chi
+40.606 xuống 7.893 nhưng ca đó vẫn timeout. Cả 13 ca: V20 có 297.623
+lời gọi, V21 có 60.813; vẫn không có optimum mới. Vì vậy cần thử bỏ các biến thời gian không trực tiếp tạo chi
 phí, thay vì tiếp tục chỉ đổi tham số RC2.
 
 Đếm bằng parser TXT độc lập, theo cặp khác tàu dùng cùng tài nguyên:
@@ -20,12 +26,12 @@ phí, thay vì tiếp tục chỉ đổi tham số RC2.
 | trackA11 | 29 | 1.217 | 6.144 |
 | stationA11 | 29 | 1.217 | 6.144 |
 
-Các instance này chỉ tính phạt ở lần đi qua có `aimed`, chủ yếu ở cuối
+Các instance TXT này chỉ tính phạt ở lần đi qua có `aimed`, chủ yếu ở cuối
 tuyến. Đây là cơ sở để thử mô hình chỉ có biến thứ tự và biến chi phí.
 Số biến SAT cuối cùng còn phụ thuộc bộ mã hóa chi phí; bảng trên chưa
 chứng minh mô hình mới nhỏ hơn hay nhanh hơn.
 
-## Biểu diễn dự kiến
+## Biểu diễn đã cài
 
 SAT giữ một biến thứ tự cho mỗi cặp khác tàu có tài nguyên xung đột.
 Một lần SAT chọn hướng cho các cặp. Dùng đúng các cạnh V20: cạnh nối tiếp
@@ -87,3 +93,67 @@ chu trình 0/dương, chi phí ban đầu dương, mức chi phí trùng, cập 
 chi phí của việc tạo đủ cặp: số cặp lớn có thể làm mất lợi ích của việc
 bỏ ladder. Sau khi có bằng chứng thực nghiệm mới xem xét mô tả phương pháp
 trong bài và đối chiếu các nghiên cứu liên quan.
+
+## Chi tiết bản cài V22
+
+Chế độ này tạo đủ biến thứ tự cho các cặp xung đột khác tàu, không tạo
+các hàng xung đột theo mốc và không dùng các mệnh đề bộ ba trong khởi tạo.
+Giá trị cờ bộ ba của cấu hình gốc được giữ để truy vết, nhưng số hàng và
+bộ ba thực sự trong chế độ master là 0; phải đọc cả cờ master và số đo.
+Nó tái sử dụng nguyên vòng weighted RC2, CostTree, core minimization và
+core exhaustion; không thay đổi đường mặc định CSOnet.
+
+Đồ thị trả về cả lịch và đường chứng minh tới từng đỉnh. Chỉ chọn đường
+có mức tăng chi phí dương; không thêm mốc chỉ vì một lần đi qua không
+có phạt bị model chọn sớm. Mốc mới vẫn được CostTree mã hóa trước lần
+SAT tiếp theo. Lịch đồ thị cải thiện UB hoặc đạt LB được kiểm tra đầy đủ
+trước khi giữ. Khi RC2 LB bằng chi phí lịch đã kiểm tra thì trả optimum.
+Không sử dụng lịch/chi phí từ dữ liệu hội nghị trong solver.
+
+Luồng heuristic đồ thị cũ được tắt trong chế độ master, vì mỗi model
+không có chu trình đã cung cấp một lịch ứng viên; tránh dùng heuristic
+có giả định resource-0/terminal chỉ phù hợp TXT để xử lý bài tổng quát.
+Greedy ban đầu chỉ là một nguồn UB và vẫn phải kiểm tra hợp lệ. Không
+đổi luồng heuristic của CSOnet khi cờ master tắt.
+
+Kiểm thử mới so master với vét cạn trên ba tàu có occupation cuối dương,
+chi phí ban đầu dương, các tổ hợp sparse/UB/extract offset, cả MiniSAT và
+CaDiCaL. Bài ba tuyến giao nhau kiểm tra 6 cặp thứ tự đầy đủ, không có hàng
+xung đột theo thời gian, và cùng optimum vét cạn trên ba hàm mục tiêu.
+Kernel còn kiểm tra cách lấy lịch và giữ đường chứng minh qua chu trình 0.
+
+Runner dự kiến tự xác nhận ba lần các ca mới sau khi sàng lọc đủ và audit.
+Chỉ khi mọi ca mới lặp lại thành công mới chạy hồi quy 203 ca V17 đã giải,
+giữ đúng một binary/cấu hình. Các ca mất được báo riêng. Một service giới
+hạn tổng 6 giờ; nếu hết giờ, giữ phần đã xong và chưa báo coverage full.
+
+## V23: một ngưỡng đại diện cho mỗi mức phạt
+
+Bản thử V22 đã chứng minh đúng optimum finsteps123, nhưng thêm hàng nghìn
+mốc trong các bậc chi phí. Cận L=200 và L=280 với aimed=0 đều tương ứng
+chi phí làm tròn 180 giây bằng 2, có thể dùng cùng mốc 181. Một đường
+chứng minh t>=L cũng chứng minh t>=181; mức chi phí giữ nguyên. V23 tìm
+mốc đầu tiên cùng mức phạt trên đoạn [earliest,L] bằng tìm kiếm nhị phân
+với chính hàm chi phí gốc. CostTree và vòng RC2 giữ nguyên. Cờ mặc định
+tắt `order_master_cost_levels`, yêu cầu master bật. Continuous không đổi
+mốc khi chi phí dương. Các kiểm thử master chạy bật/tắt chuẩn hóa, cộng
+với kiểm thử ngưỡng trên miền nhỏ và cả biên i32.
+
+
+## V24--V26: kết quả và bước kiểm tra tiếp
+
+V24 dùng nguyên binary V23, chỉ gửi đủ điều kiện chi phí. origA1 có
+optimum finsteps123=11 ở 15,62 giây, infsteps180=34 ở 13,73 giây; cont
+timeout hợp lệ ở 30 giây. Các lịch tối ưu đều qua kiểm tra độc lập, nhưng
+lượt này dừng trước ca khó. V25 giữ đúng cấu hình và chỉ sàng lọc bốn ca
+infsteps180 V17 chưa giải; không suy rộng sang cont.
+
+V26 ở mã 984e221 bổ sung tất cả đường chi phí bị vi phạm từ mỗi lịch,
+thay vì một đường. Mỗi đường vẫn có các lựa chọn thứ tự làm điều kiện
+và cận từ đồ thị; không suy ra cận từ model thời gian của SAT. Chuẩn hóa
+mốc và đăng ký chi phí của tất cả mốc mới trước truy vấn SAT kế tiếp.
+Cờ mặc định tắt. Kiểm thử nhân nhỏ so các mệnh đề với mọi lịch nhỏ hợp
+lệ và kiểm tra thứ tự chọn; kiểm thử đầy đủ cần chạy native trên VM
+trước khi sàng lọc. Bài thử thật timeout hợp lệ không còn tự chặn lượt
+sàng lọc chỉ vì chậm; validator ghi rõ điều kiện mới. Chưa có số liệu
+nào thay thế bảng full V17.

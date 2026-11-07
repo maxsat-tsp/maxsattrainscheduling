@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.17}
+\fancyhead[R]{\small Phiên bản 5.20}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -67,7 +67,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.17, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.20, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -94,22 +94,38 @@ chưa giải thêm ca nào. Toàn bộ dữ liệu đã tải về và qua kiể
 V19 đã qua 65 test Rust và 96 test Python trên VM. Mốc tốt nhất vẫn là
 V17 với 203/216; chưa lấy các phép thử không cải thiện làm kết quả chính.
 
-\textbf{Việc tiếp theo là V20:} truyền thời điểm sớm nhất qua cả chuỗi
-thứ tự giữa các tàu. Khi chuỗi lựa chọn buộc một tàu phải vào muộn hơn,
-thêm ngay mốc và mệnh đề có điều kiện tương ứng. Các mốc mới nhận chi phí
-trước lần SAT kế tiếp. Giữ tham số RC2 của V17 và chỉ bật cờ truyền cận;
-tách chi phí V19 vẫn tắt. Sau khi kiểm thử đạt, chỉ chạy 13 ca chưa giải:
-4 \code{infsteps180}, 9 \code{cont}. Không chạy lại baseline trong sàng lọc.
+\textbf{V20 và V21 cũng đã xong:} mỗi lượt chạy đủ 13 ca ở 300 giây,
+đều chưa giải thêm ca nào. Gửi toàn bộ điều kiện giúp giảm số lời gọi SAT
+trên cả nhóm ca từ 297.623 xuống 60.813, nhưng chưa đủ để chứng minh thêm
+optimum. Mọi JSON và hash đã qua kiểm tra độc lập; giữ dữ liệu để đối chứng.
 
-V20 đã qua 73 test Rust, 97 test Python, hai smoke và kiểm tra timeout;
-đang chạy trong worktree riêng trên VM. Mỗi ca dùng 300 giây,
-6.000.000 KB RAM; một vòng tối đa 6 giờ. Lệnh theo dõi và kiểm toán có
-trong runbook. Không sửa mã hay build trong worktree đang chạy thực nghiệm.
+\textbf{Biểu diễn mới từ V22: SAT chọn thứ tự, đồ thị tính lịch.} Tạo đủ
+biến thứ tự cho các cặp tàu dùng tài nguyên xung đột. Từ các hướng được
+chọn, đồ thị tính thời gian sớm nhất của tất cả các lần đi qua. Chỉ những
+lần có chi phí mới cần biến ngưỡng trong SAT. Giữ vòng RC2 của CSOnet;
+cờ mới mặc định tắt, alias riêng là \code{maxsat\_order\_graph}.
 
-Nếu có ca mới, xác nhận lại ba lần rồi kiểm tra các ca V17 từng giải được.
-Khi chưa kiểm tra các ca cũ, chưa cộng ca mới vào 203 để báo coverage full.
-Nếu không có ca mới, giữ số đo thời gian SAT, cận, số mốc và mệnh đề để
-đánh giá lại hướng cải tiến. Mỗi vòng chỉ thay một thành phần.
+V22 đã qua 76 test Rust và 106 test Python. Thử nhanh trên
+\code{origA1/finsteps123} có đúng optimum nhưng mất 18,72 giây;
+\code{infsteps180} timeout ở 30 giây nên dừng trước ca khó. Không ghi lượt
+này thành 0/13. V23 dùng chung mốc cho những thời điểm có cùng mức phạt,
+đã qua 77 test Rust và 107 test Python trên VM. Smoke \code{finsteps123} có đúng optimum ở 27,78 giây, nhưng
+\code{infsteps180} timeout ở 30 giây, nên chưa chạy ca khó. V24 dùng
+nguyên binary và gửi đủ điều kiện chi phí: hai bài thử bậc thang giải
+đúng ở 15,62 và 13,73 giây; bài \code{cont} vẫn timeout ở 30 giây. V24
+chưa chạy ca khó. V25 thử riêng bốn ca \code{infsteps180} còn thiếu;
+không xem chín ca \code{cont} bị loại khỏi lượt chạy là đã giải được.
+
+V26 đã cài cách thêm cùng lúc các ràng buộc chi phí còn thiếu từ một
+lịch. Bản này được xếp chạy sau V25, qua kiểm thử native trước khi đo
+hiệu năng. Mỗi ca khó giữ 300 giây và 6.000.000 KB; mỗi vòng tối đa 6 giờ.
+Không sửa binary đang chạy. Lệnh ở runbook.
+
+Nếu có ca mới, script tự chạy xác nhận ba lần. Chỉ khi các ca mới đều
+lặp lại thành công mới kiểm tra 203 ca V17 từng giải được. Giữ cùng một
+binary/cấu hình, báo rõ mọi ca bị mất. Chưa cộng ca mới vào 203 để báo
+coverage full trước khi hoàn tất và kiểm toán bước này. Mỗi lần chỉ
+thay một thành phần hoặc một biểu diễn có mục đích rõ ràng.
 
 Hai ca giải thêm của V16 đã xác nhận đủ ba lần, nhưng V16 mất
 \code{stationA9/cont} khi hồi quy. V17 khôi phục ca này ở 45,46 giây.
@@ -1364,7 +1380,207 @@ V20 và V21 chạy trên hai nhóm lõi vật lý riêng, cùng timeout 300 giâ
 6.000.000 KB RAM. Số đo thời gian trong sàng lọc song song dùng chẩn đoán.
 Nếu có ca mới, xác nhận và kiểm tra các ca cũ, rồi chạy full tuần tự trước
 khi dùng bảng thời gian chính. Mốc tốt nhất đã kiểm tra vẫn là 203/216;
-chưa có kết quả đủ 13 ca của V20/V21 khi khởi chạy.
+V20/V21 đã hoàn tất 13 ca mỗi lượt nhưng chưa giải thêm.
+
+\section{Bước V22: SAT chọn thứ tự, đồ thị tính lịch}
+
+V20 và V21 vẫn tạo nhiều mốc thời gian ở những lần đi qua không trực tiếp
+bị tính phạt. V22 thử bỏ phần đó khỏi SAT. SAT chỉ chọn thứ tự giữa các
+tàu và giữ các ngưỡng chi phí. Đồ thị thời gian xử lý các điều kiện di
+chuyển và không chồng lấn theo thứ tự đã chọn.
+
+Với mỗi cặp khác tàu dùng tài nguyên xung đột, tạo một biến thứ tự. Dùng
+đúng cạnh thời gian đã giải thích ở V20, gồm cả thời điểm rời thật tại lần
+đi qua kế tiếp. Lần này cần đủ các cặp, kể cả những cặp DDD chưa từng phát
+hiện xung đột. Không thêm các hàng xung đột theo mốc thời gian.
+
+Gọi $o$ là các hướng SAT đã chọn. Nếu có chu trình tổng thời gian dương,
+thêm mệnh đề cấm tổ hợp hướng trên chu trình. Nếu không, truyền earliest
+để tính lịch sớm nhất $L(o)$. Mọi lịch thực hiện theo $o$ phải có thời
+điểm không sớm hơn $L(o)$. Vì chi phí không giảm khi thời điểm tăng,
+$L(o)$ cũng là lịch có chi phí nhỏ nhất đối với các hướng đó. Cần tính
+cả lần đi qua cuối có thời gian dương khi dựng thời điểm hoàn thành.
+
+Tại mỗi lần $v$ có chi phí, dùng biến ngưỡng $d_v(t)$ và CostTree như cũ.
+Nếu đường đi với các literal $o_1,\ldots,o_m$ chứng minh
+$t_v\geq L_v$, thêm
+\[
+ \neg o_1\lor\cdots\lor\neg o_m\lor d_v(L_v).
+\]
+Chỉ thêm khi chi phí ở $L_v$ cao hơn chi phí mà model hiện tại đang thể
+hiện ở $v$. Không thêm mốc chỉ vì một lần không có phạt bị chọn sớm.
+Chi phí mốc mới phải được đưa vào CostTree trước lần SAT tiếp theo.
+
+Ví dụ, model chọn A trước B và B trước C. Đồ thị cho biết C không thể vào
+trước 15, trong khi model chi phí mới chấp nhận C vào lúc 12. Nếu việc từ
+12 lên 15 làm tăng chi phí thì thêm mệnh đề theo hai lựa chọn trên và mốc
+15 tại C. Những lần trung gian không có phạt không cần ladder thời gian
+trong SAT.
+
+Vòng xử lý là:
+\begin{enumerate}
+\item RC2 giải mô hình hiện tại và giữ cận dưới LB.
+\item Đọc đủ các hướng từ model, kiểm tra chu trình và tính lịch sớm nhất.
+\item Có lịch mới tốt hơn thì kiểm tra đầy đủ bằng bộ kiểm tra của bài
+toán, tính lại chi phí $C$ rồi mới cập nhật nghiệm tốt nhất.
+\item Nếu $C=\mathrm{LB}$, trả lịch và chứng minh tối ưu. Nếu $C>\mathrm{LB}$,
+thêm một mệnh đề chi phí theo đường chứng minh đang bị model vi phạm.
+\item Nếu $C<\mathrm{LB}$, hoặc $C>\mathrm{LB}$ mà không có mệnh đề chi phí
+mới bị vi phạm, dừng báo lỗi; không chấp nhận lịch làm optimum.
+\end{enumerate}
+
+Mỗi mệnh đề mới là hệ quả của điều kiện bài toán đầy đủ nên mô hình SAT
+vẫn cho một cận dưới hợp lệ. Khi có lịch hợp lệ chi phí bằng cận đó, hai
+phía bằng nhau. Solver không đọc kết quả hội nghị để chọn hướng hoặc
+chi phí; kết quả cũ chỉ ở script kiểm tra sau khi chạy.
+
+Cờ là \file{--maxsat-ladder-sc-order-master true}, mặc định false;
+biến Bash là \file{MAXSATDDD_ORDER_MASTER=true}. Có thể dùng alias
+\code{maxsat\_order\_graph}. Cấu hình mặc định CSOnet giữ nguyên.
+Trong master, luồng heuristic cũ được tắt; lịch từ đồ thị là nguồn nghiệm
+mới, và mọi lịch cải thiện phải được kiểm tra. Cờ bộ ba của cấu hình gốc
+có thể vẫn được ghi trong manifest, nhưng số hàng và bộ ba thực sự được
+thêm khi khởi tạo master là 0; không hiểu cờ đó là cùng cách mã hóa DDD.
+
+Script dùng \file{targeted_order_cycles.py --component order-master};
+báo cáo \file{order_master_audit.json}. Đọc
+\file{maxsat_order_master_models}, \file{maxsat_order_master_schedules},
+số biến thứ tự, mệnh đề đường đi, thời gian đồ thị và thời gian SAT.
+Trước thí nghiệm phải so với vét cạn trên ba hàm mục tiêu, cả hai SAT
+backend, chi phí ban đầu dương và occupation cuối có thời gian dương.
+
+Sau sàng lọc đủ và audit, \file{confirm_component_gains.py} tự xác nhận
+ba lần từng ca mới. Nếu tất cả lặp lại đúng chi phí, chạy hồi quy 203 ca
+V17 đã giải. Đọc \file{followup_audit.json}: \code{confirmed},
+\code{regression\_passed}, \code{lost} và \code{complete}. Có thể audit
+lại bằng cùng script với \file{--audit}. Hết thời gian thì giữ phần đã
+xong, không báo full. Sau đó mới dựng bảng đủ 216 cặp của một cấu hình.
+
+\section{Bước V23: dùng chung một mốc cho mỗi mức phạt}
+
+V22 tạo nhiều mốc tại các thời điểm khác nhau dù cùng có một mức phạt.
+Ví dụ, với thời điểm dự kiến bằng 0 và hàm làm tròn 180 giây, vào lúc 200
+hay 280 đều chịu chi phí 2. Đối với bài toán chỉ chọn thứ tự và tính chi
+phí, cả hai có thể dùng chung biến ``vào không sớm hơn 181''.
+
+Gọi $L_v$ là cận mà đường đi đã chứng minh, $\ell_v$ là earliest cứng,
+và $c=f_v(L_v)$. Chọn mốc đại diện
+\[
+ \tau_v(c)=\min\{t\in\mathbb Z:\ell_v\leq t\leq L_v,\ f_v(t)\geq c\}.
+\]
+Do chi phí không giảm, ta có $\tau_v(c)\leq L_v$ và
+$f_v(\tau_v(c))=f_v(L_v)$. Đường đi vẫn chứng minh được mốc mới, và chi
+phí phải trả giữ nguyên. Thay mệnh đề của V22 bằng
+\[
+ \neg o_1\lor\cdots\lor\neg o_m\lor d_v\bigl(\tau_v(c)\bigr).
+\]
+Mốc luôn nằm từ earliest tới cận đã chứng minh, nên không tạo thời điểm
+trước miền hợp lệ. Nếu earliest đã nằm trong bậc phạt đó, mốc là earliest.
+
+Với thời điểm dự kiến $a$, khi $c>0$, các hàm đang dùng cho:
+\begin{itemize}
+\item \code{infsteps180}: $\tau=\max(\ell_v,a+180(c-1)+1)$.
+\item \code{finsteps123}: các mức 1, 2, 3 bắt đầu ở $a+1$, $a+181$ và
+$a+361$, lần lượt; chặn dưới bởi earliest.
+\item \code{cont}: mốc có chi phí $c$ bắt đầu ở $a+c$; khi đang có một
+cận $L_v$ có chi phí dương thì mốc đại diện bằng $L_v$.
+\end{itemize}
+
+Bản cài dùng tìm kiếm nhị phân trên đoạn $[\ell_v,L_v]$ và chính hàm chi
+phí đang dùng. Vì vậy không cần viết lại công thức riêng trong solver,
+và dùng được cả các hàm bậc thang khác. Kiểm thử kiểm tra mọi thời điểm
+nhỏ ở cả ba dạng chi phí, earliest nằm giữa bậc và miền số nguyên rộng;
+kiểm thử master vét cạn so bật/tắt việc dùng chung mốc trên cả hai backend.
+
+Cờ \file{--maxsat-ladder-sc-order-master-cost-levels true} mặc định false,
+yêu cầu master đang bật; biến Bash
+\file{MAXSATDDD_ORDER_MASTER_COST_LEVELS=true}. Script dùng
+\file{--component order-master-levels}, báo cáo
+\file{order_master_levels_audit.json}. V23 chỉ đổi cách chọn mốc trên V22;
+không đồng thời bật tách chi phí hoặc đổi lịch gửi điều kiện. Chưa có
+kết quả hiệu năng trên ca khó; native đã đạt 77 test Rust và 107 test
+Python.
+
+\section{V24: cùng ngưỡng chi phí, gửi đủ điều kiện từ đầu}
+
+V23 vẫn cần hơn 107.000 lời gọi SAT trong smoke 30 giây. Nhiều lời gọi
+chỉ xét một phần điều kiện rồi mới tăng thêm. V24 giữ nguyên binary,
+chỉ gửi đủ điều kiện chi phí ngay từ đầu. Khi kiểm tra đúng cấu hình,
+\file{maxsat_partial_sat_calls} phải bằng 0. Các test native của V23
+đã bao gồm cách gửi này; runner mới có 108 test Python.
+
+Tham số là \file{--maxsat-ladder-sc-assumptions full}; script dùng
+\file{--component order-master-levels-full --reuse-build}. Báo cáo
+\file{order_master_levels_full_audit.json}, kèm commit solver gốc và
+commit runner riêng. Lượt V24 đã dừng ở bài thử \code{cont}: hai bài
+thử bậc thang có đúng optimum, còn bài liên tục hết 30 giây. Đây là kết
+quả hiệu năng kém trên bài thử đó; các lịch trả về đã được kiểm tra đúng.
+Không ghi lượt chưa chạy ca khó thành 0/13. Lệnh đầy đủ ở runbook.
+
+\section{V25: thử riêng bốn ca chưa giải của một hàm mục tiêu}
+
+V25 giữ nguyên binary và cấu hình V24, chỉ chạy
+\code{trackA11}, \code{trackA12}, \code{stationA11}, \code{stationA12}
+với \code{infsteps180}. Mục đích là kiểm tra liệu biểu diễn mới có giúp
+những ca bậc thang khó hay không. Kết quả bài thử \code{cont} của V24
+vẫn được giữ; chưa xem cấu hình này là tốt cho cả ba hàm mục tiêu.
+
+Thêm \file{--objectives infsteps180} vào lệnh chạy trong runbook. Manifest
+ghi rõ hàm mục tiêu được chọn và để danh sách ca của hai hàm còn lại rỗng.
+Auditor tự kiểm tra lại danh sách này từ 216 kết quả V17, nên không thể
+bỏ một ca khó rồi tính nó là thành công.
+
+Nếu có ca mới, chạy ba lần xác nhận rồi kiểm tra 68 ca \code{infsteps180}
+V17 đã giải. Hồi quy theo một hàm mục tiêu không phải hồi quy toàn bộ:
+\file{full_reference_regression=false}, \file{submission_passed=false}.
+Trước khi lập bảng 216 ca cần khóa cách chọn cấu hình theo hàm mục tiêu
+và kiểm tra đầy đủ; không ghép từng ca tốt nhất giữa các phiên bản.
+
+\section{V26: thêm cùng lúc các điều kiện chi phí còn thiếu}
+
+Một lịch từ SAT có thể đánh giá thấp chi phí của nhiều lần đi qua.
+V22--V25 chỉ bổ sung điều kiện cho một lần rồi giải SAT lại. V26 thu thập
+mọi lần có chi phí bị đánh giá thấp trong lịch đó. Mỗi lần được bổ sung
+một điều kiện có chứng minh riêng, trước lần gọi SAT kế tiếp.
+
+Gọi $\widehat t_v$ là thời điểm mà SAT đang dùng để tính chi phí, $L_v$
+là thời điểm sớm nhất do đồ thị chứng minh. Tập cần bổ sung là
+\[
+ J=\{v:f_v(L_v)>f_v(\widehat t_v)\}.
+\]
+Với mỗi $v\in J$, lấy đường chứng minh gồm các lựa chọn
+$o_{v,1},\ldots,o_{v,m_v}$ và mốc đại diện $\tau_v$ của V23. Thêm
+\[
+ \neg o_{v,1}\lor\cdots\lor\neg o_{v,m_v}\lor d_v(\tau_v).
+\]
+Mỗi điều kiện đã đúng riêng nên thêm chúng cùng lúc vẫn giữ cận dưới
+hợp lệ. Không dùng thời điểm SAT tự chọn làm cận bắt buộc. Các mốc mới
+đều phải nhận chi phí trước khi giải tiếp.
+
+Ví dụ, cùng một lịch buộc B vào không sớm hơn 181 và C vào không sớm
+hơn 361, trong khi SAT chưa trả đủ chi phí ở cả hai. Thay vì sửa B rồi
+giải lại để mới sửa C, V26 thêm cả hai điều kiện. Thứ tự thêm cố định:
+ưu tiên mức chi phí thiếu lớn hơn, rồi độ lệch thời gian, rồi mã lần đi
+qua. Nếu không có điều kiện nào thiếu và chi phí lịch bằng LB, trả lịch
+sau khi kiểm tra như trước.
+
+Cờ \file{--maxsat-ladder-sc-order-master-batch-cuts true} mặc định tắt,
+yêu cầu master đang bật; biến Bash
+\file{MAXSATDDD_ORDER_MASTER_BATCH_CUTS=true}. Script dùng
+\file{--component order-master-batch}. Theo dõi số lời gọi SAT, số
+mệnh đề đường đi, số mốc mới và
+\file{maxsat_order_master_max_batch}: số điều kiện nhiều nhất đã thêm
+cùng lúc. Một mô hình lớn hơn chỉ có ích nếu chứng minh được thêm ca
+hoặc giảm thời gian trên cùng các ca.
+
+Trước ca khó, so với vét cạn trên bài nhỏ, cả MiniSAT và CaDiCaL; kiểm
+tra thêm nhiều mốc vẫn giữ đúng chi phí khi kết hợp với cận trên và mã
+hóa thưa. Bài thử thật hết 30 giây nhưng có trạng thái timeout hợp lệ
+được ghi là kết quả hiệu năng, không tự xem là lỗi thuật toán. Mọi bài
+thử chứng minh tối ưu vẫn phải khớp chi phí đã biết; ít nhất một bài thử
+phải giải đúng và bộ kiểm thử phải đạt trước khi chạy 13 ca khó. Điều
+kiện này khác điều kiện dừng sớm của V22--V24 và được ghi rõ trong
+validator. Kết quả cũ giữ nguyên.
 
 \section{Nội dung được phép đưa vào bài báo}
 

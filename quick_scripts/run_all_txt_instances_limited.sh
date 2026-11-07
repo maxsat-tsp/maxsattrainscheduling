@@ -73,6 +73,7 @@ MAXSATDDD_ORDER_CYCLE_CUTS="${MAXSATDDD_ORDER_CYCLE_CUTS:-}"
 MAXSATDDD_ORDER_PATH_CUTS="${MAXSATDDD_ORDER_PATH_CUTS:-}"
 MAXSATDDD_ORDER_MASTER="${MAXSATDDD_ORDER_MASTER:-}"
 MAXSATDDD_ORDER_MASTER_COST_LEVELS="${MAXSATDDD_ORDER_MASTER_COST_LEVELS:-}"
+MAXSATDDD_ORDER_MASTER_BATCH_CUTS="${MAXSATDDD_ORDER_MASTER_BATCH_CUTS:-}"
 MAXSATDDD_EXTRACT_INITIAL_COST="${MAXSATDDD_EXTRACT_INITIAL_COST:-}"
 MAXSATDDD_OBJECTIVE_BOUND="${MAXSATDDD_OBJECTIVE_BOUND:-}"
 MAXSATDDD_BACKEND="${MAXSATDDD_BACKEND:-}"
@@ -295,6 +296,7 @@ run_fingerprint="$(python3 - \
   "${MAXSATDDD_ORDER_PATH_CUTS:-default}" \
   "${MAXSATDDD_ORDER_MASTER:-default}" \
   "${MAXSATDDD_ORDER_MASTER_COST_LEVELS:-default}" \
+  "${MAXSATDDD_ORDER_MASTER_BATCH_CUTS:-default}" \
   "${MAXSATDDD_EXTRACT_INITIAL_COST:-default}" \
   "${MAXSATDDD_OBJECTIVE_BOUND:-default}" \
   "${MAXSATDDD_BACKEND:-default}" \
@@ -385,6 +387,7 @@ else
     printf 'maxsatddd_order_path_cuts=%s\n' "${MAXSATDDD_ORDER_PATH_CUTS:-default}"
     printf 'maxsatddd_order_master=%s\n' "${MAXSATDDD_ORDER_MASTER:-default}"
     printf 'maxsatddd_order_master_cost_levels=%s\n' "${MAXSATDDD_ORDER_MASTER_COST_LEVELS:-default}"
+    printf 'maxsatddd_order_master_batch_cuts=%s\n' "${MAXSATDDD_ORDER_MASTER_BATCH_CUTS:-default}"
     printf 'maxsatddd_extract_initial_cost=%s\n' "${MAXSATDDD_EXTRACT_INITIAL_COST:-default}"
     printf 'maxsatddd_objective_bound=%s\n' "${MAXSATDDD_OBJECTIVE_BOUND:-default}"
     printf 'maxsatddd_backend=%s\n' "${MAXSATDDD_BACKEND:-default}"
@@ -478,6 +481,9 @@ run_one() {
   fi
   if [[ -n "$MAXSATDDD_ORDER_MASTER_COST_LEVELS" ]]; then
     extra_args+=(--maxsat-ladder-sc-order-master-cost-levels "$MAXSATDDD_ORDER_MASTER_COST_LEVELS")
+  fi
+  if [[ -n "$MAXSATDDD_ORDER_MASTER_BATCH_CUTS" ]]; then
+    extra_args+=(--maxsat-ladder-sc-order-master-batch-cuts "$MAXSATDDD_ORDER_MASTER_BATCH_CUTS")
   fi
   if [[ -n "$MAXSATDDD_EXTRACT_INITIAL_COST" ]]; then
     extra_args+=(--maxsat-ladder-sc-extract-initial-cost "$MAXSATDDD_EXTRACT_INITIAL_COST")

@@ -93,6 +93,7 @@ pub struct SolveStats {
     pub order_path_time: Duration,
     pub order_master_models: usize,
     pub order_master_schedules: usize,
+    pub order_master_max_batch: usize,
     pub core_literals: usize,
     pub max_core_size: usize,
     pub unit_weight_cores: usize,
@@ -950,6 +951,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         && !settings.seed_sc_from_earliest && !settings.prealloc_cost_thresholds),
         "order master requires resource orders, legacy policy and no seeded time-point expansion");
     assert!(!settings.order_master_cost_levels || settings.order_master,"canonical master cost levels require order master mode");
+    assert!(!settings.order_master_batch_cuts || settings.order_master,"batched objective paths require order master mode");
     let use_objective_bound = settings.use_objective_bound
         || (settings.aglr.use_objective_bound && settings.aglr.policy != RefinementPolicy::Legacy);
 
@@ -988,6 +990,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_order_path_cuts".to_string(), settings.order_path_cuts.into());
     output_stats("maxsat_order_master".to_string(),settings.order_master.into());
     output_stats("maxsat_order_master_cost_levels".to_string(),settings.order_master_cost_levels.into());
+    output_stats("maxsat_order_master_batch_cuts".to_string(),settings.order_master_batch_cuts.into());
     output_stats("maxsat_extract_initial_cost".to_string(), settings.extract_initial_cost.into());
     output_stats("maxsat_objective_bound".to_string(), use_objective_bound.into());
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
@@ -1886,7 +1889,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             stats.sat_calls += 1;
             let solve_start = Instant::now();
             let mut cycle_clause=None;
-            let mut path_cut=None;
+            let mut path_cuts=Vec::new();
             let mut master_solution=None;
             let mut master_return=None;
             {
@@ -1945,22 +1948,26 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                                         let index=occ.delays.partition_point(|(lit,_)|model.value(lit));
                                         assert!(index>0 && index<occ.delays.len());occ.delays[index-1].1
                                     }).collect::<Vec<_>>();
-                                    let mut cut=schedule.violated(&model_times,|v,bound,current|{
+                                    let mut cuts=schedule.violated_batch(&model_times,|v,bound,current|{
                                         let (train,index)=visits[VisitId::from(v)];
                                         problem.trains[train].visit_delay_cost(delay_cost_type,index,bound)
                                             .saturating_sub(problem.trains[train].visit_delay_cost(delay_cost_type,index,current))
-                                    },true).map_err(SolverError::InvalidSolution)?
-                                        .ok_or_else(||SolverError::InvalidSolution("order master cost gap has no violated objective path".into()))?;
-                                    if settings.order_master_cost_levels{
-                                        if let super::order_paths::Cut::Path{visit,time,..}=&mut cut{
-                                            let (train,index)=visits[VisitId::from(*visit)];
-                                            *time=super::order_paths::cost_threshold(occupations[VisitId::from(*visit)].delays[0].1,*time,
-                                                |t|problem.trains[train].visit_delay_cost(delay_cost_type,index,t))
-                                                .map_err(SolverError::InvalidSolution)?;
+                                    },true,if settings.order_master_batch_cuts{usize::MAX}else{1})
+                                        .map_err(SolverError::InvalidSolution)?;
+                                    if cuts.is_empty(){return Err(SolverError::InvalidSolution("order master cost gap has no violated objective path".into()));}
+                                    stats.order_master_max_batch=stats.order_master_max_batch.max(cuts.len());
+                                    for cut in &mut cuts {
+                                        if settings.order_master_cost_levels {
+                                            if let super::order_paths::Cut::Path{visit,time,..}=cut {
+                                                let (train,index)=visits[VisitId::from(*visit)];
+                                                *time=super::order_paths::cost_threshold(occupations[VisitId::from(*visit)].delays[0].1,*time,
+                                                    |t|problem.trains[train].visit_delay_cost(delay_cost_type,index,t))
+                                                    .map_err(SolverError::InvalidSolution)?;
+                                            }
                                         }
+                                        resource_orders.remember(cut).map_err(SolverError::InvalidSolution)?;
                                     }
-                                    resource_orders.remember(&cut).map_err(SolverError::InvalidSolution)?;
-                                    if let super::order_paths::Cut::Path{visit,time,prefix}=cut{path_cut=Some((visit,time,prefix));}
+                                    for cut in cuts{if let super::order_paths::Cut::Path{visit,time,prefix}=cut{path_cuts.push((visit,time,prefix));}}
                                 }
                             }
                         }
@@ -1977,7 +1984,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                                 .saturating_sub(problem.trains[train].visit_delay_cost(delay_cost_type,index,current))
                         }).expect("invalid temporal path separation"){
                             Some(super::order_paths::Cut::Cycle(clause))=>cycle_clause=Some(clause),
-                            Some(super::order_paths::Cut::Path{visit,time,prefix})=>path_cut=Some((visit,time,prefix)),
+                            Some(super::order_paths::Cut::Path{visit,time,prefix})=>path_cuts.push((visit,time,prefix)),
                             None=>{}
                         }
                         stats.order_path_time+=path_start.elapsed();
@@ -1988,7 +1995,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                             .expect("invalid temporal cycle separation");
                         stats.order_cycle_time+=cycle_start.elapsed();
                     }
-                    if !settings.order_master && cycle_clause.is_none() && path_cut.is_none() {
+                    if !settings.order_master && cycle_clause.is_none() && path_cuts.is_empty() {
                     is_sat = true;
                     stats.n_sat += 1;
                     let _p = hprof::enter("update times");
@@ -2171,12 +2178,14 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     start_time,solver_time,total_cost,cost,&aglr_telemetry,&heuristic_filter);
                 return Ok((best_heur.unwrap().1,stats));
             }
-            if let Some((index,time,mut prefix))=path_cut{
-                let visit=VisitId::from(index);
-                let (literal,is_new)=occupations[visit].time_point(&mut solver,time);
-                if is_new{new_time_points.push((visit,literal,time));stats.order_path_new_points+=1;}
-                stats.order_path_guards+=prefix.len();prefix.push(literal);solver.add_clause(prefix);
-                stats.order_paths_added+=1;
+            if !path_cuts.is_empty(){
+                for (index,time,mut prefix) in path_cuts {
+                    let visit=VisitId::from(index);
+                    let (literal,is_new)=occupations[visit].time_point(&mut solver,time);
+                    if is_new{new_time_points.push((visit,literal,time));stats.order_path_new_points+=1;}
+                    stats.order_path_guards+=prefix.len();prefix.push(literal);solver.add_clause(prefix);
+                    stats.order_paths_added+=1;
+                }
                 output_stats("maxsat_order_path_checks".into(),stats.order_path_checks.into());
                 output_stats("maxsat_order_paths_added".into(),stats.order_paths_added.into());
                 output_stats("maxsat_order_path_new_points".into(),stats.order_path_new_points.into());
@@ -2467,6 +2476,7 @@ fn do_output_stats<L: satcoder::Lit>(
     output_stats("maxsat_order_path_time".to_string(),stats.order_path_time.as_secs_f64().into());
     output_stats("maxsat_order_master_models".to_string(),stats.order_master_models.into());
     output_stats("maxsat_order_master_schedules".to_string(),stats.order_master_schedules.into());
+    output_stats("maxsat_order_master_max_batch".to_string(),stats.order_master_max_batch.into());
     output_stats("maxsat_core_exhaust_steps".to_string(), stats.core_exhaust_steps.into());
     output_stats("maxsat_core_exhaust_inconclusive".to_string(), stats.core_exhaust_inconclusive.into());
     output_stats("maxsat_core_exhaust_time".to_string(), stats.core_exhaust_time.as_secs_f64().into());
@@ -3008,9 +3018,10 @@ mod aglr_end_to_end_tests {
                 }}}
             }}}
             assert_ne!(optimum,i32::MAX);
-            for offset in [false,true]{for bound in [false,true]{for sparse in [false,true]{for levels in [false,true]{
+            for offset in [false,true]{for bound in [false,true]{for sparse in [false,true]{for levels in [false,true]{for batch in [false,true]{
                 let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;settings.order_master=true;
                 settings.order_master_cost_levels=levels;
+                settings.order_master_batch_cuts=batch;
                 settings.extract_initial_cost=offset;settings.use_objective_bound=bound;settings.sparse_costs=sparse;
                 settings.assumption_strategy=super::super::settings::AssumptionStrategy::Full;
                 settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
@@ -3025,7 +3036,7 @@ mod aglr_end_to_end_tests {
                 let (solution,_)=solve_with_settings(&quiet_env,satcoder::solvers::cadical::Solver::new(),
                     &problem,30.0,objective,settings,|_,_|{}).unwrap();
                 assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
-            }}}}
+            }}}}}
         }
         assert!(observed_paths>0,"the master must learn a cost path rather than enumerate times in SAT");
         // A feasible initial schedule with positive cost must not skip initial costs.
@@ -3042,6 +3053,7 @@ mod aglr_end_to_end_tests {
 
     #[test]
     fn order_master_crossing_routes_match_exhaustive_time_schedules(){
+        let mut observed_batch=0;
         let routes=[vec![1,2],vec![1,2],vec![2,1]];
         let problem=Problem{name:"order-master-crossing".into(),trains:routes.iter().map(|route|Train{
             visits:route.iter().enumerate().map(|(i,&resource_id)|Visit{resource_id,earliest:(2*i) as i32,
@@ -3060,20 +3072,23 @@ mod aglr_end_to_end_tests {
                     optimum=optimum.min(problem.verify_solution(&sol,objective).unwrap());}
             }}}
             assert_eq!(optimum,if matches!(objective,DelayCostType::Continuous){4}else{1});
-            for strategy in [super::super::settings::AssumptionStrategy::Legacy,super::super::settings::AssumptionStrategy::Full]{
+            for strategy in [super::super::settings::AssumptionStrategy::Legacy,super::super::settings::AssumptionStrategy::Full]{for batch in [false,true]{
                 let mut settings=MaxSatDddLadderScSettings::default();settings.resource_orders=true;settings.order_master=true;
                 settings.order_master_cost_levels=true;
+                settings.order_master_batch_cuts=batch;
                 settings.assumption_strategy=strategy;settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
                 let (solution,stats)=solve_with_settings(&quiet_env,crate::solvers::util::minisat_deadline::Solver::new(30.0),
                     &problem,30.0,objective,settings,|_,_|{}).unwrap();
                 assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
                 assert_eq!(stats.resource_order_pairs,6);assert_eq!(stats.resource_order_rows,0);assert!(stats.order_master_schedules>0);
+                if batch{observed_batch=observed_batch.max(stats.order_master_max_batch);}else{assert!(stats.order_master_max_batch<=1);}
                 settings.core_minimize_checks=0;settings.core_minimize_conflicts=0;settings.core_exhaust_checks=0;
                 let (solution,_)=solve_with_settings(&quiet_env,satcoder::solvers::cadical::Solver::new(),
                     &problem,30.0,objective,settings,|_,_|{}).unwrap();
                 assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
-            }
+            }}
         }
+        assert!(observed_batch>1,"exercise simultaneous path-cost registration before the next SAT call");
     }
 
     #[test]

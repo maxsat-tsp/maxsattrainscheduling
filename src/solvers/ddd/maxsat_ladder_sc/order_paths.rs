@@ -104,20 +104,42 @@ impl<L: Lit> Schedule<L> {
         priority: impl Fn(usize, i32, i32) -> usize,
         cost_only: bool,
     ) -> Result<Option<Cut<L>>, String> {
+        Ok(self
+            .violated_batch(model_times, priority, cost_only, 1)?
+            .pop())
+    }
+
+    /// Separate independent, proved path implications from one immutable model.
+    /// Limit one preserves the historical priority and tie order.
+    pub fn violated_batch(
+        &self,
+        model_times: &[i32],
+        priority: impl Fn(usize, i32, i32) -> usize,
+        cost_only: bool,
+        limit: usize,
+    ) -> Result<Vec<Cut<L>>, String> {
         if model_times.len() != self.times.len() {
             return Err("temporal model size mismatch".into());
         }
-        let chosen = (0..self.times.len())
+        let mut chosen = (0..self.times.len())
             .filter(|&v| self.times[v] > model_times[v])
             .filter(|&v| !cost_only || priority(v, self.times[v], model_times[v]) > 0)
-            .max_by_key(|&v| {
-                (
-                    priority(v, self.times[v], model_times[v]),
-                    i64::from(self.times[v]) - i64::from(model_times[v]),
-                    std::cmp::Reverse(v),
-                )
-            });
+            .collect::<Vec<_>>();
+        let key = |&v: &usize| {
+            (
+                priority(v, self.times[v], model_times[v]),
+                i64::from(self.times[v]) - i64::from(model_times[v]),
+                std::cmp::Reverse(v),
+            )
+        };
+        if limit == 1 {
+            chosen = chosen.into_iter().max_by_key(key).into_iter().collect();
+        } else {
+            chosen.sort_unstable_by_key(|v| std::cmp::Reverse(key(v)));
+        }
         chosen
+            .into_iter()
+            .take(limit)
             .map(|visit| {
                 Ok(Cut::Path {
                     visit,
@@ -125,7 +147,7 @@ impl<L: Lit> Schedule<L> {
                     prefix: prefix(&self.steps, self.witnesses[visit])?,
                 })
             })
-            .transpose()
+            .collect()
     }
 }
 
@@ -406,6 +428,95 @@ mod tests {
             7
         );
         assert!(cost_threshold(1, 0, |_| 0).is_err());
+    }
+
+    #[test]
+    fn batch_paths_keep_each_proof_and_deterministic_priority() {
+        let a = g(1);
+        let b = g(2);
+        let topology = t(vec![5, 0, 0, 0]);
+        let edges = vec![e(0, 1, 2, Some(a)), e(1, 2, 3, Some(b)), e(0, 3, 5, None)];
+        let Analysis::Feasible(schedule) = analyse(&topology, edges).unwrap() else {
+            panic!("acyclic")
+        };
+        let costs = |v, _, _| usize::from(v != 0);
+        let cuts = schedule
+            .violated_batch(&[0, 0, 0, 0], costs, true, usize::MAX)
+            .unwrap();
+        assert_eq!(
+            cuts,
+            vec![
+                Cut::Path {
+                    visit: 2,
+                    time: 10,
+                    prefix: vec![!a, !b]
+                },
+                Cut::Path {
+                    visit: 3,
+                    time: 10,
+                    prefix: vec![]
+                },
+                Cut::Path {
+                    visit: 1,
+                    time: 7,
+                    prefix: vec![!a]
+                }
+            ]
+        );
+        assert_eq!(
+            schedule.violated(&[0, 0, 0, 0], costs, true).unwrap(),
+            Some(Cut::Path {
+                visit: 2,
+                time: 10,
+                prefix: vec![!a, !b]
+            })
+        );
+        assert!(schedule
+            .violated_batch(&[0, 0, 0, 0], costs, true, 0)
+            .unwrap()
+            .is_empty());
+        assert!(schedule
+            .violated_batch(&[0, 7, 10, 10], costs, true, usize::MAX)
+            .unwrap()
+            .is_empty());
+        assert!(schedule.violated_batch(&[0], costs, true, 2).is_err());
+        // Every implication holds in all small schedules satisfying its guards.
+        for bits in 0..4 {
+            for x in 5..=10 {
+                for y in 0..=12 {
+                    for z in 0..=15 {
+                        for w in 0..=15 {
+                            let active = |lit| {
+                                if lit == a {
+                                    bits & 1 != 0
+                                } else if lit == b {
+                                    bits & 2 != 0
+                                } else {
+                                    panic!("guard")
+                                }
+                            };
+                            if (active(a) && y < x + 2) || (active(b) && z < y + 3) || w < x + 5 {
+                                continue;
+                            }
+                            let times = [x, y, z, w];
+                            for cut in &cuts {
+                                if let Cut::Path {
+                                    visit,
+                                    time,
+                                    prefix,
+                                } = cut
+                                {
+                                    assert!(
+                                        prefix.iter().any(|&neg| !active(!neg))
+                                            || times[*visit] >= *time
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]

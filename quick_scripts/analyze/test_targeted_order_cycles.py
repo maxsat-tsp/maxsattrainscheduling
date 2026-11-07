@@ -6,6 +6,23 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_batched_master_changes_only_the_number_of_cuts_per_model(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        cfg=cycles.candidate_config(source,'order-master-batch')
+        self.assertEqual(cfg,dict(cycles.candidate_config(source,'order-master-levels-full'),order_master_batch_cuts='true'))
+        self.assertEqual(cycles.report_name('order-master-batch'),'order_master_batch_audit.json')
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw);args=SimpleNamespace(binary=root/'ddd',timeout=300,ram_kb=6000000,method_definitions={'test':cfg})
+            with patch.object(extended,'execute') as execute:
+                extended.run_case('test','cont','origA1',args,root)
+                self.assertEqual(execute.call_args.args[4]['MAXSATDDD_ORDER_MASTER_BATCH_CUTS'],'true')
+            solve=dict(status='timeout',total_time=300,timeout_seconds=300,process_exit_code=0)
+            solve.update({'maxsat_'+k:v for k,v in cfg.items() if k not in ('solver','kind')})
+            extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertFalse(extended.assess_case(root,'test','cont','origA1',300,cfg)['errors'])
+            solve['maxsat_order_master_batch_cuts']=False;extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertIn('maxsat_order_master_batch_cuts differs from the locked configuration',extended.assess_case(root,'test','cont','origA1',300,cfg)['errors'])
+
     def test_objective_filter_preserves_order_and_explicitly_excludes_other_pairs(self):
         selection=dict(finsteps123=[],infsteps180=['trackA11','trackA12'],cont=['origA8'])
         before=copy.deepcopy(selection)

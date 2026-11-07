@@ -114,6 +114,8 @@ pub struct MaxSatDddLadderScSettings {
     pub order_master: bool,
     /// Share a master threshold at the first time of each cost level.
     pub order_master_cost_levels: bool,
+    /// Learn all violated objective paths from each feasible master model.
+    pub order_master_batch_cuts: bool,
     /// Charge unavoidable earliest-time costs directly; encode only residuals.
     pub extract_initial_cost: bool,
     /// Restrict original weighted cost terms by a verified feasible upper bound.
@@ -155,6 +157,7 @@ impl Default for MaxSatDddLadderScSettings {
             order_path_cuts: false,
             order_master: false,
             order_master_cost_levels: false,
+            order_master_batch_cuts: false,
             extract_initial_cost: false,
             use_objective_bound: false,
             residual_hardening: false,

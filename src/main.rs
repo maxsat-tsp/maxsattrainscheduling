@@ -174,8 +174,8 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_core_exhaust_checks: Option<usize>,
 
-    /// SAT backend for SC/AGLR and journal MaxSAT-DDD: minisat, cadical, or native glucose.
-    #[structopt(long, default_value = "minisat", possible_values = &["minisat", "cadical", "glucose"])]
+    /// SAT backend for SC/AGLR and journal MaxSAT-DDD.
+    #[structopt(long, default_value = "minisat", possible_values = &["minisat", "minisat-random-polarity", "cadical", "glucose"])]
     maxsat_ladder_sc_backend: String,
 
     /// AGLR refinement policy: legacy, all-scanned, or adaptive.
@@ -540,6 +540,55 @@ fn emit_native_minisat_stats(mut output:impl FnMut(String,serde_json::Value)) {
     output("num_clauses_total".to_string(),clauses.into());
 }
 
+/// Adapter for satcoder's deterministic random-polarity MiniSAT wrapper.
+/// The upstream type does not implement `Debug`, which the DDD interface
+/// requires for solver telemetry.
+struct MiniSatRandomPolarityDebug(satcoder::solvers::minisat::MiniSatRandomPolarity);
+
+impl MiniSatRandomPolarityDebug {
+    fn new() -> Self {
+        Self(satcoder::solvers::minisat::MiniSatRandomPolarity::new())
+    }
+}
+
+impl std::fmt::Debug for MiniSatRandomPolarityDebug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("MiniSatRandomPolarity")
+    }
+}
+
+impl satcoder::SatInstance<satcoder::solvers::minisat::Lit> for MiniSatRandomPolarityDebug {
+    fn new_var(&mut self) -> satcoder::Bool<satcoder::solvers::minisat::Lit> {
+        satcoder::SatInstance::new_var(&mut self.0)
+    }
+
+    fn add_clause<IL: Into<satcoder::Bool<satcoder::solvers::minisat::Lit>>, I: IntoIterator<Item = IL>>(
+        &mut self,
+        clause: I,
+    ) {
+        satcoder::SatInstance::add_clause(&mut self.0, clause)
+    }
+}
+
+impl satcoder::SatSolverWithCore for MiniSatRandomPolarityDebug {
+    type Lit = satcoder::solvers::minisat::Lit;
+
+    fn solve_with_assumptions<'a>(
+        &'a mut self,
+        assumptions: impl IntoIterator<Item = satcoder::Bool<Self::Lit>>,
+    ) -> satcoder::SatResultWithCore<'a, Self::Lit> {
+        satcoder::SatSolverWithCore::solve_with_assumptions(&mut self.0, assumptions)
+    }
+}
+
+impl satcoder::SatSolver for MiniSatRandomPolarityDebug {
+    type Lit = satcoder::solvers::minisat::Lit;
+
+    fn solve<'a>(&'a mut self) -> satcoder::SatResult<'a, Self::Lit> {
+        satcoder::SatSolver::solve(&mut self.0)
+    }
+}
+
 fn solve_sc_with_backend(
     backend: &str,
     problem: &problem::Problem,
@@ -565,6 +614,17 @@ fn solve_sc_with_backend(
             counting_solver::CountingSolver::new(satcoder::solvers::minisat::Solver::new()),
             problem, timeout, objective, settings, output,
         ).map(|(solution, _)| solution),
+        "minisat-random-polarity" => {
+            output(
+                "maxsat_backend_signature".to_string(),
+                "MiniSAT v2.1.0 random-polarity wrapper".into(),
+            );
+            maxsat_ladder_sc::solve_with_settings(
+                &mk_env,
+                counting_solver::CountingSolver::new(MiniSatRandomPolarityDebug::new()),
+                problem, timeout, objective, settings, output,
+            ).map(|(solution, _)| solution)
+        }
         "glucose" => maxsat_ladder_sc::solve_with_settings(
             &mk_env,
             counting_solver::CountingSolver::new(ddd_solvers::incremental_sat::new_maxsat_glucose_solver()),
@@ -596,6 +656,17 @@ fn solve_journal_with_backend(
         "minisat" => maxsat_ladder::solve(&mk_env,
             counting_solver::CountingSolver::new(satcoder::solvers::minisat::Solver::new()),
             problem, timeout, objective, output).map(|(solution, _)| solution),
+        "minisat-random-polarity" => {
+            output(
+                "maxsat_backend_signature".to_string(),
+                "MiniSAT v2.1.0 random-polarity wrapper".into(),
+            );
+            maxsat_ladder::solve(
+                &mk_env,
+                counting_solver::CountingSolver::new(MiniSatRandomPolarityDebug::new()),
+                problem, timeout, objective, output,
+            ).map(|(solution, _)| solution)
+        }
         "glucose" => maxsat_ladder::solve(&mk_env,
             counting_solver::CountingSolver::new(ddd_solvers::incremental_sat::new_maxsat_glucose_solver()),
             problem, timeout, objective, output).map(|(solution, _)| solution),
@@ -740,12 +811,12 @@ fn main() {
     };
     println!("MaxSatDddLadderSc settings {:?}", maxsat_ladder_sc_settings);
     if maxsat_ladder_sc_settings.core_minimize_conflicts>0 {
-        assert!(opt.maxsat_ladder_sc_backend=="minisat" && maxsat_ladder_sc_settings.core_minimize_checks>0
+        assert!(matches!(opt.maxsat_ladder_sc_backend.as_str(), "minisat" | "minisat-random-polarity") && maxsat_ladder_sc_settings.core_minimize_checks>0
                 && maxsat_ladder_sc_settings.core_minimize_conflicts<=i32::MAX as usize,
                 "a core conflict budget requires MiniSAT, positive core checks and an i32-sized budget");
     }
     if maxsat_ladder_sc_settings.core_exhaust_checks>0 {
-        assert!(opt.maxsat_ladder_sc_backend=="minisat"
+        assert!(matches!(opt.maxsat_ladder_sc_backend.as_str(), "minisat" | "minisat-random-polarity")
                 && maxsat_ladder_sc_settings.core_minimize_checks>0
                 && maxsat_ladder_sc_settings.core_minimize_conflicts>0,
                 "experimental core exhaustion requires MiniSAT and positive core-check and conflict budgets");

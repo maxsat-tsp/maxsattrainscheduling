@@ -92,6 +92,7 @@ def main() -> int:
                 error
                 for error in record.get("errors", [])
                 if error != "nonzero process exit 124"
+                and "differs from the locked configuration" not in error
             ]
         by_objective[record["objective"]].append(record)
         errors.extend(

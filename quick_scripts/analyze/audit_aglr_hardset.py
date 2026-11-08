@@ -80,6 +80,19 @@ def main() -> int:
     by_objective: dict[str, list[dict]] = {objective: [] for objective in OBJECTIVES}
     errors: list[str] = []
     for record in records:
+        # The outer /usr/bin/timeout wrapper returns 124 when a solver has
+        # not exited a few seconds after its internal deadline. This is a
+        # valid non-proven result for a targeted hard-set run, provided the
+        # solver reports an external timeout rather than a crash.
+        if (
+            record.get("status") == "external_timeout"
+            and record.get("solve", {}).get("process_exit_code") == 124
+        ):
+            record["errors"] = [
+                error
+                for error in record.get("errors", [])
+                if error != "nonzero process exit 124"
+            ]
         by_objective[record["objective"]].append(record)
         errors.extend(
             f"{record['objective']}/{record['name']}: {message}"

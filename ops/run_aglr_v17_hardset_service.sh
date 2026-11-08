@@ -5,7 +5,8 @@
 set -euo pipefail
 
 REPO="${REPO:-/home/tuyenkv/projects/maxsattrainscheduling}"
-RUN_ID="${RUN_ID:-aglr-v17-hardset-300-$(date -u +%Y%m%d)}"
+DEFAULT_COMMIT="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || printf 'nogit')"
+RUN_ID="${RUN_ID:-aglr-v17-hardset-300-$(date -u +%Y%m%d)-$DEFAULT_COMMIT}"
 RESULTS_ROOT="${RESULTS_ROOT:-$REPO/results/aglr}"
 CAMPAIGN_DIR="$RESULTS_ROOT/$RUN_ID"
 REFERENCE="${REFERENCE:-$REPO/results/sat_research/core_exhaustion_v17_20261107/full_216}"

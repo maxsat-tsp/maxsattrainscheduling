@@ -22,7 +22,7 @@ exec 9>"$LOCK_FILE"
 flock -n 9 || { echo "another AGLR hard-set campaign is running" >&2; exit 2; }
 
 cd "$REPO"
-[[ -f Cargo.toml && -x "$BIN" && -x "$RUNNER" && -f "$AUDITOR" ]] || {
+[[ -f Cargo.toml && -x "$BIN" && -f "$RUNNER" && -f "$AUDITOR" ]] || {
   echo "missing repository, binary, runner, or auditor" >&2
   exit 2
 }

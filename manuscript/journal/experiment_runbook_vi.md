@@ -1572,10 +1572,10 @@ resource-order, tính bắc cầu và core processing.
 
 Vòng tiếp theo chỉ chạy đúng 13 cặp mà V17 chưa chứng minh được: bốn cặp
 `infsteps180` và chín cặp `cont`. Các cặp V17 đã giải được được tái sử dụng
-nguyên trạng. Mỗi cấu hình dùng 300 giây, RAM 6.000.000 KB, MiniSAT,
-`resource_orders=true`, `order_transitivity=true`,
-`core_minimize_checks=4`, `core_minimize_conflicts=100` và
-`core_exhaust_checks=4`. Bốn biến thể được chạy tuần tự, mỗi biến thể chỉ
+nguyên trạng. Mỗi cấu hình dùng 300 giây, RAM 6.000.000 KB và MiniSAT.
+Trong mã hiện tại, resource-order chỉ được hỗ trợ với refinement `legacy`,
+do đó vòng AGLR thích nghi giữ resource-order, tính bắc cầu và core
+exhaustion ở trạng thái tắt; không bỏ qua assertion để ép chạy. Bốn biến thể được chạy tuần tự, mỗi biến thể chỉ
 đổi một điều khiển AGLR:
 
 * `control`: rescue theo cận hoặc heuristic, heuristic mỗi vòng, không lọc
@@ -1597,3 +1597,7 @@ Auditor `quick_scripts/analyze/audit_aglr_hardset.py` kiểm tra tên ca, lịch
 `cost=lb=ub`, trạng thái tiến trình và sinh `hardset_audit.json`. Nếu có
 ít nhất một ca mới, coverage dự kiến vượt `203/216`; khi đó phải xác nhận
 ba lần và hồi quy toàn bộ 203 ca trước khi thay mốc trong bản thảo.
+
+Nếu AGLR không tạo ca mới, vòng kế tiếp sẽ giữ policy `legacy` của V17 và
+chỉ thay một tham số RC2/core trên cùng 13 ca. Vòng đó được báo cáo riêng,
+không gộp telemetry AGLR thích nghi với kết quả V17.

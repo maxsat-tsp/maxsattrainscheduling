@@ -64,11 +64,11 @@ if [[ ! -s "$CAMPAIGN_DIR/campaign.txt" ]]; then
     printf 'timeout_seconds=%s\n' "$TIMEOUT"
     printf 'ram_limit_kb=%s\n' "$RAM_LIMIT_KB"
     printf 'backend=minisat\n'
-    printf 'resource_orders=true\n'
-    printf 'order_transitivity=true\n'
-    printf 'core_minimize_checks=4\n'
-    printf 'core_minimize_conflicts=100\n'
-    printf 'core_exhaust_checks=4\n'
+    printf 'resource_orders=false\n'
+    printf 'order_transitivity=false\n'
+    printf 'core_minimize_checks=0\n'
+    printf 'core_minimize_conflicts=0\n'
+    printf 'core_exhaust_checks=0\n'
     printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$CAMPAIGN_DIR/campaign.txt"
 else
@@ -112,11 +112,11 @@ instances_by_objective=$selection_json
 assumptions=legacy
 backend=minisat
 sparse_costs=false
-resource_orders=true
-order_transitivity=true
-core_minimize_checks=4
-core_minimize_conflicts=100
-core_exhaust_checks=4
+resource_orders=false
+order_transitivity=false
+core_minimize_checks=0
+core_minimize_conflicts=0
+core_exhaust_checks=0
 EOF
 
   for objective in infsteps180 cont; do
@@ -139,9 +139,9 @@ PY
       AGLR_HEURISTIC_MIN_GAP="$gap" AGLR_USE_OBJECTIVE_BOUND=false \
       AGLR_FILTER_DUPLICATES="$filter" MAXSATDDD_ASSUMPTIONS=legacy \
       MAXSATDDD_BACKEND=minisat MAXSATDDD_SPARSE_COSTS=false \
-      MAXSATDDD_RESOURCE_ORDERS=true MAXSATDDD_ORDER_TRANSITIVITY=true \
-      MAXSATDDD_CORE_MINIMIZE_CHECKS=4 MAXSATDDD_CORE_MINIMIZE_CONFLICTS=100 \
-    MAXSATDDD_CORE_EXHAUST_CHECKS=4 RERUN_NON_OK=1 bash "$RUNNER"
+      MAXSATDDD_RESOURCE_ORDERS=false MAXSATDDD_ORDER_TRANSITIVITY=false \
+      MAXSATDDD_CORE_MINIMIZE_CHECKS=0 MAXSATDDD_CORE_MINIMIZE_CONFLICTS=0 \
+    MAXSATDDD_CORE_EXHAUST_CHECKS=0 RERUN_NON_OK=1 bash "$RUNNER"
     python3 "$CSV_BATCH" "$out" --format compact --overwrite >/dev/null
   done
   python3 "$AUDITOR" --variant "$dir" --reference "$REFERENCE" --timeout "$TIMEOUT" \

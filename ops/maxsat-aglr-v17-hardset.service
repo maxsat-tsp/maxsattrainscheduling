@@ -1,0 +1,15 @@
+[Unit]
+Description=Unattended AGLR V17 hard-set campaign
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/maxsattrainscheduling
+ExecStart=/home/tuyenkv/projects/maxsattrainscheduling/ops/run_aglr_v17_hardset_service.sh
+TimeoutStartSec=infinity
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1562,3 +1562,38 @@ Telemetry cũng ghi kích thước các tập điều kiện chi phí gây mâu 
 `maxsat_unit_weight_cores` đếm các lần chỉ tăng được cận dưới một đơn vị.
 Các số này giúp quyết định có cần thu nhỏ tập mâu thuẫn ở vòng sau; chưa
 thay đổi cách RC2 xử lý chúng trong vòng bounds.
+
+## Vòng AGLR trên 13 ca V17 chưa giải
+
+Chiến dịch `full-final-120-20261108` đã hoàn tất nhưng AGLR cơ sở chỉ đạt
+`(72,68,55)` ở giới hạn 120 giây. Không dùng kết quả này để thay mốc V17.
+Mốc SAT mạnh nhất vẫn là V17: `(72,68,63)`, tổng `203/216`, với MiniSAT,
+resource-order, tính bắc cầu và core processing.
+
+Vòng tiếp theo chỉ chạy đúng 13 cặp mà V17 chưa chứng minh được: bốn cặp
+`infsteps180` và chín cặp `cont`. Các cặp V17 đã giải được được tái sử dụng
+nguyên trạng. Mỗi cấu hình dùng 300 giây, RAM 6.000.000 KB, MiniSAT,
+`resource_orders=true`, `order_transitivity=true`,
+`core_minimize_checks=4`, `core_minimize_conflicts=100` và
+`core_exhaust_checks=4`. Bốn biến thể được chạy tuần tự, mỗi biến thể chỉ
+đổi một điều khiển AGLR:
+
+* `control`: rescue theo cận hoặc heuristic, heuristic mỗi vòng, không lọc
+  trùng;
+* `rescue-model`: coi tăng mô hình là tiến triển khi quyết định rescue;
+* `filter-duplicates`: lọc ứng viên và mệnh đề trùng trước khi chọn;
+* `heuristic-period8`: chỉ gửi nghiệm heuristic sau tám vòng.
+
+Lệnh không cần theo dõi thủ công:
+
+```bash
+systemctl status maxsat-aglr-v17-hardset.service --no-pager
+journalctl -u maxsat-aglr-v17-hardset.service -f
+```
+
+Runner `ops/run_aglr_v17_hardset_service.sh` có lock chống chạy trùng, ghi
+commit, hash binary, tham số và danh sách ca; có thể tiếp tục sau gián đoạn.
+Auditor `quick_scripts/analyze/audit_aglr_hardset.py` kiểm tra tên ca, lịch,
+`cost=lb=ub`, trạng thái tiến trình và sinh `hardset_audit.json`. Nếu có
+ít nhất một ca mới, coverage dự kiến vượt `203/216`; khi đó phải xác nhận
+ba lần và hồi quy toàn bộ 203 ca trước khi thay mốc trong bản thảo.

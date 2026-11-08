@@ -1,0 +1,18 @@
+[Unit]
+Description=MaxSAT journal full campaign (resumable)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/maxsattrainscheduling
+ExecStart=/home/tuyenkv/bin/run_final_campaign_service.sh
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=90
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

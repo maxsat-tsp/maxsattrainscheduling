@@ -4,12 +4,16 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=oneshot
+Type=simple
 User=tuyenkv
 WorkingDirectory=/home/tuyenkv/projects/maxsattrainscheduling
 ExecStart=/home/tuyenkv/projects/maxsattrainscheduling/ops/run_aglr_v17_hardset_service.sh
+Restart=on-failure
+RestartSec=30
 TimeoutStartSec=infinity
-RemainAfterExit=yes
+TimeoutStopSec=90
+KillMode=control-group
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target

@@ -22,6 +22,11 @@ exec 9>"$LOCK_FILE"
 flock -n 9 || { echo "another AGLR hard-set campaign is running" >&2; exit 2; }
 
 cd "$REPO"
+source /home/tuyenkv/miniconda3/etc/profile.d/conda.sh
+conda activate gurobi
+export GUROBI_HOME=/home/tuyenkv/miniconda3/envs/gurobi
+export LD_LIBRARY_PATH=/home/tuyenkv/miniconda3/envs/gurobi/lib
+export GRB_LICENSE_FILE=/home/tuyenkv/gurobi.lic
 [[ -f Cargo.toml && -x "$BIN" && -f "$RUNNER" && -f "$AUDITOR" ]] || {
   echo "missing repository, binary, runner, or auditor" >&2
   exit 2
@@ -121,9 +126,9 @@ PY
 )"
     out="$dir/$objective.json"
     if [[ -s "$out" ]]; then
-      echo "[$tag] reusing $objective"
-    else
-      echo "[$tag] running $objective | timeout=${TIMEOUT}s | instances=$names"
+      echo "[$tag] resuming $objective"
+    fi
+    echo "[$tag] running $objective | timeout=${TIMEOUT}s | instances=$names"
       BIN="$BIN" SOLVER=maxsat_ddd_ladder_aglr OBJECTIVE="$objective" JSON_OUT="$out" \
       RUN_LOG_DIR="$dir/$objective.logs" INSTANCE_TIMEOUT_SECS="$TIMEOUT" \
       EXTERNAL_TIMEOUT_GRACE_SECS=30 RAM_LIMIT_KB="$RAM_LIMIT_KB" \
@@ -135,8 +140,7 @@ PY
       MAXSATDDD_BACKEND=minisat MAXSATDDD_SPARSE_COSTS=false \
       MAXSATDDD_RESOURCE_ORDERS=true MAXSATDDD_ORDER_TRANSITIVITY=true \
       MAXSATDDD_CORE_MINIMIZE_CHECKS=4 MAXSATDDD_CORE_MINIMIZE_CONFLICTS=100 \
-      MAXSATDDD_CORE_EXHAUST_CHECKS=4 RERUN_NON_OK=1 bash "$RUNNER"
-    fi
+    MAXSATDDD_CORE_EXHAUST_CHECKS=4 RERUN_NON_OK=1 bash "$RUNNER"
     python3 "$CSV_BATCH" "$out" --format compact --overwrite >/dev/null
   done
   python3 "$AUDITOR" --variant "$dir" --reference "$REFERENCE" --timeout "$TIMEOUT" \

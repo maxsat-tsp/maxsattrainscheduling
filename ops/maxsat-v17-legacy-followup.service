@@ -1,0 +1,19 @@
+[Unit]
+Description=Unattended V17 legacy SAT follow-up on hard cases
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/maxsattrainscheduling
+ExecStart=/home/tuyenkv/projects/maxsattrainscheduling/ops/run_v17_legacy_followup_service.sh
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=infinity
+TimeoutStopSec=90
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

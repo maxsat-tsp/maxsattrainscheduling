@@ -33,3 +33,38 @@ VM root:
 `/home/tuyenkv/projects/sat-bound-search-v41/results/aglr/sat-bound-search-v41-20261109/`.
 Read `hard-priority-evaluation.json` after the hard phase and
 `followup-priority-evaluation.json` only after full confirmation/regression.
+
+## Completed campaign and independent full audit
+
+The controlled round completed successfully. `complete_snapshot.tar.gz`
+preserves the full campaign, and `full_evaluation.json` independently
+rechecks all schedules/costs, replays every bound update, and requires
+exactly 216 distinct nonrepeat pairs with the same frozen source/binary.
+Six confirmations are kept separate from coverage.
+
+| Objective | V17 / 300 s | V40 / 300 s | V41 / 300 s |
+|---|---:|---:|---:|
+| finsteps123 | 72 | 72 | 72 |
+| infsteps180 | 68 | 67 | 67 |
+| cont | 63 | 64 | 65 |
+| Total | 203 | 203 | 204 |
+
+Relative to V17, V41 gains `cont/origA8` (23143, 55.139021 seconds) and
+`cont/stationA2` (9193, 163.733396 seconds). Both reproduce in all three
+confirmations: origA8 55.306112 / 55.224009 / 54.984624 seconds; stationA2
+163.513513 / 163.515240 / 163.524238 seconds. It still loses
+`infsteps180/stationA8`, timeout with its own [160,162], versus V17's
+optimum 161 in 44.761233 seconds. Thus total coverage improves by one,
+but the objective-wise nonregression condition is not met. No SOTA or
+submission claim is made. Full-120 Gurobi already proves at least 206.
+
+No remaining case improves a bound over all imported historical SAT/MILP
+sources; two improve a bound over prior SAT runs. In particular V41's
+infsteps180/trackA12 UB 125 does not improve V40's known UB 118. Candidate
+bounds are never replaced by pooled reference bounds.
+
+`full_reference_pool.json` and its SHA-256 receipt freeze the comparison
+sources. `full_summary.csv` and `unresolved_bounds.csv` are derived from
+the full audit. The earlier preflight-only snapshot/report above remains
+unchanged; it is not relabeled as a completed experiment. The twelve
+unresolved pairs in this complete archive form the next development set.

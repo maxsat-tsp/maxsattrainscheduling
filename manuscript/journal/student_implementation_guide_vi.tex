@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.22}
+\fancyhead[R]{\small Phiên bản 5.23}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.22, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.23, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -1678,6 +1678,49 @@ Nếu có ca mới, vẫn cần ba lần xác nhận và hồi quy 68 ca bậc t
 giải. Lượt này chưa thay thế bảng full V17. Công thức của phương pháp
 không đổi khi đổi backend; bản ghi và bộ kiểm tra giúp xác nhận hai
 bộ giải đang thực sự giải cùng một mô hình.
+
+\section{V37: rút gọn lại tập điều kiện gây mâu thuẫn}
+
+Các vòng tăng số lần thử bỏ từng điều kiện chưa giải thêm được ca khó.
+V37 thử một bước nhẹ hơn, gọi là \emph{core trimming}: gửi lại toàn bộ
+tập điều kiện vừa gây mâu thuẫn để SAT tìm một tập nhỏ hơn. Đây là bước
+đã có trong \href{https://pysathq.github.io/docs/html/api/examples/rc2.html\#pysat.examples.rc2.RC2.trim_core}{RC2 của PySAT}; không coi bản thân bước này là đóng góp mới.
+
+Gọi $F$ là các ràng buộc đang có, $C$ là tập điều kiện chi phí vừa được
+chứng minh mâu thuẫn. Chỉ nhận tập mới $C'$ khi:
+\[
+ \varnothing\ne C'\subseteq C,
+ \qquad F\land\bigwedge_{\ell\in C'}\ell
+ \text{ được SAT chứng minh là UNSAT.}
+\]
+Không suy ra mâu thuẫn chỉ vì truy vấn hết ngân sách. Nếu chưa có chứng
+minh mới, giữ nguyên $C$. Nếu SAT lại trả lời rằng toàn bộ $C$ có nghiệm,
+dừng để kiểm tra lỗi vì điều này trái với chứng minh vừa có.
+
+Ví dụ, $C=\{a,b,c\}$ nhưng chỉ $a$ và $b$ đã xung đột. Truy vấn mới có
+thể trả về $C'=\{a,b\}$; khi đó bộ đếm chi phí chỉ cần xử lý hai điều kiện.
+Với trọng số $w_a=5,w_b=7,w_c=1$, RC2 xử lý tập nhỏ hơn với
+\[
+ \delta=\min_{\ell\in C'}w_\ell=5.
+\]
+Vẫn phải giữ phần trọng số còn lại của $b$ và toàn bộ trọng số của $c$.
+Bỏ $c$ khỏi tập mâu thuẫn không có nghĩa là xóa chi phí của $c$ khỏi bài toán.
+
+Tham số mới là \file{--maxsat-ladder-sc-core-trim-checks}. Mặc định bằng
+0, nghĩa là không thực hiện bước mới. V37 đặt bằng 3, giữ giới hạn 100
+xung đột cho mỗi truy vấn phụ, MiniSAT và các tham số V17 còn lại.
+Dừng rút gọn khi tập không nhỏ hơn, hết ba lần thử hoặc hết ngân sách.
+
+Trước ca khó, service phải chạy kiểm thử bảng chân trị, so với vét cạn
+trên lịch ba tàu ở cả ba hàm mục tiêu, và sáu smoke test có bật/tắt bước
+mới. Mỗi nghiệm đều được kiểm tra độc lập. Theo dõi số truy vấn rút gọn,
+số điều kiện đã bỏ, thời gian thêm và số lần chưa kết luận được.
+
+Service \file{maxsat-core-trim-v37.service} chờ V36 kết thúc và kiểm toán
+lại dữ liệu V36. Chỉ khi V36 không có ca mới và mọi kiểm thử V37 đạt mới
+chạy đúng 13 ca chưa giải, mỗi ca 300 giây. Nếu có ca mới thì xác nhận
+ba lần, sau đó kiểm tra lại 203 ca cũ. Không cộng ca mới với kết quả V17
+để tuyên bố coverage của V37 khi chưa kiểm tra hồi quy.
 
 \section{Nội dung được phép đưa vào bài báo}
 

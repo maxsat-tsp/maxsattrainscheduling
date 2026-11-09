@@ -170,6 +170,10 @@ struct Opt {
     #[structopt(long)]
     maxsat_ladder_sc_core_minimize_conflicts: Option<usize>,
 
+    /// Whole-core trimming queries before minimization (default 0; MiniSAT only).
+    #[structopt(long)]
+    maxsat_ladder_sc_core_trim_checks: Option<usize>,
+
     /// Extra cardinality-floor checks per new core (default 0; MiniSAT experiment).
     #[structopt(long)]
     maxsat_ladder_sc_core_exhaust_checks: Option<usize>,
@@ -790,6 +794,7 @@ fn main() {
         residual_hardening: opt.maxsat_ladder_sc_residual_hardening.unwrap_or(false),
         core_minimize_checks: opt.maxsat_ladder_sc_core_minimize_checks.unwrap_or(0),
         core_minimize_conflicts: opt.maxsat_ladder_sc_core_minimize_conflicts.unwrap_or(0),
+        core_trim_checks: opt.maxsat_ladder_sc_core_trim_checks.unwrap_or(0),
         core_exhaust_checks: opt.maxsat_ladder_sc_core_exhaust_checks.unwrap_or(0),
         assumption_strategy: match opt.maxsat_ladder_sc_assumptions.as_deref().unwrap_or("legacy") {
             "legacy" => maxsat_ladder_sc::AssumptionStrategy::Legacy,
@@ -810,6 +815,11 @@ fn main() {
         aglr: maxsat_ladder_sc::AglrSettings::default(),
     };
     println!("MaxSatDddLadderSc settings {:?}", maxsat_ladder_sc_settings);
+    if maxsat_ladder_sc_settings.core_trim_checks > 0 {
+        assert!(opt.maxsat_ladder_sc_backend == "minisat"
+                && maxsat_ladder_sc_settings.core_minimize_conflicts > 0,
+                "bounded core trimming requires MiniSAT and a positive core conflict budget");
+    }
     if maxsat_ladder_sc_settings.core_minimize_conflicts>0 {
         assert!(matches!(opt.maxsat_ladder_sc_backend.as_str(), "minisat" | "minisat-random-polarity") && maxsat_ladder_sc_settings.core_minimize_checks>0
                 && maxsat_ladder_sc_settings.core_minimize_conflicts<=i32::MAX as usize,

@@ -10,6 +10,40 @@ pub(super) struct Outcome<L: Lit> {
     pub minimum_weight_increased: bool,
 }
 
+/// Re-query the complete proved core before deletion-based minimization.
+/// A bounded/UNKNOWN query preserves the old proof. SAT contradicts that
+/// proof and is an error; a returned core must be a nonempty unique subset.
+pub(super) fn trim<L: Lit>(
+    mut core: Vec<Bool<L>>,
+    max_checks: usize,
+    weight: impl Fn(Bool<L>) -> usize,
+    mut query: impl FnMut(&[Bool<L>]) -> Result<Option<Vec<Bool<L>>>, String>,
+    expired: impl Fn() -> bool,
+) -> Result<Outcome<L>, String> {
+    if core.is_empty() || core.iter().copied().collect::<HashSet<_>>().len() != core.len() {
+        return Err("core trimming requires a nonempty core without duplicates".into());
+    }
+    let before = core.len();
+    let initial_weight = core.iter().map(|&literal| weight(literal)).min().unwrap();
+    let mut checks = 0;
+    while checks < max_checks && core.len() > 1 && !expired() {
+        checks += 1;
+        let Some(mut reduced) = query(&core)? else { break; };
+        if reduced.is_empty()
+            || reduced.iter().copied().collect::<HashSet<_>>().len() != reduced.len()
+            || reduced.iter().any(|literal| !core.contains(literal))
+        {
+            return Err("core trimming returned an empty, duplicate, or out-of-query core".into());
+        }
+        if reduced.len() == core.len() { break; }
+        reduced.sort_unstable();
+        core = reduced;
+    }
+    let final_weight = core.iter().map(|&literal| weight(literal)).min().unwrap();
+    Ok(Outcome { removed: before - core.len(), core, checks,
+                 minimum_weight_increased: final_weight > initial_weight })
+}
+
 /// `query` returns a newly proved UNSAT core, or None for SAT or an explicitly
 /// abandoned inconclusive check. Neither permits removing an assumption.
 /// Try removing low-weight assumptions first:
@@ -64,6 +98,52 @@ mod tests {
             SatResultWithCore::Sat(_) => None,
             SatResultWithCore::Unsat(core) => Some(core.iter().map(|&literal| Bool::Lit(literal)).collect()),
         }
+    }
+
+    #[test]
+    fn trimming_accepts_only_proved_reductions_and_preserves_weighted_cost() {
+        let mut solver = satcoder::solvers::minisat::Solver::new();
+        let a=solver.new_var(); let b=solver.new_var(); let c=solver.new_var();
+        SatInstance::add_clause(&mut solver,vec![!a,!b]);
+        let weights=[(a,5),(b,7),(c,1)];
+        let result=trim(vec![a,b,c],3,
+            |literal| weights.iter().find(|(l,_)|*l==literal).unwrap().1,
+            |assumptions| Ok(query(&mut solver,assumptions)),||false).unwrap();
+        assert_eq!(result.core.len(),2); assert_eq!(result.removed,1);
+        assert!(result.minimum_weight_increased); assert!(result.checks<=3);
+        assert!(result.core.contains(&a) && result.core.contains(&b));
+        assert!(query(&mut solver,&result.core).is_some());
+        for mask in 0..8 {
+            let values=[mask&1!=0,mask&2!=0,mask&4!=0];
+            if values[0] && values[1] {continue;}
+            let old=5*usize::from(!values[0])+7*usize::from(!values[1])+usize::from(!values[2]);
+            let violations=usize::from(!values[0])+usize::from(!values[1]);
+            let residual=5+2*usize::from(!values[1])+usize::from(!values[2])+5*(violations-1);
+            assert_eq!(old,residual);
+        }
+    }
+
+    #[test]
+    fn trimming_fixed_point_budget_and_unknown_never_remove_assumptions() {
+        let mut solver=satcoder::solvers::minisat::Solver::new();
+        let a=solver.new_var(); let b=solver.new_var();
+        for (budget,expired,calls) in [(0,false,0),(3,true,0),(3,false,1)] {
+            let result=trim(vec![a,b],budget,|_|1,|_|Ok(None),||expired).unwrap();
+            assert_eq!(result.core,vec![a,b]);assert_eq!(result.checks,calls);
+        }
+        let result=trim(vec![a,b],3,|_|1,|core|Ok(Some(core.to_vec())),||false).unwrap();
+        assert_eq!(result.checks,1);assert_eq!(result.removed,0);
+    }
+
+    #[test]
+    fn trimming_rejects_malformed_proofs_and_unexpected_sat() {
+        let mut solver=satcoder::solvers::minisat::Solver::new();
+        let a=solver.new_var();let b=solver.new_var();let c=solver.new_var();
+        for proof in [vec![],vec![c],vec![a,a]] {
+            assert!(trim(vec![a,b],3,|_|1,|_|Ok(Some(proof.clone())),||false).is_err());
+        }
+        assert!(trim(vec![a,b],3,|_|1,|_|Err("SAT contradicts proved core".into()),||false).is_err());
+        assert!(trim(vec![a,a],0,|_|1,|_|Ok(None),||false).is_err());
     }
 
     #[test]

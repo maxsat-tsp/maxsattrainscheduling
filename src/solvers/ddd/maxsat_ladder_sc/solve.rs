@@ -104,6 +104,11 @@ pub struct SolveStats {
     pub core_minimize_weight_increases: usize,
     pub core_minimize_inconclusive: usize,
     pub core_minimize_time: Duration,
+    pub core_trim_calls: usize,
+    pub core_trim_removed: usize,
+    pub core_trim_weight_increases: usize,
+    pub core_trim_inconclusive: usize,
+    pub core_trim_time: Duration,
     pub core_exhaust_calls: usize,
     pub core_exhaust_steps: usize,
     pub core_exhaust_inconclusive: usize,
@@ -941,6 +946,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         "AGLR fraction must be finite and between zero and one"
     );
     assert!(settings.aglr.max_wait > 0, "AGLR max_wait must be positive");
+    assert!(settings.core_trim_checks == 0 || settings.core_minimize_conflicts > 0,
+            "bounded core trimming requires a positive conflict budget");
     assert!(!settings.resource_orders || settings.aglr.policy == RefinementPolicy::Legacy,
             "resource-order experiments currently require legacy refinement");
     assert!(!settings.order_transitivity || settings.resource_orders,
@@ -1000,6 +1007,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_residual_hardening".to_string(), settings.residual_hardening.into());
     output_stats("maxsat_core_minimize_checks".to_string(), settings.core_minimize_checks.into());
     output_stats("maxsat_core_minimize_conflicts".to_string(), settings.core_minimize_conflicts.into());
+    output_stats("maxsat_core_trim_checks".to_string(), settings.core_trim_checks.into());
     output_stats("maxsat_core_exhaust_checks".to_string(), settings.core_exhaust_checks.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
@@ -2282,6 +2290,47 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
             }
 
             let mut core = core.iter().map(|c| Bool::Lit(*c)).collect::<Vec<_>>();
+            if settings.core_trim_checks > 0 && core.len() > 1 {
+                let trim_started = Instant::now();
+                let outcome = super::core_minimize::trim(
+                    core, settings.core_trim_checks,
+                    |literal| soft_constraints[&literal].1,
+                    |assumptions| {
+                        let started = Instant::now();
+                        stats.sat_calls += 1;
+                        let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            crate::solvers::util::minisat_deadline::with_core_check_limit(
+                                settings.core_minimize_conflicts, || {
+                                    match solver.solve_with_assumptions(assumptions.iter().copied()) {
+                                        satcoder::SatResultWithCore::Sat(_) => Err(
+                                            "SAT contradicts the proved core during trimming".to_string()),
+                                        satcoder::SatResultWithCore::Unsat(proof) => Ok(Some(
+                                            proof.iter().map(|&literal| Bool::Lit(literal)).collect())),
+                                    }
+                                },
+                            )
+                        })) {
+                            Ok(result) => result,
+                            Err(payload) if payload.is::<crate::solvers::util::minisat_deadline::CoreCheckInconclusive>() => {
+                                stats.core_trim_inconclusive += 1;
+                                Ok(None)
+                            },
+                            Err(payload) => std::panic::resume_unwind(payload),
+                        };
+                        solver_time += started.elapsed();
+                        result
+                    },
+                    || start_time.elapsed().as_secs_f64() >= timeout,
+                ).map_err(SolverError::InvalidSolution)?;
+                stats.core_trim_calls += outcome.checks;
+                stats.core_trim_removed += outcome.removed;
+                stats.core_trim_weight_increases += usize::from(outcome.minimum_weight_increased);
+                stats.core_trim_time += trim_started.elapsed();
+                core = outcome.core;
+                // Preserve completed trimming telemetry even if a later native
+                // SAT query reaches its watchdog deadline and unwinds the loop.
+                output_trim_stats(&mut output_stats, &stats);
+            }
             if settings.core_minimize_checks > 0 && core.len() > 1 {
                 let minimize_start = Instant::now();
                 let outcome = super::core_minimize::minimize(
@@ -2473,6 +2522,14 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     }
 }
 
+fn output_trim_stats(output: &mut impl FnMut(String, serde_json::Value), stats: &SolveStats) {
+    output("maxsat_core_trim_calls".into(), stats.core_trim_calls.into());
+    output("maxsat_core_trim_removed".into(), stats.core_trim_removed.into());
+    output("maxsat_core_trim_weight_increases".into(), stats.core_trim_weight_increases.into());
+    output("maxsat_core_trim_inconclusive".into(), stats.core_trim_inconclusive.into());
+    output("maxsat_core_trim_time".into(), stats.core_trim_time.as_secs_f64().into());
+}
+
 fn do_output_stats<L: satcoder::Lit>(
     output_stats: &mut impl FnMut(String, serde_json::Value),
     iteration: usize,
@@ -2486,6 +2543,7 @@ fn do_output_stats<L: satcoder::Lit>(
     aglr: &AglrTelemetry,
     heuristic_filter: &heuristic::HeuristicFilter,
 ) {
+    output_trim_stats(output_stats, stats);
     output_stats("iterations".to_string(), iteration.into());
     output_stats("maxsat_sat_calls".to_string(), stats.sat_calls.into());
     output_stats("maxsat_partial_sat_calls".to_string(), stats.partial_sat_calls.into());
@@ -3349,6 +3407,43 @@ mod aglr_end_to_end_tests {
         }
         assert!(observed_checks > 0, "test must exercise the extra SAT queries");
         assert!(observed_exhaust_checks > 0, "test must exercise native cardinality-floor queries");
+    }
+
+    #[test]
+    fn bounded_core_trimming_matches_exhaustive_three_train_schedules() {
+        let problem=Problem {
+            name:"bounded-core-trimming".into(),
+            trains:(0..3).map(|_|Train {visits:vec![Visit {
+                resource_id:0, earliest:0, aimed:Some(0), travel_time:2,
+            }]}).collect(),
+            conflicts:vec![(0,0)],
+        };
+        let mut observed_checks=0;
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,
+                          DelayCostType::InfiniteSteps180] {
+            let mut optimum=i32::MAX;
+            for a in 0..=6 {for b in 0..=6 {for c in 0..=6 {
+                if let Some(cost)=problem.verify_solution(
+                    &vec![vec![a,a+2],vec![b,b+2],vec![c,c+2]],objective) {
+                    optimum=optimum.min(cost);
+                }
+            }}}
+            for budget in [1,100] {for checks in [0,3] {
+                let mut settings=MaxSatDddLadderScSettings::default();
+                settings.resource_orders=true;settings.order_transitivity=true;
+                settings.core_minimize_checks=4;settings.core_minimize_conflicts=budget;
+                settings.core_exhaust_checks=4;settings.core_trim_checks=checks;
+                let (solution,stats)=solve_with_settings(
+                    &quiet_env,crate::solvers::util::minisat_deadline::Solver::new(30.0),
+                    &problem,30.0,objective,settings,|_,_|{},
+                ).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+                assert!(stats.core_trim_calls<=checks*stats.n_unsat);
+                if checks==0 {assert_eq!(stats.core_trim_calls,0);}
+                observed_checks+=stats.core_trim_calls;
+            }}
+        }
+        assert!(observed_checks>0,"test must exercise whole-core trimming");
     }
 
     #[test]

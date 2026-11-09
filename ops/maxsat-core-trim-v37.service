@@ -1,0 +1,26 @@
+[Unit]
+Description=Bounded RC2 core trimming after the V36 experiment
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=3600
+StartLimitBurst=2
+ConditionPathExists=!/home/tuyenkv/projects/core-trim-v37/results/aglr/core-trim-v37-20261109/COMPLETED
+ConditionPathExists=!/home/tuyenkv/projects/core-trim-v37/results/aglr/core-trim-v37-20261109/FAILED
+ConditionPathExists=!/home/tuyenkv/projects/core-trim-v37/results/aglr/core-trim-v37-20261109/SKIPPED
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/core-trim-v37
+EnvironmentFile=/home/tuyenkv/.config/maxsat/core-trim-v37.env
+ExecStart=/usr/bin/taskset -c 0,1,4,5 /bin/bash /home/tuyenkv/projects/core-trim-v37/ops/run_core_trim_v37.sh
+Restart=on-failure
+RestartPreventExitStatus=78
+RestartSec=30
+RuntimeMaxSec=21600
+TimeoutStopSec=30
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

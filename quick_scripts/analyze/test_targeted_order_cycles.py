@@ -6,6 +6,32 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_bounded_whole_core_trimming_is_single_flag_and_is_audited(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],
+            core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
+        config=cycles.candidate_config(source,'core-trim')
+        self.assertEqual(config,dict(source['definition'],core_trim_checks='3'))
+        with self.assertRaises(ValueError):
+            cycles.candidate_config(dict(definition=config),'core-trim')
+        for backend,budget in [('cadical','100'),('minisat','0')]:
+            with self.assertRaises(ValueError):
+                cycles.candidate_config(dict(definition=dict(source['definition'],
+                    backend=backend,core_minimize_conflicts=budget)),'core-trim')
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);args=SimpleNamespace(binary=root/'ddd',timeout=300,ram_kb=6000000,
+                method_definitions={'test':config})
+            with patch.object(extended,'execute') as execute:
+                extended.run_case('test','cont','origA1',args,root)
+                self.assertEqual(execute.call_args.args[4]['MAXSATDDD_CORE_TRIM_CHECKS'],'3')
+            solve=dict(status='timeout',total_time=300,timeout_seconds=300,process_exit_code=0)
+            solve.update({'maxsat_'+k:v for k,v in config.items() if k not in ('solver','kind')})
+            extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertFalse(extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
+            solve['maxsat_core_trim_checks']=0
+            extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+            self.assertIn('maxsat_core_trim_checks differs from the locked configuration',
+                extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
+
     def test_v17_assumption_contrasts_keep_core_and_resource_settings(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],
             core_minimize_checks='4', core_minimize_conflicts='100', core_exhaust_checks='4'))

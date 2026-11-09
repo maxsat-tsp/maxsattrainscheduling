@@ -306,6 +306,7 @@ def run_case(method: str, objective: str, name: str, args, root: Path) -> None:
                             ("objective_bound", "OBJECTIVE_BOUND"), ("residual_hardening", "RESIDUAL_HARDENING"),
                             ("core_minimize_checks", "CORE_MINIMIZE_CHECKS"),
                             ("core_minimize_conflicts", "CORE_MINIMIZE_CONFLICTS"),
+                            ("core_trim_checks", "CORE_TRIM_CHECKS"),
                             ("core_exhaust_checks", "CORE_EXHAUST_CHECKS")):
             if key in cfg:
                 env["MAXSATDDD_" + suffix] = cfg[key]

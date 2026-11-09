@@ -81,6 +81,7 @@ MAXSATDDD_BACKEND="${MAXSATDDD_BACKEND:-}"
 MAXSATDDD_RESIDUAL_HARDENING="${MAXSATDDD_RESIDUAL_HARDENING:-}"
 MAXSATDDD_CORE_MINIMIZE_CHECKS="${MAXSATDDD_CORE_MINIMIZE_CHECKS:-}"
 MAXSATDDD_CORE_MINIMIZE_CONFLICTS="${MAXSATDDD_CORE_MINIMIZE_CONFLICTS:-}"
+MAXSATDDD_CORE_TRIM_CHECKS="${MAXSATDDD_CORE_TRIM_CHECKS:-}"
 MAXSATDDD_CORE_EXHAUST_CHECKS="${MAXSATDDD_CORE_EXHAUST_CHECKS:-}"
 
 tmpdir="$(mktemp -d /tmp/ddd-run-all.XXXXXX)"
@@ -305,6 +306,7 @@ run_fingerprint="$(python3 - \
   "${MAXSATDDD_RESIDUAL_HARDENING:-default}" \
   "${MAXSATDDD_CORE_MINIMIZE_CHECKS:-default}" \
   "${MAXSATDDD_CORE_MINIMIZE_CONFLICTS:-default}" \
+  "${MAXSATDDD_CORE_TRIM_CHECKS:-default}" \
   "${MAXSATDDD_CORE_EXHAUST_CHECKS:-default}" \
   "${cpu_model:-unavailable}" "$logical_cpus" "$memory_bytes" "$system_description" \
   "$cargo_lock_sha256" "$dataset_file_count" "$dataset_sha256" \
@@ -397,6 +399,7 @@ else
     printf 'maxsatddd_residual_hardening=%s\n' "${MAXSATDDD_RESIDUAL_HARDENING:-default}"
     printf 'maxsatddd_core_minimize_checks=%s\n' "${MAXSATDDD_CORE_MINIMIZE_CHECKS:-default}"
     printf 'maxsatddd_core_minimize_conflicts=%s\n' "${MAXSATDDD_CORE_MINIMIZE_CONFLICTS:-default}"
+    printf 'maxsatddd_core_trim_checks=%s\n' "${MAXSATDDD_CORE_TRIM_CHECKS:-default}"
     printf 'maxsatddd_core_exhaust_checks=%s\n' "${MAXSATDDD_CORE_EXHAUST_CHECKS:-default}"
     printf 'rustc=%s\n' "$(rustc --version 2>/dev/null || printf unavailable)"
     printf 'gurobi=%s\n' "${gurobi_version:-unavailable}"
@@ -511,6 +514,9 @@ run_one() {
   fi
   if [[ -n "$MAXSATDDD_CORE_EXHAUST_CHECKS" ]]; then
     extra_args+=(--maxsat-ladder-sc-core-exhaust-checks "$MAXSATDDD_CORE_EXHAUST_CHECKS")
+  fi
+  if [[ -n "$MAXSATDDD_CORE_TRIM_CHECKS" ]]; then
+    extra_args+=(--maxsat-ladder-sc-core-trim-checks "$MAXSATDDD_CORE_TRIM_CHECKS")
   fi
   if [[ -n "$MAXSAT_RC2_BOUND_MODE" ]]; then
     extra_args+=(--maxsat-rc2-bound-mode "$MAXSAT_RC2_BOUND_MODE")

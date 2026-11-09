@@ -24,6 +24,12 @@ def candidate_config(source,component='order-cycles'):
         if config.get('assumptions') != 'legacy':
             raise ValueError('assumption contrast requires the legacy V17 reference')
         return dict(config, assumptions=ASSUMPTION_COMPONENTS[component])
+    if component == 'core-trim':
+        if config.get('core_trim_checks', '0') != '0':
+            raise ValueError('reference already enables core trimming')
+        if config.get('backend') != 'minisat' or int(config.get('core_minimize_conflicts','0')) <= 0:
+            raise ValueError('bounded core trimming requires MiniSAT and a positive conflict budget')
+        return dict(config, core_trim_checks='3')
     if component=='order-master-seeds':
         return dict(candidate_config(source,'order-master-batch'),order_master_seed_costs='true')
     if component=='order-master-batch':
@@ -68,6 +74,7 @@ def measurement_context(mode,paired_run_id):
     return {}
 
 def schema_for(component):
+    if component=='core-trim':return 'targeted-core-trim-v1'
     if component in ASSUMPTION_COMPONENTS:return 'targeted-' + component + '-v1'
     if component=='order-master-seeds':return 'targeted-order-master-seeds-v1'
     if component=='order-master-batch':return 'targeted-order-master-batch-v1'
@@ -76,6 +83,7 @@ def schema_for(component):
     return {'order-cycles':'targeted-order-cycles-v1','initial-cost':'targeted-initial-cost-v1','order-paths':'targeted-order-paths-v1','order-paths-full':'targeted-order-paths-full-v1','order-master':'targeted-order-master-v1'}[component]
 
 def report_name(component):
+    if component=='core-trim':return 'core_trim_audit.json'
     if component in ASSUMPTION_COMPONENTS:return component.replace('-', '_') + '_audit.json'
     if component=='order-master-seeds':return 'order_master_seeds_audit.json'
     if component=='order-master-batch':return 'order_master_batch_audit.json'
@@ -84,6 +92,7 @@ def report_name(component):
     return {'order-cycles':'order_cycles_audit.json','initial-cost':'initial_cost_audit.json','order-paths':'order_paths_audit.json','order-paths-full':'order_paths_full_audit.json','order-master':'order_master_audit.json'}[component]
 
 def tag_for(component):
+    if component=='core-trim':return 'V17-Core-Trim'
     if component in ASSUMPTION_COMPONENTS:return 'V17-' + component
     if component=='order-master-seeds':return 'Order-Master-Seeds'
     if component=='order-master-batch':return 'Order-Master-Batch'
@@ -95,7 +104,7 @@ def verify_snapshot(root):
     path=root/'snapshot.json'
     if not path.exists():return
     index=json.loads(path.read_text())
-    reports={report_name(c) for c in ['order-cycles','initial-cost','order-paths','order-paths-full','order-master','order-master-levels','order-master-levels-full','order-master-batch','order-master-seeds', *ASSUMPTION_COMPONENTS]}
+    reports={report_name(c) for c in ['order-cycles','initial-cost','order-paths','order-paths-full','order-master','order-master-levels','order-master-levels-full','order-master-batch','order-master-seeds','core-trim', *ASSUMPTION_COMPONENTS]}
     if index.get('schema')!='targeted-component-snapshot-v1' or index.get('report') not in reports:
         raise ValueError('unsupported component snapshot')
     hashes=index['file_sha256']
@@ -243,7 +252,7 @@ def main():
     parser.add_argument('--reference',type=Path,required=True);parser.add_argument('--results',type=Path,required=True)
     parser.add_argument('--binary',type=Path);parser.add_argument('--round-seconds',type=int,default=21600)
     parser.add_argument('--build-manifest',type=Path)
-    parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths','order-paths-full','order-master','order-master-levels','order-master-levels-full','order-master-batch','order-master-seeds', *ASSUMPTION_COMPONENTS],default='order-cycles')
+    parser.add_argument('--component',choices=['order-cycles','initial-cost','order-paths','order-paths-full','order-master','order-master-levels','order-master-levels-full','order-master-batch','order-master-seeds','core-trim', *ASSUMPTION_COMPONENTS],default='order-cycles')
     parser.add_argument('--reuse-build',action='store_true',help='reuse the hashed binary while retaining its own source commit')
     parser.add_argument('--objectives',nargs='+',choices=extended.audit.OBJECTIVES,
         help='screen only these objectives; excluded pairs remain unresolved and cannot count as gains')

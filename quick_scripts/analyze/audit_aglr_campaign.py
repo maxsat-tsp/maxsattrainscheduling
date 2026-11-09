@@ -200,6 +200,8 @@ def load_json_method(config_dir: Path, config: dict[str, str], timeout: float) -
                 errors.append("maxsat_core_minimize_checks differs from the locked configuration")
             if "core_minimize_conflicts" in config and not journal_audit.same_number(solve.get("maxsat_core_minimize_conflicts"), config["core_minimize_conflicts"]):
                 errors.append("maxsat_core_minimize_conflicts differs from the locked configuration")
+            if "core_trim_checks" in config and not journal_audit.same_number(solve.get("maxsat_core_trim_checks"), config["core_trim_checks"]):
+                errors.append("maxsat_core_trim_checks differs from the locked configuration")
             if "core_exhaust_checks" in config and not journal_audit.same_number(solve.get("maxsat_core_exhaust_checks"), config["core_exhaust_checks"]):
                 errors.append("maxsat_core_exhaust_checks differs from the locked configuration")
             if config.get("process_exit_required") == "true" and config.get("policy") in {"adaptive", "all-scanned"}:

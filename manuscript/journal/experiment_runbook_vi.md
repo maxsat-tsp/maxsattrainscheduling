@@ -1647,3 +1647,33 @@ lần rồi hồi quy 203 ca. `COMPLETED` chỉ cho biết vòng đã kết thú
 `GAIN_REQUIRES_REVIEW` báo có ca mới cần tổng hợp; cả hai đều không đồng
 nghĩa đạt submission. `FAILED` chặn restart lặp vô hạn, giữ log để sửa lỗi;
 `INCOMPLETE` báo đã hết ngân sách sáu giờ và còn việc chưa xong.
+
+## V37: rút gọn toàn bộ tập mâu thuẫn trước khi tạo bộ đếm
+
+V37 thêm cờ `--maxsat-ladder-sc-core-trim-checks`, mặc định 0. Khi đặt 3,
+solver gọi lại MiniSAT với cả tập điều kiện vừa chứng minh mâu thuẫn,
+tối đa ba lần. Chỉ nhận một tập con không rỗng, không trùng, có chứng minh
+UNSAT mới. Nếu truy vấn vượt ngân sách 100 xung đột thì giữ tập cũ. Nếu
+SAT lại trả có nghiệm cho tập đã chứng minh mâu thuẫn, dừng với lỗi để
+điều tra. RC2 chỉ tính lại trọng số nhỏ nhất sau bước này; không xóa các
+điều kiện bị rút khỏi tập khỏi hàm chi phí.
+
+Đây là bước core trimming của
+[RC2/PySAT](https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.trim_core).
+Giữ các thành phần V17 và sửa thứ tự hòa của V30; chỉ bật thêm trimming.
+Giới hạn 300 giây, RAM 6.000.000 KB, CPU 0,1,4,5, chỉ 13 ca còn khó và
+chỉ MiniSAT. Cấu hình mặc định CSOnet không bật thêm truy vấn nào.
+
+Service `maxsat-core-trim-v37.service` chờ V36 dừng và kiểm toán lại raw
+V36. Có ca mới thì ưu tiên xác nhận V36 và bỏ qua V37. Nếu V36 không có
+ca mới, service mới build, chạy sáu kiểm thử nhân SAT cùng bài lịch ba tàu
+vét cạn, sáu smoke có bật/tắt cờ, và một ca timeout ngắn. Chỉ khi tất cả
+đạt mới mở ca khó. Có optimum mới thì xác nhận ba lần rồi hồi quy các ca
+V17 đã giải trong phần thời gian còn lại. Giới hạn sáu giờ gồm cả chờ,
+build, kiểm thử và đo; `FAILED` chặn lặp lỗi, `COMPLETED` không phải bằng
+chứng đạt submission.
+
+Telemetry mới: `maxsat_core_trim_calls`, `maxsat_core_trim_removed`,
+`maxsat_core_trim_weight_increases`, `maxsat_core_trim_inconclusive` và
+`maxsat_core_trim_time`. Các số này được lưu ngay sau mỗi bước rút gọn để
+giữ tiến độ khi instance dừng trong một truy vấn SAT về sau.

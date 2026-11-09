@@ -1,6 +1,6 @@
 # V39: diagnose why MaxSAT fails on instances solved by Big-M
 
-This directory preserves oracle selection and partial VM diagnostics.
+This directory preserves oracle selection and all sixteen VM diagnostics.
 It does **not** report a new autonomous MaxSAT optimum or an improvement in coverage.
 `oracle_selection_audit.json` records the initial oracle selection only.
 
@@ -30,7 +30,23 @@ arithmetic tests, 136 Python tests, three ordinary-CLI smokes and twelve
 diagnostic smokes. All fifteen downloaded smoke schedules/outcomes and
 the recorded Rust source hashes were independently checked.
 
-## First independently audited hard-case result
+## Complete independently audited diagnostics
+
+All sixteen runs completed without audit errors. All four RC2 controls and
+all four optimal-incumbent-only RC2 runs timed out at 300 seconds.
+
+| cont instance | Optimum | SAT at optimum (s) | UNSAT below optimum (s) |
+|---|---:|---:|---:|
+| origA8 | 23143 | 15.798933 | 16.911099 |
+| stationA1 | 12884 | 210.131921 | 163.585725 |
+| stationA2 | 9193 | 84.024499 | 75.594220 |
+| trackA8 | 24441 | timeout 300 | timeout 300 |
+
+The `stationA2` result also motivates threshold search; `trackA8` shows that
+even a known optimal threshold does not make every SAT decision easy.
+The costs supplied by the oracle remain diagnostic inputs, never coverage.
+
+## Detailed origA8 comparison
 
 For `cont/origA8`, with independently verified optimum 23143:
 
@@ -60,8 +76,9 @@ general solution. Interpret each instance separately.
 
 `raw_snapshot.tar.gz` contains only completed cases, native test logs, smokes,
 build/source hashes and the exact MIP source files. Running cases are excluded.
-The VM continues the remaining modes and instances; consult
-`independent_audit.json` for the exact completed/expected count in this snapshot.
+`independent_audit.json` checks all 16/16 runs; `diagnostics.csv` gives the
+complete per-query table. The V39 service finished and the next round uses
+autonomous threshold selection without a MIP optimum as a solver input.
 
 The fixed-threshold queries disable RC2 cost assumptions but retain DDD
 refinement and the tested binary cost bound, whose initial budget is fixed at

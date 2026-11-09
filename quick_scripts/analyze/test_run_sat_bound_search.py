@@ -90,5 +90,23 @@ class SearchAuditTests(unittest.TestCase):
             with patch.object(search.subprocess,'run',side_effect=execute):
                 search.run_case(binary,300,6000000,'commit',case,'cont','origA1',0)
 
+    def test_audit_rejects_wrong_build_and_duplicate_tasks_before_results(self):
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);reference=root/'reference';reference.mkdir()
+            (reference/'manifest.json').write_text('{}')
+            build=dict(git_commit='source',binary_sha256='binary')
+            (root/'build_manifest.json').write_text(json.dumps(build))
+            task=dict(objective='cont',name='origA8',repeat=0)
+            manifest=dict(schema='sat-bound-search-campaign-v1',uses_optimum_oracle=False,
+                dataset_sha256='dataset',reference_manifest_sha256=search.ex.focus.sha(reference/'manifest.json'),
+                build_manifest_sha256=search.ex.focus.sha(root/'build_manifest.json'),commit='source',
+                binary_sha256='wrong',tasks=[task])
+            (root/'manifest.json').write_text(json.dumps(manifest))
+            with patch.object(search.ex.focus,'dataset_hash',return_value='dataset'):
+                with self.assertRaisesRegex(ValueError,'build evidence'):search.audit(root,reference)
+                manifest.update(binary_sha256='binary',tasks=[task,task])
+                (root/'manifest.json').write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError,'duplicate'):search.audit(root,reference)
+
 
 if __name__=='__main__':unittest.main()

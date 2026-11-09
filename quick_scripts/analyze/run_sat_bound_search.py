@@ -125,9 +125,19 @@ def tasks_for(reference):
 
 def audit(root,reference,diagnostic_root=None):
     manifest=json.load(open(root/'manifest.json'))
+    if manifest.get('schema')!='sat-bound-search-campaign-v1' or manifest.get('uses_optimum_oracle') is not False:
+        raise ValueError('invalid campaign definition or oracle provenance')
     if manifest['dataset_sha256']!=ex.focus.dataset_hash():raise ValueError('dataset changed')
     if manifest['reference_manifest_sha256']!=ex.focus.sha(reference/'manifest.json'):
         raise ValueError('reference changed')
+    build=json.load(open(root/'build_manifest.json'))
+    if (ex.focus.sha(root/'build_manifest.json')!=manifest['build_manifest_sha256']
+            or build['git_commit']!=manifest['commit'] or build['binary_sha256']!=manifest['binary_sha256']):
+        raise ValueError('build evidence differs from the locked source/binary')
+    keys=[(t['objective'],t['name'],t['repeat']) for t in manifest['tasks']]
+    if len(keys)!=len(set(keys)):raise ValueError('duplicate campaign tasks')
+    if manifest.get('followup') is None and keys!=[(o,n,0) for o,n in tasks_for(reference)]:
+        raise ValueError('hard-set selection differs from the unresolved reference pairs')
     known=reference_costs(reference,diagnostic_root);records=[]
     for task in manifest['tasks']:
         objective,name,repeat=task['objective'],task['name'],task['repeat']

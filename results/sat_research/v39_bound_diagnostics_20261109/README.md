@@ -19,7 +19,7 @@ These are printed progress values, not final certified bounds recovered from
 the timeout JSON. The heuristic's printed candidate costs omit the initial
 greedy incumbent and therefore do not establish the final maintained UB.
 
-The VM campaign uses pinned source `ce89553`, MiniSAT and the V17 settings.
+The VM campaign uses pinned source `21998ae`, MiniSAT and the V17 settings.
 For every selected pair it will run `at-opt`, `below-opt`, `oracle-ub` and
 `control`, serially, at 300 seconds per query and 6,000,000 KB. It waits for
 V38, requires native arithmetic/exhaustive tests and real-instance smoke
@@ -29,7 +29,8 @@ native VM validation and diagnostic outcomes are still pending in this
 initial record.
 
 The fixed-threshold queries disable RC2 cost assumptions but retain DDD
-refinement and the tested binary cost bound. The `oracle-ub` mode supplies a
+refinement and the tested binary cost bound, whose initial budget is fixed at
+the queried threshold while unused budget is allowed. The `oracle-ub` mode supplies a
 verified schedule without setting RC2's LB or inserting oracle time points;
 it disables the now-unnecessary graph heuristic. `control` receives no oracle
 information inside the solver. Every diagnostic is ineligible for the

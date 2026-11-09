@@ -1816,6 +1816,9 @@ Cách đọc kết quả:
 \end{itemize}
 
 V39 lưu riêng tiến trình cận, số vòng, thời gian SAT, số biến và mệnh đề.
+Ngân sách ban đầu của hai truy vấn SAT được cố định bằng ngưỡng $T$ đang
+hỏi; cho phép còn ngân sách chưa dùng, nên điều kiện vẫn là $f(x)\le T$.
+Không bắt SAT chọn thêm một giá trị ngân sách nhỏ hơn $T$.
 Các ca Big-M 120 giây đã có đáp án dùng được ngay; không cần chạy lại
 Big-M để tạo đáp án cho một thí nghiệm chẩn đoán. Mỗi phép thử MaxSAT
 giữ timeout 300 giây như tập ca khó V17. Đây không phải bảng so sánh

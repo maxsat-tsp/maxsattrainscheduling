@@ -22,7 +22,8 @@ trên (`oracle-ub`), SAT tìm lịch có chi phí `≤ opt` (`at-opt`), và SAT
 chứng minh không có lịch `≤ opt−1` (`below-opt`). Không gán cận dưới
 bằng đáp án Big-M. Cách gán cả `LB=UB=opt` sẽ làm mất phép đo cần thiết.
 
-Mã chẩn đoán được tách thành binary riêng tại commit `ce89553`; service
+Mã chẩn đoán được tách thành binary riêng từ commit `ce89553`; bản chạy VM
+được khóa tại `21998ae`, với ngân sách SAT cố định ở ngưỡng đang hỏi. Service
 `maxsat-bound-diagnostics-v39.service` đã được bật trên worktree
 `/home/tuyenkv/projects/bound-diagnostics-v39`. Service chờ V38 kết thúc
 để tránh chạy đo cùng lúc, rồi kiểm thử native MiniSAT, kiểm thử biểu diễn

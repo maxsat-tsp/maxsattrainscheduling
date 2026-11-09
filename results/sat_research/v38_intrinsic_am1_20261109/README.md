@@ -1,4 +1,4 @@
-# V38: bounded intrinsic-AM1 adaptation, launch snapshot
+# V38: bounded intrinsic-AM1 adaptation, completed hard-set trial
 
 The new component starts from a proved two-preference core and extends it
 only after SAT proves incompatibility with every existing group member.
@@ -28,7 +28,17 @@ AM1 reweighting is separately exercised by the native SAT truth-table
 test. Any later gain with zero adapted groups must not be attributed to
 the group rewrite without an ablation of the extra SAT queries.
 
-The hard-set trial is running; **no new coverage or SOTA claim is made**.
+The trial completed all 13 pairs: **13 valid timeouts, no new optimum**.
+The downloaded raw data passed the independent trial audit. All 13 cases
+have zero accepted AM1 groups and zero fixed cost from adaptation. The
+candidate search therefore did not exercise a larger-group rewrite on the
+hard set. Native SAT time is about 299.70--299.91 seconds per 300-second
+case; AM1 search itself takes only about 0.01--0.26 seconds per case.
+This does not demonstrate a gain from AM1 or rule out other AM1 strategies.
+Complete raw data, an independent audit and per-case telemetry accompany
+the earlier launch snapshot.
+
+**No new coverage or SOTA claim is made.**
 The best audited full SAT result remains V17 (72,68,63) = 203/216.
 Service `maxsat-intrinsic-am1-v38.service` uses a fixed RUN_ID, frozen
 worktree, hashed binary, cached completed timeouts and a six-hour wall

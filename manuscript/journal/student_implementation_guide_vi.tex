@@ -91,8 +91,13 @@ $(72,67,65)$, tổng $204/216$, tăng một so với V17. Hai ca
 xác nhận thành công 3/3 lần. Vẫn mất \code{infsteps180/stationA8}, nên
 chưa đạt điều kiện không giảm từng objective. Trên các ca còn lại, V41
 chưa có cận tốt hơn mọi nguồn đã nhập. Mốc UB $118$ của V40 vẫn được giữ
-là điều đã biết. V42 sẽ thử RC2 tìm cận ban đầu, rồi SAT tìm tiếp; chỉ
+ là điều đã biết. V42 đang thử RC2 tìm cận ban đầu, rồi SAT tìm tiếp; chỉ
 thử 12 ca V41 chưa giải trước khi cân nhắc hồi quy toàn bộ.
+
+\textbf{Ca đầu V42 đã được kiểm tra lại:}
+\code{infsteps180/stationA8} đạt $L=U=\mathrm{cost}=161$ trong 35,20
+giây, ngay ở giai đoạn RC2. Đây là ca bị mất ở V40/V41. Chưa cộng vào
+204 để báo coverage V42; vẫn chờ các ca còn lại, xác nhận và hồi quy.
 
 Từ ngày 09-11-2026, chọn hướng cải tiến theo thứ tự sau:
 \begin{enumerate}
@@ -2075,6 +2080,13 @@ chưa giải trong bản full V41 đã kiểm tra; không chạy lại
 \code{origA8} hoặc \code{stationA2} ở bước sàng lọc. Nếu giải thêm ca,
 xác nhận ba lần rồi mới thử lại 204 ca V41 từng giải. Bảng full chỉ được
 ghép từ các ca thực sự đã đo bằng cùng binary V42, không cộng kết quả cũ.
+
+Bản cài V42 khóa tại \code{c53cd29} đã qua 17 kiểm thử Rust, 173 kiểm
+thử Python, ba smoke, probe timeout và probe chuyển từ RC2 sang SAT trên
+VM. Ca đầu khôi phục \code{stationA8} với đúng optimum 161 trong
+35,20 giây. Bằng chứng từng checkpoint và lịch nằm trong
+\file{v42\_sat\_bound\_search\_20261109/}. Đây mới là một ca trong
+12 ca thử; chưa có bảng full V42.
 
 \section{Nội dung được phép đưa vào bài báo}
 

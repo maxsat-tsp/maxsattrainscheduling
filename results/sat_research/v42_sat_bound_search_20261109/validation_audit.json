@@ -1,0 +1,87 @@
+{
+  "audit_passed": true,
+  "source_commit": "c53cd2941ae471b600ec76fd0c12c1bc267ef46b",
+  "binary_sha256": "acd58591be8899887d8254102ad919ced68d8467d6e375b6bddd85bbff1c207b",
+  "rust_source_hashes_verified": 56,
+  "tests": {
+    "rust-search-tests": 10,
+    "rust-objective-tests": 5,
+    "rust-rc2-tests": 1,
+    "rust-legacy-tests": 1,
+    "python": 173
+  },
+  "smokes_and_probes": [
+    {
+      "objective": "cont",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.15803633,
+      "lb": 5526,
+      "ub": 5526,
+      "cost": 5526,
+      "queries": 0,
+      "sat_calls": 505,
+      "threshold_policy": "close-upper",
+      "rc2_warmup_seconds": 60.0
+    },
+    {
+      "objective": "finsteps123",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.102340639,
+      "lb": 11,
+      "ub": 11,
+      "cost": 11,
+      "queries": 0,
+      "sat_calls": 87,
+      "threshold_policy": "close-upper",
+      "rc2_warmup_seconds": 60.0
+    },
+    {
+      "objective": "infsteps180",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.106946296,
+      "lb": 34,
+      "ub": 34,
+      "cost": 34,
+      "queries": 0,
+      "sat_calls": 161,
+      "threshold_policy": "close-upper",
+      "rc2_warmup_seconds": 60.0
+    },
+    {
+      "objective": "cont",
+      "name": "origA8",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 0.050237522,
+      "lb": 21211,
+      "ub": 37305,
+      "cost": 37305,
+      "queries": 0,
+      "sat_calls": 155,
+      "threshold_policy": "close-upper",
+      "rc2_warmup_seconds": 60.0
+    },
+    {
+      "objective": "cont",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.277061763,
+      "lb": 5526,
+      "ub": 5526,
+      "cost": 5526,
+      "queries": 4,
+      "sat_calls": 711,
+      "threshold_policy": "close-upper",
+      "rc2_warmup_seconds": 1e-06
+    }
+  ],
+  "submission_passed": false,
+  "scope": "native preflight and first completed hard case only; full campaign pending"
+}

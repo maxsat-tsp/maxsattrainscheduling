@@ -37,6 +37,14 @@ có ca mới mới xác nhận ba lần và hồi quy 204 ca V41 đã giải. C�
 dùng chọn tập và kiểm tra sau khi chạy, không thay thế kết quả đo V42.
 Một vòng vẫn tối đa sáu giờ. Xem runbook và hướng dẫn LaTeX phiên bản 5.28.
 
+V42 khóa tại `c53cd29` đã qua 17 test Rust, 173 test Python, ba smoke,
+probe timeout chung và probe chuyển từ RC2 sang SAT trên VM. Ca đầu
+`infsteps180/stationA8` đã khôi phục optimum 161 trong 35,203 giây; RC2
+kết thúc ngay trong giai đoạn khởi đầu, không cần truy vấn SAT bổ sung.
+Đã tải về và kiểm tra lại lịch, các checkpoint, hash và 56 file Rust so
+với source đã khóa. Bản chụp này chỉ có 1/12 ca; chưa cộng thành 205/216
+trước xác nhận và hồi quy. Service solver và báo cáo cận đều đang chạy.
+
 ## Quyết định hiện tại và kết quả V40 đầy đủ
 
 Thứ tự lựa chọn mới là **số instance chứng minh tối ưu → cận tốt hơn trên

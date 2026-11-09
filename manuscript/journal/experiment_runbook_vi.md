@@ -1960,3 +1960,20 @@ ngân sách/thời gian RC2, các checkpoint LB/UB, lịch cho từng UB mới v
 các cờ thực sự đã dùng. `queries` là phần SAT sau đó. Auditor kiểm tra
 lịch, phát lại cận qua cả hai giai đoạn và từ chối việc cấp lại 300 giây
 cho SAT. Những tham số và kết quả cũ vẫn được giữ để tái tạo lịch sử.
+
+V42 đã qua đủ preflight native tại source `c53cd29`: 17 test Rust,
+173 test Python, ba smoke, probe timeout và probe chuyển giai đoạn.
+Ca đầu đã khôi phục `infsteps180/stationA8`, optimum 161 trong 35,203 giây,
+nhưng chưa có bảng full. Bản chụp đã kiểm tra lại trong
+`results/sat_research/v42_sat_bound_search_20261109/` giữ đúng 1/12 ca.
+
+Service đọc báo cáo là `maxsat-bound-priority-report-v42.service`, chạy
+trên CPU 2,3,6,7, không thay source/binary đang đo. Nó cập nhật mỗi phút
+`evaluation/priority_evaluation.json` và tạo `evaluation/full_evaluation.json`
+sau khi đủ xác nhận/hồi quy. Mốc so sánh full của V42 là V41 204/216;
+cận đã biết vẫn lấy từ mọi nguồn đã nhập, gồm V40, V41 và MILP.
+
+```bash
+systemctl status maxsat-bound-priority-report-v42.service
+journalctl -u maxsat-bound-priority-report-v42.service -n 20 --no-pager
+```

@@ -17,15 +17,15 @@ Native preflight passed 7 search/exhaustive tests, 5 binary objective tests,
 checked against the frozen commit. Smoke/probe receipts, schedules, trace
 ledgers and query budgets were checked independently again.
 
-The service `maxsat-sat-bound-search-v41.service` is enabled and runs a
-controlled round of at most six hours in its separate worktree. It tests
+The service `maxsat-sat-bound-search-v41.service` completed a controlled
+round of less than six hours in its separate worktree. It tested
 the 13 V17 hard pairs and the V40 regression loss infsteps180/stationA8.
-Any new gain triggers three confirmations and regression on the remaining
+Each new gain triggered three confirmations and regression on the remaining
 previously solved pairs, reusing cases already measured in this same round.
 The bound pool includes V40: finding UB 118 again is not a new known bound.
 
-This snapshot contains **preflight only**, no hard-case outcome and no
-coverage improvement claim. `independent_preflight_audit.json` records the
+The earlier preflight snapshot contains **preflight only**. The completed
+campaign and its measured coverage are recorded in the next section. `independent_preflight_audit.json` records the
 checks; `preflight_snapshot.tar.gz` preserves raw tests, smokes, deadline
 probe, build/dependency provenance and the 14-case campaign manifest.
 

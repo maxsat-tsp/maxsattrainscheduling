@@ -1,53 +1,76 @@
-# V40: autonomous SAT search over cost thresholds
+# V40: autonomous SAT cost-threshold search, complete
 
-The first frozen candidate (`9ab1725`) accepts only an instance, objective,
-total time limit and output path. It has no optimum or oracle-schedule input.
-MiniSAT, V17 resource orders, transitivity and DDD refinement are retained.
-RC2 cost optimization is replaced by binary search over fixed-budget SAT
-decisions; each threshold rebuilds the model. All queries share **one
-300-second deadline per instance** and the run has a six-hour wall limit.
+Frozen solver source: `9ab1725`. MiniSAT, V17 resource orders/transitivity
+and DDD refinement are retained; binary search replaces RC2 optimization.
+The solver receives no optimum or reference schedule. Each instance has
+one shared 300-second deadline across every threshold query.
 
-The initial LB is the sum of visit costs at chain-propagated earliest times.
-The UB comes from an independently validated greedy schedule. A SAT witness
-updates UB to its checked cost; an UNSAT proof raises LB to threshold+1.
-UNKNOWN changes neither bound and stops that instance. Reference costs are
-consulted by the auditor only after the solver process exits.
+## Full result and confirmations
 
-## Independently checked partial results
+All 13 hard cases, three gain confirmations and 203 regression cases have
+completed. Every initial/incumbent/final schedule and cost was independently
+checked again after download. Each LB/UB update and the common deadline were
+replayed from the query ledger. Exact full membership and method identity
+were checked; repetitions are not independent coverage observations.
 
-| cont instance | Result | Seconds | Recorded LB / UB | Threshold queries |
-|---|---|---:|---:|---:|
-| origA8 | optimum, cost 23143 | 176.520220 | 23143 / 23143 | 14 |
-| stationA1 | timeout | 300.001722 | 12729 / 13197 | 6 |
+| Objective | V17 at 300 s | V40 at 300 s | Change |
+|---|---:|---:|---:|
+| finsteps123 | 72 | 72 | 0 |
+| infsteps180 | 68 | 67 | -1 |
+| cont | 63 | 64 | +1 |
+| Total | 203 | 203 | 0 |
 
-`origA8` is a new autonomous proof relative to the frozen V17 full reference,
-whose corresponding run timed out at 300 seconds. V39 also timed out with
-both ordinary RC2 and RC2 given the optimal incumbent. The V40 schedule,
-every improving schedule in its query ledger, the input-only initial LB,
-the full sequence of bounds and the shared deadline were checked again
-after download. Recorded Rust source hashes match the frozen commit.
+The new proof is `cont/origA8`, cost=LB=UB=23143, 176.520220 seconds.
+Three confirmations succeed at 177.179616, 175.713405 and 176.948636 seconds.
+The lost pair is `infsteps180/stationA8`, timeout with its own bounds
+[161,163]. This candidate does not improve total coverage or meet the
+objective-wise nonregression gate. No SOTA/submission claim is made.
 
-This is **not** a new full-dataset coverage or SOTA claim. The other eleven
-unresolved pairs are not present in this snapshot. The VM continues all
-13 unresolved pairs; any gain then triggers three confirmation runs and
-regression on V17's 203 previously solved pairs. A failed confirmation or
-an unfinished regression must be reported before drawing a full conclusion.
+## Priority: optimal coverage, improved known bounds, then runtime
 
-Native validation passed five search/exhaustive tests, five binary-cost
-tests, 144 Python tests, three real-case smokes (costs 11, 34, 5526) and a
-native timeout probe. A subsequent local auditor check also rejects
-changed build/source evidence and duplicate campaign tasks. Raw evidence
-and frozen build/dependency hashes accompany the independent audit.
+On `infsteps180/trackA12`, V40 returns an independently checked schedule of
+cost 118, improving the best UB 125 in the imported historical SAT/MILP
+sources. Its own LB is only 92, versus the previous best LB 106. Thus the
+intervals are [92,118] and [106,125]: a new upper bound, with a weaker lower
+bound. [106,118] combines evidence from different methods and is not V40's
+own interval. There is one new-best-bound case among the unresolved pairs
+and four cases improving at least one bound relative to imported SAT runs.
 
-`raw_snapshot.tar.gz` contains completed cases only, preflight evidence,
-the predecessor audit and manifests; it excludes the executable and active
-case files. The binary is identified by SHA-256 in `validation_audit.json`.
+References include 120-, 300- and 600-second cutoffs. This identifies known
+bounds, not equal-budget performance dominance. Reference timeout LBs/log
+progress are explicitly solver-reported; available witnesses are checked.
+`full_reference_pool.json` freezes sources and hashes. Its `.sha256` receipt
+protects against changing that pool in later comparisons. The old V15
+archive lacks an internal snapshot hash receipt and is explicitly excluded.
 
-The first trace is a useful next-step diagnostic: after SAT found cost
-23143, six more bisection UNSAT queries closed the remaining 34-unit gap.
-Testing the current UB minus one, or preserving learned model information
-between thresholds, are possible later ablations; neither is implemented
-in V40 and neither has a measured gain here.
+Cross-reference auditing flags CPLEX's claimed optimum 35 for
+`finsteps123/trackA8`, contradicted by valid SAT schedules of cost 34. The
+reported LB 35 is retained as `excluded_lower_bound` and quarantined from
+the known-bound pool; its valid UB 35 is retained. This does not silently
+repair the historical CPLEX coverage table. The conflict must be resolved
+before using that table for submission.
 
-VM service: `maxsat-sat-bound-search-v40.service`.
-Root: `/home/tuyenkv/projects/sat-bound-search-v40/results/aglr/sat-bound-search-v40-20261109/`.
+## Files
+
+- `complete_snapshot.tar.gz`: complete, unmodified VM campaign including
+  hard cases, confirmations, regression, receipts, traces and native
+  preflight evidence. The executable and lock file are excluded.
+- `full_evaluation.json`: current independent full evaluation, including
+  per-case bounds, source pool, gains/losses, confirmations and runtime.
+- `full_summary.csv`, `unresolved_bounds.csv`: readable derived tables.
+- `gurobi_infsteps180_source.json`: original full-120 source used in the
+  bound comparison. The cont source remains in the V39 artifact directory.
+- `raw_snapshot.tar.gz`, `independent_audit.json`, `validation_audit.json`:
+  the preserved first snapshot with two completed cases; these historical
+  files are not overwritten or relabeled as the complete experiment.
+- `archive_hashes.json`: SHA-256 for all accompanying artifacts.
+
+The original native preflight passed 5 search/exhaustive tests, 5 binary
+cost tests, 144 Python tests, three real-case smokes and a deadline probe.
+The new coverage/bounds evaluator additionally passed 164 Python tests on
+both the local machine and VM, without rebuilding/replacing the V40 binary.
+
+The service `maxsat-sat-bound-search-v40.service` completed successfully.
+Raw root: `/home/tuyenkv/projects/sat-bound-search-v40/results/aglr/sat-bound-search-v40-20261109/`.
+The separate read-only `maxsat-bound-priority-report.service` completed its
+reports under that root's `evaluation/`, using frozen checkout `15dd0e6`.

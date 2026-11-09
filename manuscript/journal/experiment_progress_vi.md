@@ -1,5 +1,42 @@
 # Tiến độ thử nghiệm trên VM, cập nhật 09-11-2026
 
+## V41 đã hoàn tất: tăng lên 204/216; V42 thử cận RC2 ban đầu
+
+Đã tải toàn bộ kết quả V41 về và kiểm tra lại: 216 ca khác nhau, sáu lần
+xác nhận, mọi lịch/cost hợp lệ và mọi cập nhật cận phát lại được.
+
+| Objective | V17, 300 s | V40, 300 s | V41, 300 s |
+|---|---:|---:|---:|
+| `finsteps123` | 72 | 72 | 72 |
+| `infsteps180` | 68 | 67 | 67 |
+| `cont` | 63 | 64 | 65 |
+| Tổng | 203 | 203 | 204 |
+
+V41 giải `cont/origA8` trong 55,139 giây, cost 23143; giải thêm
+`cont/stationA2` trong 163,733 giây, cost 9193. Mỗi ca đều xác nhận
+thành công 3/3 lần. Hồi quy vẫn mất `infsteps180/stationA8`, khoảng cận
+riêng `[160,162]`, trong khi V17 đã chứng minh optimum 161 ở 44,761 giây.
+Coverage tăng một nhưng chưa đạt điều kiện không giảm từng objective,
+và còn dưới mốc ít nhất 206 của Gurobi full-120. Không cập nhật kết luận COR.
+
+Trên 12 ca còn lại, V41 chưa cải thiện cận so với mọi nguồn đã nhập;
+hai ca cải thiện ít nhất một cận so với các nguồn SAT. V40 vẫn giữ UB 118
+cho `infsteps180/trackA12`; V41 chỉ đạt UB 125, nên không được đếm lại
+một tiến bộ về cận. Dữ liệu và bảng full đã lưu dưới
+`results/sat_research/v41_sat_bound_search_20261109/`.
+
+V42 chỉ thêm một bước: RC2 tự tìm cận/lịch tối đa 60 giây đầu, rồi SAT
+`close-upper` dùng phần thời gian còn lại của cùng 300 giây. Nếu RC2 đã
+chứng minh tối ưu thì dừng. Thời lượng 60 giây được chọn để bao phủ ca
+`stationA8` mà V17 đã giải ở 44,761 giây. Đây là giả thuyết cần đo, không
+phải bảo đảm sẽ giữ được ca đó. Solver không nhận cận/lịch từ bảng đáp án.
+
+Tập thử mới lấy đúng 12 ca chưa giải từ bản full V41 đã kiểm toán, khóa
+bằng hash archive; không chạy lại `origA8`/`stationA2` ở bước này. Chỉ khi
+có ca mới mới xác nhận ba lần và hồi quy 204 ca V41 đã giải. Các ca cũ chỉ
+dùng chọn tập và kiểm tra sau khi chạy, không thay thế kết quả đo V42.
+Một vòng vẫn tối đa sáu giờ. Xem runbook và hướng dẫn LaTeX phiên bản 5.28.
+
 ## Quyết định hiện tại và kết quả V40 đầy đủ
 
 Thứ tự lựa chọn mới là **số instance chứng minh tối ưu → cận tốt hơn trên

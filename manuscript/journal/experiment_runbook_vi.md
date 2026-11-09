@@ -1921,3 +1921,42 @@ này có cả V40 và CPLEX chạy lại đúng optimum 34. Xem trạng thái b�
 systemctl status maxsat-bound-priority-report-v41.service
 journalctl -u maxsat-bound-priority-report-v41.service -n 20 --no-pager
 ```
+
+## V42: RC2 tìm cận trước, SAT dùng thời gian còn lại
+
+V41 đã hoàn tất ở `(72,67,65)`, tổng 204/216, với sáu xác nhận thành công.
+Bản chụp đầy đủ và các bảng đã được kiểm tra trong
+`results/sat_research/v41_sat_bound_search_20261109/`. Còn đúng 12 ca chưa
+chứng minh tối ưu; vẫn chưa vượt mốc Gurobi ít nhất 206.
+
+V42 thêm `--rc2-warmup-seconds 60`, mặc định bằng 0 để giữ V40/V41.
+RC2 và SAT đều dùng MiniSAT. RC2 giữ các cờ V17, ghi cận đã chứng minh và
+lịch đã kiểm tra; nếu chưa giải được, SAT `close-upper` bắt đầu từ các cận
+đó. Tổng thời gian vẫn 300 giây, gồm cả 60 giây RC2 và mọi chi phí xử lý.
+Một truy vấn RC2 bị ngắt không được ghi thành UNSAT hoặc tăng LB.
+
+Worktree riêng: `/home/tuyenkv/projects/sat-bound-search-v42`;
+RUN_ID: `sat-bound-search-v42-20261109`. Service chạy tuần tự, tối đa sáu
+ giờ và dừng nếu có lỗi. Trước ca khó phải qua test Rust tìm cận, test
+checkpoint RC2, đối chiếu legacy với vét cạn, test biểu diễn chi phí,
+Python, ba smoke, probe timeout và probe chuyển từ RC2 sang SAT.
+
+```bash
+systemctl status maxsat-sat-bound-search-v42.service
+journalctl -u maxsat-sat-bound-search-v42.service -n 25 --no-pager
+```
+
+Script `ops/run_sat_bound_search_v42.sh` dùng `--selection-archive` trỏ tới
+bản full V41 đã commit. Nó kiểm tra lại raw/receipt, xác nhận, cấu hình và
+hash trước khi chọn đúng 12 ca chưa giải. Archive không được gửi vào
+binary solver. Nếu có ca mới, tự xác nhận ba lần và hồi quy 204 ca cũ.
+Chỉ sau khi đủ kết quả mới có bảng full; không cộng ca mới vào coverage
+V41 để giả làm một lượt V42 đã đo đầy đủ.
+
+Giữ nguyên RUN_ID để tiếp tục. Đọc `hard/audit.json`,
+`hard-priority-evaluation.json` và sau khi đủ hồi quy,
+`followup-priority-evaluation.json`. Mỗi `result.json` có thêm `warmup`:
+ngân sách/thời gian RC2, các checkpoint LB/UB, lịch cho từng UB mới và
+các cờ thực sự đã dùng. `queries` là phần SAT sau đó. Auditor kiểm tra
+lịch, phát lại cận qua cả hai giai đoạn và từ chối việc cấp lại 300 giây
+cho SAT. Những tham số và kết quả cũ vẫn được giữ để tái tạo lịch sử.

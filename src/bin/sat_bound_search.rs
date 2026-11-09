@@ -9,6 +9,7 @@ struct Opt {
     #[structopt(long)] objective:String,
     #[structopt(long,default_value="300")] timeout:f64,
     #[structopt(long,default_value="bisect")] threshold_policy:String,
+    #[structopt(long,default_value="0")] rc2_warmup_seconds:f64,
     #[structopt(long,parse(from_os_str))] output:PathBuf,
 }
 fn main()->Result<(),Box<dyn std::error::Error>>{
@@ -23,7 +24,7 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
     if let Some(parent)=opt.output.parent(){fs::create_dir_all(parent)?;}
     let mut trace=File::create(opt.output.with_extension("trace.jsonl"))?;
     let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
-        bound_search::solve_with_policy(&named.problem,objective,opt.timeout,policy,|query,lower,upper|{
+        bound_search::solve_with_warmup(&named.problem,objective,opt.timeout,policy,opt.rc2_warmup_seconds,|query,lower,upper|{
             writeln!(trace,"{}",serde_json::json!({"query":query,"lb":lower,"ub":upper})).unwrap();
             trace.flush().unwrap();
         })));

@@ -1003,8 +1003,19 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     debug_out: impl Fn(DebugInfo),
     output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
-    solve_inner(mk_env, solver, problem, timeout, delay_cost_type, settings, None,
+    solve_inner(mk_env, solver, problem, timeout, delay_cost_type, settings, None, None,
         debug_out, output_stats)
+}
+
+/// Same RC2 path with optional, checked checkpoints; no reference data input.
+pub fn solve_with_progress<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
+    solver: impl SatInstance<L> + SatSolverWithCore<Lit=L> + std::fmt::Debug,
+    problem:&Problem,timeout:f64,objective:DelayCostType,settings:MaxSatDddLadderScSettings,
+    progress:&mut super::progress::Rc2Progress,
+    output_stats:impl FnMut(String,serde_json::Value),
+)->Result<(Vec<Vec<i32>>,SolveStats),SolverError>{
+    solve_inner(||panic!("the legacy graph heuristic does not create a Gurobi environment"),
+        solver,problem,timeout,objective,settings,None,Some(progress),|_|{},output_stats)
 }
 
 /// Separate diagnostic entry point. Oracle-assisted results must never enter
@@ -1026,7 +1037,7 @@ pub fn solve_bound_diagnostic<L: satcoder::Lit + Copy + std::fmt::Debug + 'stati
     output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
     solve_inner(mk_env, solver, problem, timeout, delay_cost_type, settings,
-        Some(&diagnostic), |_| {}, output_stats)
+        Some(&diagnostic), None, |_| {}, output_stats)
 }
 
 /// Solve a cost decision chosen by an optimizer, without any optimum oracle.
@@ -1042,7 +1053,7 @@ pub fn solve_cost_threshold<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
     solve_inner(|| panic!("a threshold decision never starts a MIP heuristic"),
         solver, problem, timeout, delay_cost_type, settings,
-        Some(&BoundDiagnostic::Decision(target)), |_| {}, |key,value| {
+        Some(&BoundDiagnostic::Decision(target)), None, |_| {}, |key,value| {
             if key=="diagnostic_only" || key=="diagnostic_supplied_ub" {return;}
             let key=key.strip_prefix("diagnostic_")
                 .map(|suffix|format!("threshold_{suffix}")).unwrap_or(key);
@@ -1058,6 +1069,7 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     delay_cost_type: DelayCostType,
     settings: MaxSatDddLadderScSettings,
     diagnostic: Option<&BoundDiagnostic<'_>>,
+    mut progress:Option<&mut super::progress::Rc2Progress>,
     debug_out: impl Fn(DebugInfo),
     mut output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
@@ -1465,6 +1477,9 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
 
     // Main DDD loop.
     loop {
+        if let Some(snapshot)=progress.as_deref_mut(){
+            snapshot.observe(problem,delay_cost_type,total_cost,best_heur.as_ref(),start_time.elapsed().as_secs_f64())?;
+        }
         if diagnostic.is_some() {
             output_stats("diagnostic_lb".into(), total_cost.into());
             output_stats("diagnostic_ub".into(), best_heur.as_ref().map(|x|x.0).into());
@@ -1581,6 +1596,9 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
                 }
             }
 
+            if let Some(snapshot)=progress.as_deref_mut(){
+                snapshot.observe(problem,delay_cost_type,total_cost,best_heur.as_ref(),start_time.elapsed().as_secs_f64())?;
+            }
             // Extract the current solution and check for travel-time and resource conflicts.
             let mut found_travel_time_conflict = false;
             let mut found_resource_conflict = false;

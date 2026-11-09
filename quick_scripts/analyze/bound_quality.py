@@ -118,3 +118,24 @@ def rank_key(row):
     return (-row['proven_total'],-int(row.get('new_best_bound_cases') or 0),
         gap if gap is not None else math.inf,
         row['par2_sum'] if row.get('bounds_verified') else math.inf,row.get('tag',''))
+
+
+def combine_full(hard,followup,baseline):
+    """Require actual coverage of all 216 pairs by the same frozen method."""
+    if not hard['complete'] or not followup['complete']:
+        raise ValueError('complete hard and regression phases are required')
+    gains={(r['objective'],r['name']):r['cost'] for r in hard['newly_solved']}
+    hard_pairs={(r['objective'],r['name']) for r in hard['records'] if not r['repeat']}
+    expected={(r['objective'],r['name'],0) for r in baseline if r['proven'] and (r['objective'],r['name']) not in hard_pairs}
+    expected|={(o,n,i) for o,n in gains for i in (1,2,3)}
+    actual=[(r['objective'],r['name'],r['repeat']) for r in followup['records']]
+    if len(actual)!=len(set(actual)) or set(actual)!=expected:
+        raise ValueError('confirmation/regression membership is missing, duplicated or unexpected')
+    confirmations=[r for r in followup['records'] if r['repeat']]
+    if any(not r['proven'] or r['cost']!=gains[r['objective'],r['name']] for r in confirmations):
+        raise ValueError('new gain did not reproduce in every confirmation')
+    records=[r for r in hard['records']+followup['records'] if not r['repeat']]
+    pairs=[(r['objective'],r['name']) for r in records]
+    if len(pairs)!=len(set(pairs)) or set(pairs)!={(r['objective'],r['name']) for r in baseline}:
+        raise ValueError('full evaluation has missing or duplicated pairs')
+    return records,confirmations

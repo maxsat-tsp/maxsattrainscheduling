@@ -28,6 +28,8 @@ mod core_exhaust;
 #[cfg(test)]
 mod backend_tests;
 mod solve;
+mod progress;
+pub use progress::{Rc2Progress,Rc2Checkpoint};
 
 pub use settings::{
     AglrSettings, AssumptionStrategy, MaxSatDddLadderScSettings, RefinementPolicy,
@@ -35,5 +37,5 @@ pub use settings::{
 };
 pub use solve::{
     solve, solve_debug, solve_debug_with_settings, solve_with_settings, solve_bound_diagnostic,
-    solve_cost_threshold, BoundDiagnostic, IterationType, SolveStats,
+    solve_cost_threshold, solve_with_progress, BoundDiagnostic, IterationType, SolveStats,
 };

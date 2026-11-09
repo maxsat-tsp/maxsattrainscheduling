@@ -66,6 +66,15 @@ pub struct QueryRecord {
 }
 
 #[derive(Serialize)]
+pub struct WarmupRecord {
+    pub status:&'static str,pub budget_seconds:f64,pub seconds:f64,
+    pub lower_before:i32,pub upper_before:i32,pub lb:i32,pub ub:i32,
+    pub solution:Vec<Vec<i32>>,pub checkpoints:Vec<sc::Rc2Checkpoint>,
+    pub native_sat_calls:usize,pub native_sat_seconds:f64,
+    pub evidence:serde_json::Map<String,serde_json::Value>,
+}
+
+#[derive(Serialize)]
 pub struct SearchResult {
     pub schema:&'static str,pub solver_name:&'static str,pub status:&'static str,
     pub uses_optimum_oracle:bool,pub maxsat_backend:&'static str,
@@ -74,6 +83,7 @@ pub struct SearchResult {
     pub initial_lb:i32,pub initial_ub:i32,pub initial_solution:Vec<Vec<i32>>,
     pub queries:Vec<QueryRecord>,
     pub threshold_policy:ThresholdPolicy,
+    pub rc2_warmup_seconds:f64,pub warmup:Option<WarmupRecord>,
 }
 
 /// Costs at chain-propagated earliest starts are an input-only lower bound.
@@ -100,15 +110,63 @@ pub fn solve(problem:&Problem,objective:DelayCostType,timeout:f64,
 }
 
 pub fn solve_with_policy(problem:&Problem,objective:DelayCostType,timeout:f64,policy:ThresholdPolicy,
+    checkpoint:impl FnMut(&QueryRecord,i32,i32))->Result<SearchResult,SolverError>{
+    solve_with_warmup(problem,objective,timeout,policy,0.0,checkpoint)
+}
+
+pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,policy:ThresholdPolicy,
+    warmup_seconds:f64,
     mut checkpoint:impl FnMut(&QueryRecord,i32,i32))->Result<SearchResult,SolverError>{
     if !timeout.is_finite() || timeout<=0.0 {
         return Err(SolverError::InvalidSolution("search timeout must be finite and positive".into()));
+    }
+    if !warmup_seconds.is_finite() || warmup_seconds<0.0 {
+        return Err(SolverError::InvalidSolution("warmup budget must be finite and nonnegative".into()));
     }
     let started=Instant::now();
     let (mut interval,mut incumbent)=initial_bounds(problem,objective)?;
     let initial_lb=interval.lower;let initial_ub=interval.upper;let initial_solution=incumbent.clone();
     let mut queries=Vec::new();
     let mut signature=minisat::Solver::new().solver_name().to_string();
+    let budget=warmup_seconds.min((timeout-started.elapsed().as_secs_f64()).max(0.0));
+    let warmup=if budget>0.0 && interval.lower<interval.upper {
+        let before=interval;let warm_started=Instant::now();
+        counting_solver::reset_counts();
+        let solver=minisat_deadline::Solver::new(budget);signature=solver.signature().to_string();
+        let mut settings=sc::MaxSatDddLadderScSettings::default();
+        settings.resource_orders=true;settings.order_transitivity=true;
+        settings.core_minimize_checks=4;settings.core_minimize_conflicts=100;settings.core_exhaust_checks=4;
+        let mut progress=sc::Rc2Progress::default();let mut evidence=serde_json::Map::new();
+        let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
+            sc::solve_with_progress(counting_solver::CountingSolver::new(solver),problem,budget,objective,settings,&mut progress,
+                |key,value|{evidence.insert(key,value);} )));
+        let status=match result {
+            Ok(Ok((solution,_)))=>{
+                let cost=problem.verify_solution(&solution,objective)
+                    .ok_or_else(||SolverError::InvalidSolution("RC2 optimum schedule failed validation".into()))?;
+                if evidence.get("lb").and_then(|v|v.as_i64())!=Some(i64::from(cost)) {
+                    return Err(SolverError::InvalidSolution("RC2 optimum has no matching proved lower bound".into()));
+                }
+                progress.observe(problem,objective,cost,Some(&(cost,solution)),warm_started.elapsed().as_secs_f64())?;
+                "optimal"
+            },
+            Ok(Err(SolverError::Timeout))=>"timeout",
+            Err(payload) if payload.is::<DeadlineReached>()=>"timeout",
+            Ok(Err(error))=>return Err(error),
+            Err(payload)=>std::panic::resume_unwind(payload),
+        };
+        interval.lower=interval.lower.max(progress.lower);
+        if progress.upper<interval.upper {
+            incumbent=progress.solution.ok_or_else(||SolverError::InvalidSolution("RC2 upper bound has no schedule".into()))?;
+            interval.upper=progress.upper;
+        }
+        if interval.lower>interval.upper{return Err(SolverError::InvalidSolution("warmup contradicts the initial feasible interval".into()));}
+        let stats=minisat_deadline::native_stats();
+        Some(WarmupRecord{status,budget_seconds:budget,seconds:warm_started.elapsed().as_secs_f64(),
+            lower_before:before.lower,upper_before:before.upper,lb:interval.lower,ub:interval.upper,
+            solution:incumbent.clone(),checkpoints:progress.checkpoints,native_sat_calls:stats.calls,
+            native_sat_seconds:stats.sat_time.as_secs_f64(),evidence})
+    }else{None};
     while let Some(target)=interval.target_for(policy){
         let remaining=timeout-started.elapsed().as_secs_f64();
         if remaining<=0.0 {break;}
@@ -162,18 +220,53 @@ pub fn solve_with_policy(problem:&Problem,objective:DelayCostType,timeout:f64,po
     if cost!=interval.upper || interval.lower>cost {
         return Err(SolverError::InvalidSolution("search bounds disagree with incumbent".into()));
     }
-    Ok(SearchResult{schema:"sat-bound-search-v1",solver_name:match policy {
-        ThresholdPolicy::Bisect=>"SAT-Bisect-Restart",ThresholdPolicy::CloseUpper=>"SAT-CloseUpper-Restart"},
+    Ok(SearchResult{schema:"sat-bound-search-v1",solver_name:match (warmup_seconds>0.0,policy) {
+        (false,ThresholdPolicy::Bisect)=>"SAT-Bisect-Restart",(false,ThresholdPolicy::CloseUpper)=>"SAT-CloseUpper-Restart",
+        (true,ThresholdPolicy::Bisect)=>"RC2-Warm-SAT-Bisect-Restart",(true,ThresholdPolicy::CloseUpper)=>"RC2-Warm-SAT-CloseUpper-Restart"},
         status:if interval.lower==interval.upper && elapsed<=timeout {"ok"}else{"timeout"},
         uses_optimum_oracle:false,maxsat_backend:"minisat",maxsat_backend_signature:signature,
         timeout_seconds:timeout,total_time:elapsed,lb:interval.lower,ub:interval.upper,cost,solution:incumbent,
-        initial_lb,initial_ub,initial_solution,queries,threshold_policy:policy})
+        initial_lb,initial_ub,initial_solution,queries,threshold_policy:policy,rc2_warmup_seconds:warmup_seconds,warmup})
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::problem::{Train,Visit};
+    #[test]
+    fn rc2_warmup_preserves_exhaustive_optima_for_every_objective(){
+        for count in 1..=3 {
+            let p=Problem{name:"warmup-exhaustive".into(),conflicts:vec![(0,0)],
+                trains:(0..count).map(|_|Train{visits:vec![Visit{resource_id:0,earliest:0,aimed:Some(0),travel_time:2}]}).collect()};
+            for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180]{
+                let pure=solve_with_policy(&p,objective,5.0,ThresholdPolicy::CloseUpper,|_,_,_|{}).unwrap();
+                let warm=solve_with_warmup(&p,objective,5.0,ThresholdPolicy::CloseUpper,1.0,|_,_,_|{}).unwrap();
+                assert_eq!(warm.status,"ok");assert_eq!(warm.cost,pure.cost);assert_eq!(warm.lb,warm.ub);
+                if let Some(record)=warm.warmup {
+                    assert!(record.lb>=warm.initial_lb && record.ub<=warm.initial_ub);
+                    assert_eq!(p.verify_solution(&record.solution,objective),Some(record.ub));
+                }
+            }
+        }
+    }
+    #[test]
+    fn interrupted_rc2_warmup_never_claims_an_unproved_optimum(){
+        let p=Problem{name:"warmup-timeout".into(),conflicts:vec![(0,0)],
+            trains:(0..4).map(|_|Train{visits:vec![Visit{resource_id:0,earliest:0,aimed:Some(0),travel_time:2}]}).collect()};
+        let r=solve_with_warmup(&p,DelayCostType::Continuous,1e-9,ThresholdPolicy::CloseUpper,1.0,|_,_,_|{}).unwrap();
+        assert_eq!(r.status,"timeout");assert!(r.queries.is_empty());
+        assert_eq!(p.verify_solution(&r.solution,DelayCostType::Continuous),Some(r.ub));
+        assert!(solve_with_warmup(&p,DelayCostType::Continuous,1.0,ThresholdPolicy::CloseUpper,-1.0,|_,_,_|{}).is_err());
+    }
+    #[test]
+    fn sat_search_continues_after_an_interrupted_short_warmup(){
+        let p=Problem{name:"warmup-handoff".into(),conflicts:vec![(0,0)],
+            trains:(0..4).map(|_|Train{visits:vec![Visit{resource_id:0,earliest:0,aimed:Some(0),travel_time:2}]}).collect()};
+        let r=solve_with_warmup(&p,DelayCostType::Continuous,5.0,ThresholdPolicy::CloseUpper,1e-9,|_,_,_|{}).unwrap();
+        assert_eq!(r.status,"ok");assert_eq!(r.cost,12);assert!(!r.queries.is_empty());
+        let warm=r.warmup.as_ref().unwrap();assert_eq!(warm.status,"timeout");
+        assert!(r.queries[0].remaining_seconds<=5.0-warm.seconds);
+    }
     #[test]
     fn close_upper_policy_switches_only_at_small_gap_and_closes_proved_intervals(){
         assert_eq!(SearchInterval::new(8949,9245).unwrap().target_for(ThresholdPolicy::CloseUpper),Some(9244));

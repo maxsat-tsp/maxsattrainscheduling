@@ -10,6 +10,62 @@ import run_sat_bound_search as search
 
 
 class SearchAuditTests(unittest.TestCase):
+    def warm_fixture(self,optimal=True):
+        r=self.fixture();schedule=r['solution'];cost=r['cost']
+        evidence=dict(aglr_policy='legacy',maxsat_assumptions='legacy',maxsat_resource_orders=True,
+            maxsat_order_transitivity=True,maxsat_sparse_costs=False,maxsat_objective_bound=False,
+            maxsat_extract_initial_cost=False,maxsat_residual_hardening=False,maxsat_order_master=False,
+            maxsat_core_minimize_checks=4,maxsat_core_minimize_conflicts=100,maxsat_core_exhaust_checks=4,
+            maxsat_core_trim_checks=0,maxsat_am1_checks=0,maxsat_order_cycle_cuts=False,maxsat_order_path_cuts=False)
+        checkpoints=[dict(seconds=0.1,lb=0,ub=r['initial_ub'],cost=r['initial_ub'],solution=r['initial_solution'])]
+        if optimal:checkpoints.append(dict(seconds=0.5,lb=cost,ub=cost,cost=cost,solution=schedule))
+        warm=dict(status='optimal' if optimal else 'timeout',budget_seconds=30,seconds=1 if optimal else 30,
+            lower_before=r['initial_lb'],upper_before=r['initial_ub'],
+            lb=cost if optimal else r['initial_lb'],ub=cost if optimal else r['initial_ub'],
+            solution=schedule if optimal else r['initial_solution'],checkpoints=checkpoints,native_sat_calls=3,evidence=evidence)
+        if optimal:
+            evidence.update(lb=cost,ub=cost);r.update(queries=[],total_time=1.2)
+        else:r['total_time']+=30
+        r.update(solver_name='RC2-Warm-'+r['solver_name'],rc2_warmup_seconds=30,warmup=warm)
+        return r
+
+    def test_warmup_can_prove_optimality_without_any_threshold_query(self):
+        r=self.warm_fixture();row,trace=search.check_result(r,'origA1','cont',300,5526)
+        self.assertTrue(row['proven']);self.assertEqual(row['sat_calls'],3);self.assertEqual(trace,[])
+
+    def test_warmup_witness_checkpoint_and_proof_cannot_be_fabricated(self):
+        for mutate in (lambda r:r['warmup']['checkpoints'][-1].update(cost=0),
+                       lambda r:r['warmup']['checkpoints'][-1].update(lb=5527),
+                       lambda r:r['warmup']['evidence'].update(lb=5525),
+                       lambda r:r.update(warmup=None)):
+            r=self.warm_fixture();mutate(r)
+            with self.assertRaises(ValueError):search.check_result(r,'origA1','cont',300,5526)
+
+    def test_threshold_phase_cannot_get_a_fresh_budget_after_warmup(self):
+        r=self.warm_fixture(optimal=False)
+        with self.assertRaisesRegex(ValueError,'budget'):search.check_result(r,'origA1','cont',300,5526)
+        for q in r['queries']:q['remaining_seconds']-=30
+        self.assertTrue(search.check_result(r,'origA1','cont',300,5526)[0]['proven'])
+
+    def test_missing_selection_archive_and_mixed_warmup_methods_are_rejected(self):
+        from pathlib import Path
+        with self.assertRaisesRegex(ValueError,'selection archive'):
+            search.baseline_for_manifest(dict(selection_archive='missing.tar.gz',selection_archive_sha256='bad'),Path('.'),None)
+        a={k:0 for k in ('commit','binary_sha256','build_manifest_sha256','dataset_sha256','timeout_seconds','ram_kb','cpu_affinity')}
+        with self.assertRaisesRegex(ValueError,'mixes methods'):search.same_method(dict(a,rc2_warmup_seconds=30),a)
+
+    def test_previous_full_search_selects_only_its_twelve_unresolved_pairs(self):
+        archive=search.ex.REPO/'results/sat_research/v41_sat_bound_search_20261109/complete_snapshot.tar.gz'
+        # Membership is checked here; baseline_for_manifest replays the
+        # complete raw campaign before using it for an actual selection.
+        import tarfile
+        with tarfile.open(archive) as t:
+            saved=json.load(t.extractfile('evaluation/full_evaluation.json'))
+        rows=saved['cases'];selected=search.hard_tasks(None,baseline=rows)
+        self.assertEqual(len(selected),12);self.assertEqual(sum(r['proven'] for r in rows),204)
+        self.assertIn(('infsteps180','stationA8'),selected)
+        self.assertNotIn(('cont','origA8'),selected);self.assertNotIn(('cont','stationA2'),selected)
+
     def fixture(self,policy='bisect'):
         rows=json.loads((search.ex.REPO/'results/conferences/MaxsatScDefault_cont.json').read_text())
         s=next(r['solves'][0] for r in rows if r['name']=='origA1')

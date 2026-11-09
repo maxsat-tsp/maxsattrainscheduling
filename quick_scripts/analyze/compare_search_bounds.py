@@ -255,7 +255,7 @@ class Pool:
                 if manifest['binary_sha256']==exclude_binary:continue
                 hard=search.audit(root/'hard',reference,diagnostics)
                 followup=search.audit(root/'followup',reference,diagnostics)
-                baseline=json.loads((reference/'full_audit.json').read_text())['case_bounds']
+                baseline,_=search.baseline_for_manifest(manifest,reference,diagnostics)
                 records,_=combine_full(hard,followup,baseline);self.track(path)
                 if manifest['binary_sha256']!=json.loads((root/'followup/manifest.json').read_text())['binary_sha256']:
                     raise ValueError('historical search mixes binaries')
@@ -306,28 +306,10 @@ def comparison_report(records,pool,expected):
         candidate_bounds_replaced_by_reference=False)
 
 
-def combine_full(hard,followup,baseline):
-    """Require actual coverage of all 216 pairs by the same frozen method."""
-    if not hard['complete'] or not followup['complete']:
-        raise ValueError('complete hard and regression phases are required')
-    gains={(r['objective'],r['name']):r['cost'] for r in hard['newly_solved']}
-    hard_pairs={(r['objective'],r['name']) for r in hard['records'] if not r['repeat']}
-    expected={(r['objective'],r['name'],0) for r in baseline if r['proven'] and (r['objective'],r['name']) not in hard_pairs}
-    expected|={(o,n,i) for o,n in gains for i in (1,2,3)}
-    actual=[(r['objective'],r['name'],r['repeat']) for r in followup['records']]
-    if len(actual)!=len(set(actual)) or set(actual)!=expected:
-        raise ValueError('confirmation/regression membership is missing, duplicated or unexpected')
-    confirmations=[r for r in followup['records'] if r['repeat']]
-    if any(not r['proven'] or r['cost']!=gains[r['objective'],r['name']] for r in confirmations):
-        raise ValueError('new gain did not reproduce in every confirmation')
-    records=[r for r in hard['records']+followup['records'] if not r['repeat']]
-    pairs=[(r['objective'],r['name']) for r in records]
-    if len(pairs)!=len(set(pairs)) or set(pairs)!={(r['objective'],r['name']) for r in baseline}:
-        raise ValueError('full evaluation has missing or duplicated pairs')
-    return records,confirmations
+combine_full=quality.combine_full
 
 
-def full_comparison(records,baseline,cutoff,confirmations):
+def full_comparison(records,baseline,cutoff,confirmations,baseline_label='V17 full300'):
     previous={(r['objective'],r['name']):r for r in baseline};summary=[];gains=[];losses=[]
     for r in records:
         old=previous[r['objective'],r['name']]
@@ -348,7 +330,7 @@ def full_comparison(records,baseline,cutoff,confirmations):
             paired_instances=len(paired),paired_candidate_seconds=sum(r['seconds'] for r in paired),
             paired_baseline_seconds=sum(previous[o,r['name']]['seconds'] for r in paired)))
     return dict(summary=summary,gained=gains,lost=losses,confirmations=confirmations,
-        complete=True,cutoff_seconds=cutoff,baseline='V17 full300',
+        complete=True,cutoff_seconds=cutoff,baseline=baseline_label,
         coverage_total_delta=sum(r['coverage_delta'] for r in summary),
         coverage_nonregression=all(r['coverage_delta']>=0 for r in summary),
         scope='one frozen method on every pair; no mixing with baseline solutions')
@@ -360,12 +342,12 @@ def evaluate(args,candidate):
     followup=getattr(args,'followup',None)
     if followup is not None:
         fm=json.loads((followup/'manifest.json').read_text());hm=json.loads((candidate/'manifest.json').read_text())
-        if not fm.get('followup') or any(fm[k]!=hm[k] for k in ('commit','binary_sha256','build_manifest_sha256','dataset_sha256','timeout_seconds','ram_kb','cpu_affinity')) or fm.get('threshold_policy','bisect')!=hm.get('threshold_policy','bisect'):
-            raise ValueError('full evaluation mixes methods or resource limits')
+        if not fm.get('followup'):raise ValueError('not a followup phase')
+        search.same_method(hm,fm)
         fa=search.audit(followup,args.reference,args.diagnostics)
-        baseline=json.loads((args.reference/'full_audit.json').read_text())['case_bounds']
+        baseline,label=search.baseline_for_manifest(hm,args.reference,args.diagnostics)
         records,confirmations=combine_full(audited,fa,baseline);expected=len(baseline)
-        full=full_comparison(records,baseline,hm['timeout_seconds'],confirmations)
+        full=full_comparison(records,baseline,hm['timeout_seconds'],confirmations,label)
     selection=([(o,n) for o in ex.audit.OBJECTIVES for n in ex.common.EXPECTED_NAMES] if full else
         [(t['objective'],t['name']) for t in json.loads((candidate/'manifest.json').read_text())['tasks'] if not t['repeat']])
     pool=Pool(selection)

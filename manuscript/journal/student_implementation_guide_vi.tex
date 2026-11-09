@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.27}
+\fancyhead[R]{\small Phiên bản 5.28}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.27, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.28, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -84,6 +84,15 @@ Mỗi báo cáo phải ghi rõ giả định này.
 \section{Sinh viên đọc phần này trước}
 
 \subsection{Thứ tự ưu tiên hiện tại: giải thêm, cải thiện cận, rồi thời gian}
+
+\textbf{Mốc mới nhất: V41 đã chạy đủ và được kiểm tra lại.} Coverage là
+$(72,67,65)$, tổng $204/216$, tăng một so với V17. Hai ca
+\code{cont/origA8} và \code{cont/stationA2} tự chứng minh tối ưu và đều
+xác nhận thành công 3/3 lần. Vẫn mất \code{infsteps180/stationA8}, nên
+chưa đạt điều kiện không giảm từng objective. Trên các ca còn lại, V41
+chưa có cận tốt hơn mọi nguồn đã nhập. Mốc UB $118$ của V40 vẫn được giữ
+là điều đã biết. V42 sẽ thử RC2 tìm cận ban đầu, rồi SAT tìm tiếp; chỉ
+thử 12 ca V41 chưa giải trước khi cân nhắc hồi quy toàn bộ.
 
 Từ ngày 09-11-2026, chọn hướng cải tiến theo thứ tự sau:
 \begin{enumerate}
@@ -2026,12 +2035,46 @@ không bị chạy lại khi ghép bảng full.
 
 Bản V41 khóa tại \code{76bff0c} đã qua 7 kiểm thử Rust tìm cận, 5 kiểm
 thử biểu diễn chi phí, 166 kiểm thử Python, ba smoke và probe timeout
-trên VM. Lượt 14 ca đang tự chạy, chưa có bảng full mới.
+trên VM. Lượt 14 ca và hồi quy đã hoàn tất: coverage thật là
+$(72,67,65)$, tổng $204/216$. \code{origA8} và \code{stationA2} đều xác
+nhận thành công 3/3; \code{infsteps180/stationA8} vẫn chưa giải. Không
+ghép ca đã giải của phương pháp khác vào coverage V41.
 
 Báo cáo V41 phải đối chiếu cả V40. Do đó, UB $118$ của V40 đã trở thành
 một cận đã biết; tìm lại $118$ không được tính là cận tốt nhất mới. Giữ
 riêng nhật ký, source, binary và file kết quả của từng lượt. Sinh viên
 xem trạng thái service và lệnh kiểm toán trong runbook.
+
+\section{V42: dùng cận RC2 tự tìm được để khởi đầu SAT}
+
+V41 có tiến bộ nhưng khởi đầu nhiều ca khó với khoảng cận còn rộng.
+Trong khi đó, V17 từng giải \code{infsteps180/stationA8} trong 44,76 giây.
+V42 thử một thay đổi: cho RC2 làm việc trước tối đa 60 giây. Nếu RC2 đã
+chứng minh tối ưu thì kết thúc ngay. Nếu chưa, lấy cận và lịch mà chính
+RC2 vừa tìm được rồi chuyển sang SAT theo cách chọn ngưỡng V41.
+
+Gọi $L_0,U_0$ là hai cận ban đầu như V40; gọi $L_R$ là cận dưới RC2 đã
+chứng minh và $U_R$ là chi phí lịch RC2 đã tìm và kiểm tra hợp lệ. SAT
+bắt đầu từ
+\[
+ L=\max\{L_0,L_R\},\qquad U=\min\{U_0,U_R\}.
+\]
+Nếu RC2 chưa có cận mới, giữ cận cũ tương ứng. Không lấy cận hoặc lịch
+từ Big-M hay file kết quả trước để truyền vào solver. Các file đó chỉ
+dùng chọn ca cần thử và đối chiếu sau khi chạy.
+
+\textbf{Hai giai đoạn dùng chung 300 giây.} Nếu RC2 dùng 60 giây thì
+SAT còn khoảng 240 giây, trừ thêm chi phí xử lý thực tế. Không cộng
+60 giây ngoài ngân sách. RC2 bị ngắt giữa một truy vấn không có nghĩa
+là UNSAT; chỉ chuyển những cận đã ghi trước đó và các lịch đã kiểm tra.
+Nhật ký lưu riêng từng lần tăng cận dưới, từng lịch tốt hơn và thời gian.
+
+Cờ mới là \code{--rc2-warmup-seconds 60}. Mặc định bằng $0$, nên V40/V41
+vẫn giữ cách chạy cũ. RC2 và SAT đều dùng MiniSAT. V42 chỉ dùng 12 ca
+chưa giải trong bản full V41 đã kiểm tra; không chạy lại
+\code{origA8} hoặc \code{stationA2} ở bước sàng lọc. Nếu giải thêm ca,
+xác nhận ba lần rồi mới thử lại 204 ca V41 từng giải. Bảng full chỉ được
+ghép từ các ca thực sự đã đo bằng cùng binary V42, không cộng kết quả cũ.
 
 \section{Nội dung được phép đưa vào bài báo}
 

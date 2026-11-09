@@ -1,5 +1,43 @@
 # Tiến độ thử nghiệm trên VM, cập nhật 09-11-2026
 
+## V39 hoàn tất; V40 tự chọn ngưỡng chi phí
+
+Đã tải đủ và kiểm toán độc lập 16/16 phép thử V39. Không có lịch sai,
+chi phí lệch hay lỗi tiến trình. Cả bốn lượt RC2 bình thường và cả bốn
+lượt RC2 được cấp lịch tối ưu đều timeout ở 300 giây.
+
+| Objective/instance | Optimum Big-M | SAT tìm lịch ở opt | SAT bác bỏ opt−1 |
+|---|---:|---:|---:|
+| `cont/origA8` | 23143 | 15,799 s | 16,911 s |
+| `cont/stationA1` | 12884 | 210,132 s | 163,586 s |
+| `cont/stationA2` | 9193 | 84,024 s | 75,594 s |
+| `cont/trackA8` | 24441 | timeout 300 s | timeout 300 s |
+
+Kết quả ủng hộ thử cách tìm ngưỡng khác trên `origA8` và `stationA2`,
+nhưng chưa cho thấy việc này đủ cho mọi ca. Mọi dữ liệu V39 vẫn là
+chẩn đoán biết trước đáp án, không phải coverage mới.
+
+V40 đã được cài ở commit `9ab1725`, binary riêng `sat_bound_search`.
+Nó lấy cận dưới từ thời điểm sớm nhất sau khi truyền dọc hành trình,
+lấy cận trên từ lịch greedy hợp lệ, rồi tự thử ngưỡng ở giữa hai cận.
+Không có tham số nhận optimum hoặc lịch Big-M. Giữ MiniSAT và bước
+phát hiện/bổ sung xung đột của V17. Mỗi ngưỡng dựng một mô hình SAT mới;
+đây là bản thử đầu tiên để kiểm tra cách tìm cận, chưa tối ưu tái sử dụng
+mệnh đề giữa các truy vấn.
+
+VM đã qua 5 kiểm thử tìm cận/vét cạn, 5 kiểm thử biểu diễn chi phí,
+144 kiểm thử Python, 3 smoke cho ba objective và một probe timeout.
+Các smoke chứng minh các chi phí 11, 34 và 5526 đúng như V17.
+Service `maxsat-sat-bound-search-v40.service` đang thử đúng 13 ca V17
+chưa giải, mỗi ca có **300 giây cho toàn bộ quá trình**, không phải cho
+mỗi ngưỡng. Nếu có ca mới, tự chạy xác nhận ba lần và kiểm tra hồi quy
+các ca V17 đã giải trong giới hạn sáu giờ. Chưa có kết quả coverage V40.
+
+**Ca tự chứng minh mới đầu tiên:** `cont/origA8` đạt `cost=lb=ub=23143`
+trong 176,520 giây, 14 truy vấn và 3633 lời gọi native SAT. Solver không
+nhận optimum hay lịch Big-M. Đây là kết quả thử đầu tiên, còn chờ xác
+nhận ba lần và hồi quy; chưa cộng với 203 ca cũ để tuyên bố coverage mới.
+
 ## V39: chẩn đoán bằng đáp án tối ưu Big-M
 
 Theo yêu cầu mới, ưu tiên xác định nguyên nhân thay vì thêm một biến thể

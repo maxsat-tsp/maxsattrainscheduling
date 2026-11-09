@@ -1760,3 +1760,57 @@ Kết quả mang cờ `submission_eligible=false` và không vào bảng coverag
 RUN_ID, commit, binary và tập dữ liệu được khóa khi bắt đầu. Một ca bị
 ngắt khi chưa có kết quả hoàn chỉnh sẽ làm controller dừng để giữ log;
 không tự biến lỗi thành timeout hoặc chạy lại làm mất dữ liệu ban đầu.
+
+## V40: SAT tự chọn ngưỡng, không nhận đáp án Big-M
+
+V39 đã hoàn tất 16/16 phép thử. V40 chuyển từ ngưỡng biết sẵn sang tự
+tìm kiếm: lấy cận dưới từ thời điểm sớm nhất của các tàu, lấy cận trên
+từ lịch greedy đã kiểm tra, rồi hỏi SAT tại ngưỡng giữa hai cận. Có lịch
+thì giảm cận trên; có chứng minh UNSAT thì tăng cận dưới; timeout giữ
+nguyên các cận. Bảng Big-M chỉ dùng để đối chiếu kết quả sau khi chạy.
+
+Source được khóa tại `9ab1725`, worktree
+`/home/tuyenkv/projects/sat-bound-search-v40`, RUN_ID
+`sat-bound-search-v40-20261109`. Binary riêng là `sat_bound_search` và
+không nhận `--optimum` hay `--oracle-schedule`. Mỗi ngưỡng dựng lại SAT-DDD;
+giữ MiniSAT, resource orders và transitivity của V17. Đường solver CSOnet
+hiện có tiếp tục dùng cấu hình cũ.
+
+**300 giây là giới hạn chung của toàn bộ một instance.** Không cấp lại
+300 giây cho từng truy vấn. Manifest khóa commit, binary, dataset, cận
+thời gian, RAM 6.000.000 KB và CPU 0,1,4,5. Các timeout hoàn chỉnh được
+tái sử dụng khi tiếp tục; một ca ngắt giữa chừng được giữ log để rà soát,
+không tự ghi đè.
+
+VM đã qua 5 kiểm thử tìm cận và so với vét cạn, 5 kiểm thử biểu diễn
+chi phí, 144 kiểm thử Python, ba smoke ở cả ba objective và probe timeout.
+Controller chỉ chạy 13 ca V17 chưa giải. Có ca mới thì xác nhận ba lần,
+sau đó kiểm tra hồi quy các ca V17 đã giải trong phần thời gian còn lại
+của vòng sáu giờ. Nếu xác nhận thất bại, dừng lượt followup để giữ dữ liệu.
+Chưa đủ hồi quy thì chưa có kết luận coverage đầy đủ hoặc vượt SOTA.
+
+Theo dõi trên VM:
+
+```bash
+systemctl status maxsat-sat-bound-search-v40.service
+journalctl -u maxsat-sat-bound-search-v40.service -n 30 --no-pager
+```
+
+Thư mục dữ liệu là
+`results/aglr/sat-bound-search-v40-20261109/` trong worktree nói trên.
+`hard/audit.json` ghi kết quả trên ca chưa giải; `followup/` chỉ xuất hiện
+khi có ca mới. Mỗi case lưu `result.json`, `result.trace.jsonl`, lệnh
+chạy và hash. Auditor kiểm tra riêng lịch ban đầu, các lịch SAT tìm được,
+thứ tự ngưỡng, các bước nâng/hạ cận và ngân sách thời gian chung.
+
+```bash
+python3 quick_scripts/analyze/run_sat_bound_search.py audit \
+  --results results/aglr/sat-bound-search-v40-20261109/hard \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216 \
+  --diagnostic-root /home/tuyenkv/projects/bound-diagnostics-v39/results/aglr/bound-diagnostics-v39-20261109
+```
+
+Số truy vấn ít hơn chưa đủ để kết luận nhanh hơn. Đọc thời gian từng
+ngưỡng: truy vấn gần optimum có thể rất đắt, như V39 đã cho thấy ở
+`stationA1` và `trackA8`. Ưu tiên ca chứng minh tối ưu mới, sau đó mới
+đánh giá thời gian, khả năng lặp lại và các ca cũ bị mất.

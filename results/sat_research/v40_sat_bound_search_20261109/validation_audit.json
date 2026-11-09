@@ -1,0 +1,66 @@
+{
+  "audit_passed": true,
+  "source_commit": "9ab1725833182fa436a764911414f14850aab552",
+  "binary_sha256": "ab923464e9ad6dcf2ab090738b4d4eb1ce221ff8560d2dcc39e0655781b6dd83",
+  "source_hashes_verified": true,
+  "native_tests": {
+    "rust-search-tests": 5,
+    "rust-objective-tests": 5,
+    "python": 144
+  },
+  "smokes": [
+    {
+      "objective": "finsteps123",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.16237808,
+      "lb": 11,
+      "ub": 11,
+      "cost": 11,
+      "queries": 4,
+      "sat_calls": 304
+    },
+    {
+      "objective": "infsteps180",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.182788645,
+      "lb": 34,
+      "ub": 34,
+      "cost": 34,
+      "queries": 4,
+      "sat_calls": 508
+    },
+    {
+      "objective": "cont",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.509852831,
+      "lb": 5526,
+      "ub": 5526,
+      "cost": 5526,
+      "queries": 10,
+      "sat_calls": 1763
+    }
+  ],
+  "deadline_probe": {
+    "objective": "cont",
+    "name": "origA8",
+    "status": "timeout",
+    "proven": false,
+    "seconds": 0.050590101,
+    "lb": 20056,
+    "ub": 37305,
+    "cost": 37305,
+    "queries": 1,
+    "sat_calls": 87
+  },
+  "uses_optimum_oracle": false,
+  "submission_passed": false,
+  "post_audit_commit": "559f069527d1cad400c07a92d85c995d28cab96b",
+  "post_audit_script_sha256": "2d1420e04c64a633db33277573a012ebef34ea92f68f27361a1640c26459e78b",
+  "post_audit_python_tests_passed": 145
+}

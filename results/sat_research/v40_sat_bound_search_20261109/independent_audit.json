@@ -1,0 +1,52 @@
+{
+  "schema": "sat-bound-search-audit-v1",
+  "audit_passed": true,
+  "complete": false,
+  "completed_runs": 2,
+  "expected_runs": 13,
+  "records": [
+    {
+      "objective": "cont",
+      "name": "origA8",
+      "status": "ok",
+      "proven": true,
+      "seconds": 176.520219548,
+      "lb": 23143,
+      "ub": 23143,
+      "cost": 23143,
+      "queries": 14,
+      "sat_calls": 3633,
+      "repeat": 0
+    },
+    {
+      "objective": "cont",
+      "name": "stationA1",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.001721756,
+      "lb": 12729,
+      "ub": 13197,
+      "cost": 13197,
+      "queries": 6,
+      "sat_calls": 976,
+      "repeat": 0
+    }
+  ],
+  "newly_solved": [
+    {
+      "objective": "cont",
+      "name": "origA8",
+      "status": "ok",
+      "proven": true,
+      "seconds": 176.520219548,
+      "lb": 23143,
+      "ub": 23143,
+      "cost": 23143,
+      "queries": 14,
+      "sat_calls": 3633,
+      "repeat": 0
+    }
+  ],
+  "submission_passed": false,
+  "scope": "selected pairs only; full coverage requires regression"
+}

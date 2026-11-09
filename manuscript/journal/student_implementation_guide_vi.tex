@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.25}
+\fancyhead[R]{\small Phiên bản 5.26}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.25, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.26, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -1856,6 +1856,71 @@ và 163,59 giây để chứng minh không có lịch tốt hơn. Vì thế ph�
 quả theo từng ca: có ca chậm ở quy trình tìm cận, có ca mà chính truy vấn
 SAT tại ngưỡng đã tốn nhiều thời gian. Chưa được kết luận rằng đổi cách
 tìm cận sẽ giải quyết mọi instance.
+
+\section{V40: để SAT tự tìm ngưỡng chi phí}
+
+V39 đã chạy đủ 16 phép thử. Biết trước optimum giúp giải nhanh một số
+truy vấn nhưng chưa phải cách tối ưu tự động. V40 bỏ thông tin đáp án
+khỏi đầu vào solver và tự thu hẹp khoảng chi phí có thể chứa optimum.
+Phương pháp dùng MiniSAT và bước bổ sung xung đột, mốc thời gian của V17.
+
+Gọi $L$ là cận dưới và $U$ là chi phí của lịch tốt nhất đang giữ. Ban đầu:
+\[
+ L=\sum_v f_v(e_v),\qquad U=f(x^{\mathrm{greedy}}).
+\]
+Trong đó $e_v$ là thời điểm sớm nhất sau khi truyền thời gian chạy dọc
+hành trình của từng tàu. Bỏ qua xung đột giữa các tàu khi tính $L$, nên
+đây chỉ là một cận dưới. Lịch $x^{\mathrm{greedy}}$ được xếp nhanh rồi
+kiểm tra đầy đủ tính hợp lệ trước khi dùng làm cận trên. Không lấy $L$
+hoặc $U$ từ bảng optimum của Big-M.
+
+Khi $L<U$, chọn ngưỡng:
+\[
+ T=L+\left\lfloor\frac{U-L-1}{2}\right\rfloor.
+\]
+Hỏi SAT có lịch hợp lệ với $f(x)\le T$ không:
+\begin{enumerate}
+\item Nếu tìm được lịch $x$ và kiểm tra lại được chi phí $c\le T$,
+      đặt $U\leftarrow c$ và giữ lịch đó.
+\item Nếu SAT chứng minh không có lịch ở ngưỡng này, đặt
+      $L\leftarrow T+1$.
+\item Nếu hết thời gian và chưa kết luận được, giữ nguyên hai cận và
+      dừng. Không được coi timeout là chứng minh không có lịch.
+\end{enumerate}
+Lặp đến khi hai cận bằng nhau; lịch đang giữ khi đó có chi phí tối ưu.
+Mọi trường hợp được tính là tối ưu còn phải hoàn tất trong giới hạn
+thời gian của instance.
+
+Ví dụ từ lượt chạy tự động trên \code{origA8}: chương trình tự tính
+$L=20056$, $U=37305$, chọn $T=28680$, rồi tìm được lịch có chi phí
+$27376$. Nó cập nhật $U=27376$ và thử tiếp $T=23715$. Những ngưỡng này
+được tính từ trạng thái đang có, không lấy từ optimum $23143$ của Big-M.
+
+Mỗi instance có \emph{một} đồng hồ 300 giây cho toàn bộ quá trình, gồm
+mọi truy vấn và bước thêm mô hình. Truy vấn tiếp theo chỉ được dùng thời
+gian còn lại. Bản đầu V40 dựng lại mô hình cho mỗi ngưỡng để ngưỡng cũ
+không cản phép thử mới có ngưỡng lớn hơn. Đây là lựa chọn triển khai ban
+đầu, chưa phải bản tối ưu tái sử dụng mệnh đề giữa các ngưỡng.
+
+Binary mới là \file{sat\_bound\_search}; không có tham số nhận optimum
+hoặc lịch Big-M. Script lưu lịch ban đầu, từng ngưỡng, kết quả SAT hoặc
+UNSAT và lịch trả về sau mỗi lần cải thiện. Auditor tự tính lại cận dưới,
+kiểm tra các lịch, rồi phát lại toàn bộ quá trình cập nhật cận.
+Đáp án Big-M chỉ được đối chiếu \emph{sau} khi solver trả kết quả.
+
+Service \file{maxsat-sat-bound-search-v40.service} đã qua 5 kiểm thử tìm
+cận/vét cạn, 5 kiểm thử biểu diễn chi phí, 144 kiểm thử Python, ba smoke
+và một probe timeout. Trước hết chạy đúng 13 ca V17 chưa giải ở 300 giây.
+Nếu có ca mới, tự xác nhận ba lần và kiểm tra lại các ca V17 đã giải;
+mỗi vòng vẫn giới hạn sáu giờ. Nếu chưa xong hoặc có ca cũ bị mất thì
+báo rõ, không cộng ca mới vào coverage cũ để tuyên bố đã vượt SOTA.
+
+Kết quả đầu tiên của V40: \code{cont/origA8} tự đạt
+$\mathrm{cost}=L=U=23143$ trong 176,52 giây sau 14 truy vấn, không nhận
+đáp án Big-M. Đây là một ca V17 chưa giải được ở 300 giây. Tuy nhiên,
+\code{stationA1} vẫn timeout: cận dưới/trên ghi được là $12729/13197$.
+Kết quả cho thấy hướng tìm ngưỡng có tác dụng ở một ca, chưa chứng minh
+cả phương pháp tốt hơn trên toàn bộ dataset. Vẫn phải xác nhận và hồi quy.
 
 \section{Nội dung được phép đưa vào bài báo}
 

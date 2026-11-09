@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.24}
+\fancyhead[R]{\small Phiên bản 5.25}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.24, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.25, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -1766,6 +1766,66 @@ so với lịch nhỏ vét cạn, smoke test và timeout ngắn. Mọi kiểm th
 đạt trước khi chạy 13 ca khó ở 300 giây. Theo dõi số truy vấn, số nhóm
 đã dùng, phần chi phí tính trước và thời gian thêm. Chỉ kết luận có cải
 thiện sau khi có ca mới được kiểm tra độc lập, lặp lại và qua hồi quy.
+
+\section{V39: biết trước đáp án để tìm nguyên nhân chạy chậm}
+
+Một câu hỏi cần trả lời trước khi thêm cải tiến là: MaxSAT chậm vì khó
+tìm lịch tốt, khó chứng minh lịch đó tối ưu, hay vì phải nâng cận dưới
+qua quá nhiều bước? Chọn những ca mà Big-M đã chứng minh tối ưu nhưng
+V17 còn timeout. Chỉ nhận đáp án Big-M sau khi kiểm tra độc lập lịch và
+xác nhận $\mathrm{cost}=\mathrm{LB}=\mathrm{UB}$.
+
+Gọi $z^\star$ là chi phí tối ưu Big-M đã chứng minh và $f(x)$ là chi phí
+của lịch $x$. Thử bốn chế độ trên cùng instance, MiniSAT và timeout:
+\begin{enumerate}
+\item \code{control}: chạy MaxSAT như V17, chưa cấp đáp án cho solver.
+\item \code{oracle-ub}: cấp lịch tối ưu Big-M làm nghiệm tốt nhất ban đầu,
+      tức $\mathrm{UB}=z^\star$. MaxSAT vẫn tự xây dựng cận dưới. Không
+      đưa các mốc thời gian của lịch Big-M vào mô hình; không cần chạy
+      heuristic MIP vì đã có lịch tối ưu.
+\item \code{at-opt}: chỉ hỏi SAT có tìm được lịch hợp lệ thỏa
+      $f(x)\le z^\star$ không. Giữ bước phát hiện xung đột và bổ sung
+      mốc thời gian, nhưng bỏ các vòng tối ưu bằng tập mâu thuẫn của RC2.
+      Không cấp lịch Big-M cho phép thử này.
+\item \code{below-opt}: hỏi SAT có lịch thỏa $f(x)\le z^\star-1$ không.
+      Chi phí là số nguyên, nên câu trả lời đúng phải là không có lịch.
+      Solver phải tự chứng minh điều đó; không được thêm điều kiện
+      $f(x)\ge z^\star$ từ đáp án đã biết.
+\end{enumerate}
+
+Không gán trực tiếp cả hai biến cận bằng $z^\star$: nếu đã có lịch hợp lệ
+và gán hai cận bằng nhau thì solver có thể dừng ngay. Cách đó không đo
+được việc tìm lịch hay việc chứng minh tối ưu. Cũng không thay biến chi
+phí tích lũy của RC2 bằng đáp án Big-M, vì biến này gắn với các chi phí
+đã được xử lý trong mô hình.
+
+Cách đọc kết quả:
+\begin{itemize}
+\item Nếu cấp riêng cận trên giúp giải nhanh, cần cải thiện cách tìm
+      nghiệm tốt ban đầu.
+\item Nếu tìm được lịch ở $z^\star$ nhanh nhưng chứng minh không có lịch
+      ở $z^\star-1$ còn chậm, phần chứng minh cận dưới là điểm nghẽn.
+\item Nếu cả hai truy vấn SAT đều nhanh nhưng RC2 vẫn timeout, nên thử
+      cách tìm kiếm trên các mức chi phí thay vì tiếp tục chỉnh các bước
+      nâng cận hiện tại.
+\item Nếu các truy vấn SAT cũng chậm, xem thời gian SAT và số biến,
+      mệnh đề được thêm. Phép thử hiện dùng biểu diễn nhị phân cho giới
+      hạn chi phí; chi phí của biểu diễn này cũng có thể làm phép thử
+      chậm. Chưa thể quy mọi nguyên nhân cho backend SAT.
+\end{itemize}
+
+V39 lưu riêng tiến trình cận, số vòng, thời gian SAT, số biến và mệnh đề.
+Các ca Big-M 120 giây đã có đáp án dùng được ngay; không cần chạy lại
+Big-M để tạo đáp án cho một thí nghiệm chẩn đoán. Mỗi phép thử MaxSAT
+giữ timeout 300 giây như tập ca khó V17. Đây không phải bảng so sánh
+tốc độ Big-M và MaxSAT.
+
+Chương trình riêng là \file{bound\_diagnostic}; script là
+\file{quick\_scripts/analyze/diagnose\_optimal\_bounds.py}.
+Service \file{maxsat-bound-diagnostics-v39.service} chờ V38 kết thúc,
+chạy kiểm thử và thực nghiệm tuần tự, với giới hạn tổng sáu giờ.
+Mọi kết quả có \code{submission\_eligible=false}: biết trước đáp án chỉ
+giúp chọn hướng cải tiến, không được tính thành ca mới MaxSAT tự giải.
 
 \section{Nội dung được phép đưa vào bài báo}
 

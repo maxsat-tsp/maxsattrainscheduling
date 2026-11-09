@@ -1707,3 +1707,56 @@ Theo dõi `maxsat_am1_calls`, `maxsat_am1_groups`, `maxsat_am1_literals`,
 `maxsat_am1_fixed_cost`, `maxsat_am1_inconclusive` và `maxsat_am1_time`.
 Số nhóm hoặc phần cận tính trước chỉ là telemetry. Chỉ tính tăng coverage
 sau khi có lịch tối ưu được kiểm tra, lặp lại ba lần và giữ được các ca cũ.
+
+## V39: tìm xem thời gian mất ở bước nào
+
+V39 dùng đáp án Big-M đã kiểm tra cho các instance MaxSAT chưa giải.
+Sinh viên cần phân biệt bốn câu hỏi:
+
+| Chế độ | Thông tin cấp cho solver | Việc solver phải làm |
+|---|---|---|
+| `control` | Instance | Chạy tối ưu như V17 |
+| `oracle-ub` | Instance và lịch Big-M tối ưu | Tự nâng LB tới chi phí lịch đã cấp |
+| `at-opt` | Instance và số `opt` | Tìm lịch hợp lệ có chi phí `≤ opt` |
+| `below-opt` | Instance và số `opt−1` | Chứng minh không có lịch đạt mức đó |
+
+Không đặt cả LB và UB bằng đáp án rồi bấm giờ: solver sẽ có thể dừng ngay.
+Hai chế độ SAT không dùng lịch Big-M hay các vòng nâng cận RC2. Chúng dùng
+cùng bước bổ sung ràng buộc DDD và thêm giới hạn tổng chi phí bằng biểu
+diễn nhị phân đã có kiểm thử. Mặc định của chương trình `ddd` không đổi.
+
+Service tự chạy tuần tự sau V38, MiniSAT, RAM 6.000.000 KB, mỗi phép thử
+300 giây và tối đa sáu giờ cả vòng. Các đáp án được chọn từ JSON Gurobi
+full-120 hiện có; auditor kiểm tra độc lập lịch, chi phí và hai cận trước
+khi chạy. Không dùng runtime Big-M 120 giây để xếp hạng các phép thử này.
+
+Theo dõi trên VM:
+
+```bash
+systemctl status maxsat-bound-diagnostics-v39.service
+journalctl -u maxsat-bound-diagnostics-v39.service -n 30 --no-pager
+```
+
+Kết quả nằm trong
+`/home/tuyenkv/projects/bound-diagnostics-v39/results/aglr/bound-diagnostics-v39-20261109/`.
+Thư mục `trial/cases/<objective>/<instance>/<mode>/` có kết quả, log,
+`result.trace.jsonl` ghi tiến trình cận và thông tin lệnh chạy. Có thể
+kiểm toán lại bằng:
+
+```bash
+python3 quick_scripts/analyze/diagnose_optimal_bounds.py audit \
+  --results results/aglr/bound-diagnostics-v39-20261109/trial \
+  --reference /home/tuyenkv/projects/core-exhaust-v17-followup/maxsattrainscheduling/results/aglr/core-exhaust-v17-full216
+```
+
+Nếu tìm lịch ở `opt` nhanh mà chứng minh ở `opt−1` chậm, ưu tiên cải thiện
+cận dưới và chứng minh. Nếu cả hai nhanh nhưng RC2 chậm, ưu tiên cách tìm
+kiếm theo mức chi phí. Nếu chỉ cấp lịch tối ưu đã giúp RC2 giải nhanh,
+ưu tiên chất lượng nghiệm ban đầu. Nếu SAT cũng timeout, xem thời gian SAT
+và mức tăng mô hình; phần biểu diễn giới hạn chi phí có thể là một nguyên
+nhân riêng. Ghi kết luận theo từng instance, không ép mọi ca có cùng lỗi.
+
+Kết quả mang cờ `submission_eligible=false` và không vào bảng coverage.
+RUN_ID, commit, binary và tập dữ liệu được khóa khi bắt đầu. Một ca bị
+ngắt khi chưa có kết quả hoàn chỉnh sẽ làm controller dừng để giữ log;
+không tự biến lỗi thành timeout hoặc chạy lại làm mất dữ liệu ban đầu.

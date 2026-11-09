@@ -1,5 +1,39 @@
 # Tiến độ thử nghiệm trên VM, cập nhật 09-11-2026
 
+## V39: chẩn đoán bằng đáp án tối ưu Big-M
+
+Theo yêu cầu mới, ưu tiên xác định nguyên nhân thay vì thêm một biến thể
+RC2 nữa. Dùng các ca V17 chưa chứng minh tối ưu ở 300 giây nhưng Big-M
+đã giải được. Từ Gurobi full-120 hiện có, có bốn ca `cont` phù hợp:
+
+| Instance | Optimum Big-M | Cận dưới cuối ghi trong log V17 300 giây |
+|---|---:|---:|
+| `origA8` | 23.143 | 22.736 |
+| `trackA8` | 24.441 | 21.064 |
+| `stationA1` | 12.884 | 12.745 |
+| `stationA2` | 9.193 | 8.398 |
+
+Dấu chấm trong bảng phân tách hàng nghìn. Các cận log là tiến trình đã
+ghi, không phải LB/UB cuối trong JSON timeout. Script sẽ kiểm tra lại
+mọi lịch Big-M và `cost=lb=ub` trước khi nhận làm đáp án.
+
+Bốn chế độ gồm chạy như V17 (`control`), cấp riêng lịch tối ưu làm cận
+trên (`oracle-ub`), SAT tìm lịch có chi phí `≤ opt` (`at-opt`), và SAT
+chứng minh không có lịch `≤ opt−1` (`below-opt`). Không gán cận dưới
+bằng đáp án Big-M. Cách gán cả `LB=UB=opt` sẽ làm mất phép đo cần thiết.
+
+Mã chẩn đoán được tách thành binary riêng tại commit `ce89553`; service
+`maxsat-bound-diagnostics-v39.service` đã được bật trên worktree
+`/home/tuyenkv/projects/bound-diagnostics-v39`. Service chờ V38 kết thúc
+để tránh chạy đo cùng lúc, rồi kiểm thử native MiniSAT, kiểm thử biểu diễn
+chi phí và các smoke test trước khi chạy 16 phép thử ở 300 giây.
+Kiểm thử Python hiện đạt 136/136 và kiểm tra kiểu Rust đã qua trên máy
+cục bộ; kết quả native và chẩn đoán VM sẽ được ghi sau khi chạy.
+
+Biết trước đáp án không được tính là tăng coverage. Mốc SAT vẫn là
+V17 `(72,68,63)`, 203/216. Không cập nhật kết luận thực nghiệm COR từ
+các phép thử này.
+
 ## Vòng hard-set 8–9 tháng 11 và bước tiếp theo
 
 Đã tải dữ liệu từ VM và kiểm toán độc lập tám lượt hợp lệ: bốn biến thể

@@ -68,6 +68,11 @@ thì tự xác nhận ba lần và hồi quy các ca còn lại trong vòng tố
 giờ. Chưa có kết quả để kết luận V41 tốt hơn; xem service và manifest
 thực tế theo runbook.
 
+Báo cáo cận trực tiếp chạy riêng từ checkout đánh giá `77c3c97`; kết quả
+của mỗi ca hoàn tất được cập nhật mỗi phút mà không đổi solver đang đo.
+Bản auditor mới đã qua 168 test Python, bao gồm kiểm tra lại CPLEX 34 và
+từ chối LP bị thay đổi. Tài liệu LaTeX phiên bản 5.27 đã biên dịch thành công.
+
 ## V39 hoàn tất; V40 tự chọn ngưỡng chi phí
 
 Đã tải đủ và kiểm toán độc lập 16/16 phép thử V39. Không có lịch sai,

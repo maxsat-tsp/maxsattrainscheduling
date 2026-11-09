@@ -1909,3 +1909,15 @@ Các pool V41 nhập cả dữ liệu V40 đã kiểm tra, nên tìm lại UB 11
 được tính là cận tốt nhất mới. Bản chụp của chính binary đang đánh giá
 được loại khỏi nguồn tham chiếu để tránh tự so sánh với chính nó.
 Các mốc dưới đây vẫn là nghiên cứu; chưa cập nhật kết luận COR từ V41.
+
+Báo cáo cận trực tiếp dùng checkout đánh giá riêng `77c3c97`, service
+`maxsat-bound-priority-report-v41.service`. Nó đọc các ca đã hoàn tất mỗi
+phút và lưu `evaluation/priority_evaluation.json` ngay cả khi chưa xong
+14 ca. Khi đã đủ xác nhận/hồi quy, có thêm `evaluation/full_evaluation.json`.
+Không sửa source hoặc binary `76bff0c` đang đo. Các file pool của báo cáo
+này có cả V40 và CPLEX chạy lại đúng optimum 34. Xem trạng thái bằng:
+
+```bash
+systemctl status maxsat-bound-priority-report-v41.service
+journalctl -u maxsat-bound-priority-report-v41.service -n 20 --no-pager
+```

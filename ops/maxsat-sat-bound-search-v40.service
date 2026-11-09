@@ -1,0 +1,24 @@
+[Unit]
+Description=Autonomous SAT cost-threshold search on V17 unresolved pairs
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/home/tuyenkv/projects/sat-bound-search-v40/results/aglr/sat-bound-search-v40-20261109/COMPLETED
+ConditionPathExists=!/home/tuyenkv/projects/sat-bound-search-v40/results/aglr/sat-bound-search-v40-20261109/FAILED
+ConditionPathExists=!/home/tuyenkv/projects/sat-bound-search-v40/results/aglr/sat-bound-search-v40-20261109/INCOMPLETE
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/sat-bound-search-v40
+EnvironmentFile=/home/tuyenkv/.config/maxsat/sat-bound-search-v40.env
+ExecStart=/usr/bin/taskset -c 0,1,4,5 /bin/bash /home/tuyenkv/projects/sat-bound-search-v40/ops/run_sat_bound_search_v40.sh
+Restart=on-failure
+RestartPreventExitStatus=78
+RestartSec=30
+RuntimeMaxSec=21600
+TimeoutStopSec=30
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

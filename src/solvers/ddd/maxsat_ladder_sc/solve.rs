@@ -1029,6 +1029,27 @@ pub fn solve_bound_diagnostic<L: satcoder::Lit + Copy + std::fmt::Debug + 'stati
         Some(&diagnostic), |_| {}, output_stats)
 }
 
+/// Solve a cost decision chosen by an optimizer, without any optimum oracle.
+/// Reuse the tested fixed-budget DDD path and give its events neutral names.
+pub fn solve_cost_threshold<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
+    solver: impl SatInstance<L> + SatSolverWithCore<Lit = L> + std::fmt::Debug,
+    problem: &Problem,
+    timeout: f64,
+    delay_cost_type: DelayCostType,
+    settings: MaxSatDddLadderScSettings,
+    target: i32,
+    mut output_stats: impl FnMut(String, serde_json::Value),
+) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
+    solve_inner(|| panic!("a threshold decision never starts a MIP heuristic"),
+        solver, problem, timeout, delay_cost_type, settings,
+        Some(&BoundDiagnostic::Decision(target)), |_| {}, |key,value| {
+            if key=="diagnostic_only" || key=="diagnostic_supplied_ub" {return;}
+            let key=key.strip_prefix("diagnostic_")
+                .map(|suffix|format!("threshold_{suffix}")).unwrap_or(key);
+            output_stats(key,value);
+        })
+}
+
 fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     mk_env: impl Fn() -> grb::Env + Send + 'static,
     mut solver: impl SatInstance<L> + SatSolverWithCore<Lit = L> + std::fmt::Debug,

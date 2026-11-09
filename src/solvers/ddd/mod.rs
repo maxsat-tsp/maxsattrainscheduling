@@ -18,6 +18,7 @@
 //!   cost-tree, chain-earliest precedence).
 
 pub mod incremental_sat;
+pub mod bound_search;
 pub mod maxsat_ladder;
 pub mod maxsat_ladder_abstract;
 pub mod maxsat_ladder_sc;

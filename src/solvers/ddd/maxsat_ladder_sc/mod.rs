@@ -35,5 +35,5 @@ pub use settings::{
 };
 pub use solve::{
     solve, solve_debug, solve_debug_with_settings, solve_with_settings, solve_bound_diagnostic,
-    BoundDiagnostic, IterationType, SolveStats,
+    solve_cost_threshold, BoundDiagnostic, IterationType, SolveStats,
 };

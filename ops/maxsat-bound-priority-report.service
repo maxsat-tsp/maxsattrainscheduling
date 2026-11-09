@@ -1,0 +1,20 @@
+[Unit]
+Description=Read-only evaluation of coverage, bound improvements, then runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/bound-priority-eval
+EnvironmentFile=/home/tuyenkv/.config/maxsat/bound-priority-eval.env
+ExecStart=/usr/bin/taskset -c 2,3,6,7 /bin/bash /home/tuyenkv/projects/bound-priority-eval/ops/run_bound_priority_report.sh
+Restart=no
+RuntimeMaxSec=21600
+MemoryMax=1500M
+TimeoutStopSec=15
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

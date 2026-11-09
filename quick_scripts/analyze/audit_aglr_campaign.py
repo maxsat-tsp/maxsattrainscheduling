@@ -15,6 +15,7 @@ import audit_journal_campaign as journal_audit
 import summarize_conference as conference_audit
 import published_conference_reference as published_reference
 import published_baselines
+import bound_quality
 
 
 OBJECTIVES = ("finsteps123", "infsteps180", "cont")
@@ -312,7 +313,7 @@ def load_cplex(campaign_dir: Path, timeout: float) -> list[dict]:
     return records
 
 
-def summarize(records: list[dict], timeout: float) -> list[dict]:
+def summarize(records: list[dict], timeout: float, include_bound_quality: bool = False) -> list[dict]:
     groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for record in records:
         groups[(record["tag"], record["objective"])].append(record)
@@ -368,7 +369,39 @@ def summarize(records: list[dict], timeout: float) -> list[dict]:
                 "paired_instances": 0,
             }
         )
+    if include_bound_quality:
+        add_bound_metrics(rows,records)
     return rows
+
+
+def add_bound_metrics(summary,records):
+    """Add the new policy without changing immutable historical summaries."""
+    annotated=[];references=defaultdict(list)
+    for r in records:
+        solve=r.get('solve',{});verified=bool(r['proven'])
+        witness=solve.get('solution',solve.get('incumbent_solution'))
+        if witness is not None:
+            cost=solve.get('cost',solve.get('incumbent_cost',solve.get('ub')))
+            errors=journal_audit.independently_verify_solution(r['name'],r['objective'],dict(solution=witness,cost=cost))
+            if errors:r.setdefault('errors',[]).extend(errors)
+            verified=not errors and journal_audit.same_number(cost,solve.get('ub'))
+        lo,hi=bound_quality.interval(solve.get('lb'),solve.get('ub'))
+        item=dict(tag=r['tag'],objective=r['objective'],name=r['name'],proven=r['proven'],
+            lb=lo,ub=hi,bounds_verified=verified,source=r['tag'])
+        annotated.append(item)
+        if r.get('config',{}).get('policy')!='adaptive' and not r.get('errors'):
+            references[r['objective'],r['name']].append(item)
+    for row in summary:
+        items=[r for r in annotated if (r['tag'],r['objective'])==(row['tag'],row['objective'])]
+        row.update(bound_quality.summarize(items))
+        improved=[]
+        for r in items:
+            refs=references.get((r['objective'],r['name']),[])
+            if r['proven'] or not r['bounds_verified'] or not refs:continue
+            ref=bound_quality.envelope(refs)
+            if bound_quality.compare(r['lb'],r['ub'],ref['lb'],ref['ub'])['new_bound']:improved.append(r['name'])
+        row['new_best_bound_cases']=len(improved)
+        row['bound_reference_scope']='nonadaptive methods in this audited campaign'
 
 
 def add_conference_metrics(
@@ -463,18 +496,14 @@ def ranking(
                 "selected_growth_sum": sum(
                     float(row["mean_selected_growth"] or 0.0) for row in rows
                 ),
+                **bound_quality.aggregate_summary(rows),
+                "ranking_provisional": not bound_quality.aggregate_summary(rows)['bounds_verified'],
+                "ranking_priorities": ','.join(bound_quality.PRIORITIES),
             }
         )
-    ranked.sort(
-        key=lambda row: (
-            not row["coverage_non_regression"],
-            -row["proven_total"],
-            row["par2_sum"],
-            row["selected_growth_sum"],
-            -float(row["fraction"]),
-            row["tag"],
-        )
-    )
+    # Objective-specific coverage floors remain an eligibility check, not a
+    # reason to sort a lower total coverage ahead of the user's first priority.
+    ranked.sort(key=bound_quality.rank_key)
     for index, row in enumerate(ranked, 1):
         row["rank"] = index
     return ranked
@@ -533,15 +562,19 @@ def evaluate_gate(
             baseline_coverage = {o: int(lookup[(tag, o)]["proven_optimal"]) for o in OBJECTIVES}
             baseline_total = sum(baseline_coverage.values())
             baseline_par2 = sum(float(lookup[(tag, o)]["par2_seconds"]) for o in OBJECTIVES)
-            better = total_coverage > baseline_total or (
-                total_coverage == baseline_total and candidate_par2 < baseline_par2
-            )
+            candidate_quality=bound_quality.aggregate_summary([lookup['AGLR',o] for o in OBJECTIVES])
+            baseline_quality=bound_quality.aggregate_summary([lookup[tag,o] for o in OBJECTIVES])
+            preferred,preference_reason=bound_quality.preference(
+                dict(candidate_quality,par2_sum=candidate_par2),dict(baseline_quality,par2_sum=baseline_par2))
+            better=preferred is True
             comparisons.append(dict(tag=tag, coverage=baseline_coverage, total=baseline_total,
-                                    par2_sum=baseline_par2, candidate_better=better))
+                                    par2_sum=baseline_par2, candidate_better=better,
+                                    preference_reason=preference_reason,comparison_pending=preferred is None,
+                                    candidate_bound_quality=candidate_quality,baseline_bound_quality=baseline_quality))
             if not better:
                 reasons.append(f"AGLR does not beat {tag}: total coverage "
                                f"{total_coverage} versus {baseline_total}; "
-                               f"PAR-2 sum {candidate_par2:.6f} versus {baseline_par2:.6f}")
+                               f"decision={preference_reason}; PAR-2 is used only after bound quality")
     baseline_comparison_passed = (coverage_passed and complete_baselines
                                   and len(comparisons) == len(required)
                                   and all(r["candidate_better"] for r in comparisons))
@@ -792,7 +825,7 @@ def main() -> int:
                                      name="<reference>", status="reference-data-error", errors=[error])
                                 for error in published_metadata["errors"])
 
-    summary = summarize(records, args.timeout)
+    summary = summarize(records, args.timeout, include_bound_quality=True)
     conference_metadata = None
     conference_summary = None
     comparison_errors: list[dict] = []
@@ -863,9 +896,11 @@ def main() -> int:
     print(f"Wrote {campaign_dir / 'aglr_summary.csv'}")
     if ranked:
         print(
-            "Best AGLR: "
+            ("AGLR ordering (provisional): " if ranked[0]['ranking_provisional'] else "Preferred AGLR: ") +
             f"{ranked[0]['tag']} (proven={ranked[0]['proven_total']}, "
-            f"PAR2 sum={ranked[0]['par2_sum']:.3f})"
+            f"new bounds={ranked[0]['new_best_bound_cases']}, "
+            f"remaining gap={ranked[0]['mean_unsolved_relative_gap']}, "
+            f"provisional={ranked[0]['ranking_provisional']})"
         )
     if errors:
         print(f"Audit found {len(errors)} invalid/fatal records or reference-data errors")

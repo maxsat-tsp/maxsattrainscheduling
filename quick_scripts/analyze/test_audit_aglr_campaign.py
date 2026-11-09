@@ -12,6 +12,28 @@ import audit_aglr_campaign as audit
 
 
 class AuditAglrCampaignTests(unittest.TestCase):
+    def test_ranking_puts_new_bounds_then_gap_before_runtime(self):
+        rows=[]
+        for tag,solved,new,gap,time in [('more',71,0,0.9,1000),('bounds',70,1,0.4,1000),
+                ('gap',70,0,0.1,1000),('fast',70,0,0.3,1)]:
+            for objective in audit.OBJECTIVES:
+                pending=72-solved
+                rows.append(dict(tag=tag,objective=objective,policy='adaptive',instances=72,
+                    proven_optimal=solved,min_growth=32,fraction=0.5,max_wait=5,
+                    par2_seconds=time,mean_selected_growth=0,new_best_bound_cases=new,
+                    unsolved_bounds_missing=0,unsolved_gap_sum=gap*pending,bounds_verified=True))
+        ranked=audit.ranking(rows)
+        self.assertEqual([r['tag'] for r in ranked],['more','bounds','gap','fast'])
+        self.assertFalse(ranked[0]['ranking_provisional'])
+
+    def test_historical_summary_schema_is_preserved_by_default(self):
+        row=dict(tag='old',objective='cont',name='origA1',proven=False,time=30,errors=[],
+            solve=dict(lb=5,ub=10,status='timeout'))
+        self.assertNotIn('unsolved_gap_sum',audit.summarize([row],30)[0])
+        updated=audit.summarize([row],30,include_bound_quality=True)[0]
+        self.assertEqual(updated['mean_unsolved_relative_gap'],0.5)
+        self.assertFalse(updated['bounds_verified'])
+
     def test_assumption_strategy_must_match_locked_manifest(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -209,7 +231,7 @@ class AuditAglrCampaignTests(unittest.TestCase):
         gate = audit.evaluate_gate(summary)
         self.assertTrue(gate["passed"])
         self.assertTrue(gate["baseline_comparison_passed"])
-        # At equal coverage, only a lower PAR-2 is a win.
+        # At equal coverage, a faster time cannot bypass missing bound data.
         for row in summary:
             if row["tag"] == "BigM-Gurobi" and row["objective"] == "infsteps180":
                 row["proven_optimal"] = 68
@@ -217,6 +239,13 @@ class AuditAglrCampaignTests(unittest.TestCase):
         for row in summary:
             if row["tag"] == "AGLR":
                 row["par2_seconds"] = 9.0
+        self.assertFalse(audit.evaluate_gate(summary)["passed"])
+        for row in summary:
+            pending=72-row['proven_optimal']
+            row.update(unsolved_bounds_missing=0,unsolved_gap_sum=0.1*pending,bounds_verified=True)
+        self.assertTrue(audit.evaluate_gate(summary)["passed"])
+        for row in summary:
+            if row['tag']=='AGLR':row['par2_seconds']=100.0;row['unsolved_gap_sum']*=0.5
         self.assertTrue(audit.evaluate_gate(summary)["passed"])
 
     def test_conference_comparison_uses_matching_subset_and_real_pairs(self):

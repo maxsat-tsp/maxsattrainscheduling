@@ -13,6 +13,7 @@ import time
 import diagnose_optimal_bounds as diagnostic
 import extended_timeout_experiments as ex
 import targeted_order_cycles as trial
+import bound_quality
 
 
 def initial_lower(name,objective):
@@ -157,10 +158,13 @@ def audit(root,reference,diagnostic_root=None):
             raise ValueError('progress trace does not match replayed results')
         records.append(dict(row,repeat=repeat))
     hard=set(tasks_for(reference))
+    quality=bound_quality.summarize([dict(r,bounds_verified=True) for r in records if r['repeat']==0])
     return dict(schema='sat-bound-search-audit-v1',audit_passed=True,complete=len(records)==len(manifest['tasks']),
         completed_runs=len(records),expected_runs=len(manifest['tasks']),records=records,
         newly_solved=[r for r in records if r['proven'] and r['repeat']==0 and
                       (r['objective'],r['name']) in hard],
+        evaluation_priorities=list(bound_quality.PRIORITIES),bound_quality=quality,
+        bound_quality_scope='completed nonrepeat cases in this phase; confirmations are separate',
         submission_passed=False,scope='selected pairs only; full coverage requires regression')
 
 

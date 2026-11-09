@@ -28,8 +28,28 @@ Mã chẩn đoán được tách thành binary riêng từ commit `ce89553`; b�
 `/home/tuyenkv/projects/bound-diagnostics-v39`. Service chờ V38 kết thúc
 để tránh chạy đo cùng lúc, rồi kiểm thử native MiniSAT, kiểm thử biểu diễn
 chi phí và các smoke test trước khi chạy 16 phép thử ở 300 giây.
-Kiểm thử Python hiện đạt 136/136 và kiểm tra kiểu Rust đã qua trên máy
-cục bộ; kết quả native và chẩn đoán VM sẽ được ghi sau khi chạy.
+VM đã qua 3 kiểm thử chẩn đoán, 5 kiểm thử biểu diễn chi phí, 136 kiểm thử
+Python, 3 smoke cho CLI cũ và 12 smoke cho bốn chế độ chẩn đoán.
+
+**Kết quả đầu tiên đã kiểm tra độc lập, `cont/origA8`:** SAT tìm lịch ở
+`opt=23143` trong 15,799 giây; SAT chứng minh không có lịch ở `opt−1=23142`
+trong 16,911 giây. Trong khi đó V17 chưa giải được ở 300 giây. Đây là bằng
+chứng rằng hai truy vấn tại ngưỡng tối ưu không quá khó trên ca này. Khi
+cấp riêng lịch tối ưu làm `UB=23143`, RC2 vẫn timeout ở 300,012 giây;
+cận dưới cuối ghi được là 22679, với 8455 lời gọi SAT. Vì thế chỉ cải thiện
+nghiệm ban đầu chưa đủ trên ca này; cần xem lại quy trình tối ưu bằng RC2
+và các vòng nâng cận. Chưa suy rộng sang
+các instance khác hoặc tính hai kết quả biết trước đáp án thành coverage.
+Lượt `control` cùng binary mới cũng timeout ở 300,010 giây, cận dưới/trên
+cuối ghi được là 22680/23648. Như vậy cả bốn chế độ trên `origA8` đã có kết
+quả; các instance còn lại tiếp tục tự chạy. Dữ liệu nguồn, lịch, trace,
+kiểm thử và kiểm toán nằm ở `results/sat_research/v39_bound_diagnostics_20261109/`.
+
+**`cont/stationA1` cho thấy cần phân tích từng ca:** dù biết `opt=12884`,
+SAT cần 210,132 giây để tìm lịch đạt ngưỡng và 163,586 giây để chứng minh
+không có lịch ở 12883. Bản thân truy vấn SAT đã tốn nhiều thời gian trên
+ca này. Chưa thể kết luận chỉ thay cách tìm cận sẽ giúp mọi instance;
+cần xem thêm cách biểu diễn và giải ràng buộc chi phí.
 
 Biết trước đáp án không được tính là tăng coverage. Mốc SAT vẫn là
 V17 `(72,68,63)`, 203/216. Không cập nhật kết luận thực nghiệm COR từ
@@ -85,11 +105,14 @@ năng. V38 giữ trimming tắt, MiniSAT và cấu hình V17; cần kiểm thử
 smoke và probe trước khi mở 13 ca khó. Bộ điều khiển V37 được tái sử dụng
 với worktree và RUN_ID mới, giới hạn sáu giờ, không chạy lại timeout đã xong.
 
-**V38 đã mở ca khó sau khi preflight đạt:** VM chạy thành công ba kiểm thử
+**V38 đã hoàn tất sau khi preflight đạt:** VM chạy thành công ba kiểm thử
 AM1, hai kiểm thử tích hợp/vét cạn, 129 test Python, sáu smoke bật/tắt và
 probe timeout. Chi phí smoke ở ba objective là 11, 34 và 5526, đều khớp
-V17. Source được khóa tại `6acd6c9`, binary có hash trong manifest. Chỉ mới
-bắt đầu đo 13 ca; chưa có kết quả coverage mới và chưa sửa Results của COR.
+V17. Source được khóa tại `6acd6c9`, binary có hash trong manifest. Cả
+13 ca đã chạy đủ, tất cả timeout hợp lệ và không có nhóm AM1 lớn hơn được dùng.
+Thời gian native SAT khoảng 299,70--299,91 giây mỗi ca. Raw, telemetry và
+kiểm toán độc lập nằm ở `results/sat_research/v38_intrinsic_am1_20261109/`.
+Chưa có coverage mới và chưa sửa Results của COR.
 
 ## Quyết định backend từ ngày 07-11-2026
 

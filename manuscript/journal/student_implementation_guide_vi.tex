@@ -1767,6 +1767,11 @@ so với lịch nhỏ vét cạn, smoke test và timeout ngắn. Mọi kiểm th
 đã dùng, phần chi phí tính trước và thời gian thêm. Chỉ kết luận có cải
 thiện sau khi có ca mới được kiểm tra độc lập, lặp lại và qua hồi quy.
 
+V38 đã kết thúc với 13 ca timeout hợp lệ, không có optimum mới. Không ca
+nào dùng được nhóm AM1 lớn hơn cặp ban đầu. Vì vậy kết quả hiện tại cho
+thấy cách tìm nhóm này chưa có tác dụng trên tập ca khó; chưa chứng minh
+rằng mọi cách sử dụng AM1 đều không hiệu quả.
+
 \section{V39: biết trước đáp án để tìm nguyên nhân chạy chậm}
 
 Một câu hỏi cần trả lời trước khi thêm cải tiến là: MaxSAT chậm vì khó
@@ -1830,6 +1835,27 @@ Service \file{maxsat-bound-diagnostics-v39.service} chờ V38 kết thúc,
 chạy kiểm thử và thực nghiệm tuần tự, với giới hạn tổng sáu giờ.
 Mọi kết quả có \code{submission\_eligible=false}: biết trước đáp án chỉ
 giúp chọn hướng cải tiến, không được tính thành ca mới MaxSAT tự giải.
+
+Kết quả đầu tiên trên \code{cont/origA8} cho biết:
+\begin{itemize}
+\item SAT tìm được lịch có chi phí $23143$ trong 15,80 giây;
+\item SAT chứng minh không có lịch với chi phí $\le23142$ trong 16,91 giây;
+\item RC2 vẫn timeout ở 300 giây khi đã được cấp lịch tối ưu làm cận trên;
+      cận dưới cuối ghi được là $22679$.
+\item RC2 chạy bình thường với cùng binary cũng timeout ở 300 giây;
+      cận dưới/trên cuối ghi được là $22680/23648$.
+\end{itemize}
+Lịch SAT đã được kiểm tra độc lập. Trên ca này, chỉ cải thiện nghiệm ban
+đầu chưa đủ; nên ưu tiên cách tìm kiếm theo ngưỡng chi phí. Hai phép thử
+SAT biết sẵn ngưỡng từ Big-M, nên chưa phải một thuật toán tối ưu tự tìm
+đáp án và chưa được đưa vào bảng coverage.
+
+Không phải ca nào cũng giống \code{origA8}. Với \code{cont/stationA1},
+biết trước $z^\star=12884$, SAT vẫn cần 210,13 giây để tìm lịch đạt ngưỡng
+và 163,59 giây để chứng minh không có lịch tốt hơn. Vì thế phải đọc kết
+quả theo từng ca: có ca chậm ở quy trình tìm cận, có ca mà chính truy vấn
+SAT tại ngưỡng đã tốn nhiều thời gian. Chưa được kết luận rằng đổi cách
+tìm cận sẽ giải quyết mọi instance.
 
 \section{Nội dung được phép đưa vào bài báo}
 

@@ -26,3 +26,16 @@ deadline applies across restarts. Audit/configuration failures stop with
 exit 78 and a `FAILED` marker; they do not start an endless retry cycle.
 If a new optimum appears, the controller confirms it three times and
 regresses the 203 solved V17 pairs within the remaining wall budget.
+
+## Completed full-assumption trial
+
+`full_complete/` now contains the original 13-pair snapshot, independently
+rebuilt audit and telemetry. All 13 pairs timed out validly at 300 seconds;
+there is no new optimum. The geometric trial was still running when this
+completed full trial was downloaded. No incomplete geometric result is
+counted as a full-dataset measurement.
+
+`telemetry.csv` includes the last lower bound printed in each stdout log
+for diagnosis only. It is not substituted for an audited proof or a
+returned LB/UB pair. The independent audit checks every raw case against
+the frozen manifest, original V17 reference and the selected 13-pair scope.

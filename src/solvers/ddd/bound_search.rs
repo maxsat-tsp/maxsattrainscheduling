@@ -5,6 +5,18 @@ use crate::solvers::util::{counting_solver,minisat_deadline,cadical_deadline::De
 use serde::Serialize;
 use std::time::Instant;
 
+#[derive(Clone,Copy,Debug,PartialEq,Serialize)]
+pub enum ThresholdPolicy {
+    #[serde(rename="bisect")] Bisect,
+    #[serde(rename="close-upper")] CloseUpper,
+}
+impl ThresholdPolicy {
+    pub fn parse(value:&str)->Result<Self,String>{
+        match value {"bisect"=>Ok(Self::Bisect),"close-upper"=>Ok(Self::CloseUpper),
+            _=>Err("unsupported threshold policy".into())}
+    }
+}
+
 #[derive(Clone,Copy,Debug)]
 pub struct SearchInterval {pub lower:i32,pub upper:i32}
 impl SearchInterval {
@@ -13,16 +25,31 @@ impl SearchInterval {
         Ok(Self{lower,upper})
     }
     pub fn target(&self)->Option<i32>{
+        self.target_for(ThresholdPolicy::Bisect)
+    }
+    pub fn target_for(&self,policy:ThresholdPolicy)->Option<i32>{
+        if self.lower>=self.upper{return None;}
+        // At a relative gap of at most 5%, ask for any strict improvement
+        // over the incumbent. All arithmetic remains integral and overflow-safe.
+        if policy==ThresholdPolicy::CloseUpper && 100i64*i64::from(self.upper-self.lower)<=5i64*i64::from(self.upper.max(1)) {
+            return Some(self.upper-1);
+        }
         (self.lower<self.upper).then(||self.lower+(self.upper-self.lower-1)/2)
     }
     pub fn sat(&mut self,target:i32,cost:i32)->Result<(),String>{
-        if self.target()!=Some(target) || cost<self.lower || cost>target {
+        self.sat_for(ThresholdPolicy::Bisect,target,cost)
+    }
+    pub fn sat_for(&mut self,policy:ThresholdPolicy,target:i32,cost:i32)->Result<(),String>{
+        if self.target_for(policy)!=Some(target) || cost<self.lower || cost>target {
             return Err("SAT cost does not fit the current search interval".into());
         }
         self.upper=cost;Ok(())
     }
     pub fn unsat(&mut self,target:i32)->Result<(),String>{
-        if self.target()!=Some(target){return Err("UNSAT threshold was not selected by the search".into());}
+        self.unsat_for(ThresholdPolicy::Bisect,target)
+    }
+    pub fn unsat_for(&mut self,policy:ThresholdPolicy,target:i32)->Result<(),String>{
+        if self.target_for(policy)!=Some(target){return Err("UNSAT threshold was not selected by the search".into());}
         self.lower=target+1;Ok(())
     }
 }
@@ -46,6 +73,7 @@ pub struct SearchResult {
     pub lb:i32,pub ub:i32,pub cost:i32,pub solution:Vec<Vec<i32>>,
     pub initial_lb:i32,pub initial_ub:i32,pub initial_solution:Vec<Vec<i32>>,
     pub queries:Vec<QueryRecord>,
+    pub threshold_policy:ThresholdPolicy,
 }
 
 /// Costs at chain-propagated earliest starts are an input-only lower bound.
@@ -67,6 +95,11 @@ pub fn initial_bounds(problem:&Problem,objective:DelayCostType)
 }
 
 pub fn solve(problem:&Problem,objective:DelayCostType,timeout:f64,
+    checkpoint:impl FnMut(&QueryRecord,i32,i32))->Result<SearchResult,SolverError>{
+    solve_with_policy(problem,objective,timeout,ThresholdPolicy::Bisect,checkpoint)
+}
+
+pub fn solve_with_policy(problem:&Problem,objective:DelayCostType,timeout:f64,policy:ThresholdPolicy,
     mut checkpoint:impl FnMut(&QueryRecord,i32,i32))->Result<SearchResult,SolverError>{
     if !timeout.is_finite() || timeout<=0.0 {
         return Err(SolverError::InvalidSolution("search timeout must be finite and positive".into()));
@@ -76,7 +109,7 @@ pub fn solve(problem:&Problem,objective:DelayCostType,timeout:f64,
     let initial_lb=interval.lower;let initial_ub=interval.upper;let initial_solution=incumbent.clone();
     let mut queries=Vec::new();
     let mut signature=minisat::Solver::new().solver_name().to_string();
-    while let Some(target)=interval.target(){
+    while let Some(target)=interval.target_for(policy){
         let remaining=timeout-started.elapsed().as_secs_f64();
         if remaining<=0.0 {break;}
         let before=interval;
@@ -99,14 +132,14 @@ pub fn solve(problem:&Problem,objective:DelayCostType,timeout:f64,
                 }
                 let cost=problem.verify_solution(&schedule,objective)
                     .ok_or_else(||SolverError::InvalidSolution("threshold schedule is invalid".into()))?;
-                interval.sat(target,cost).map_err(SolverError::InvalidSolution)?;
+                interval.sat_for(policy,target,cost).map_err(SolverError::InvalidSolution)?;
                 incumbent=schedule.clone();("sat",Some(cost),Some(schedule))
             },
             Ok(Err(SolverError::NoSolution))=>{
                 if evidence.get("threshold_outcome").and_then(|x|x.as_str())!=Some("unsat") {
                     return Err(SolverError::InvalidSolution("threshold UNSAT evidence missing".into()));
                 }
-                interval.unsat(target).map_err(SolverError::InvalidSolution)?;
+                interval.unsat_for(policy,target).map_err(SolverError::InvalidSolution)?;
                 ("unsat",None,None)
             },
             Ok(Err(SolverError::Timeout))=>("unknown",None,None),
@@ -129,17 +162,53 @@ pub fn solve(problem:&Problem,objective:DelayCostType,timeout:f64,
     if cost!=interval.upper || interval.lower>cost {
         return Err(SolverError::InvalidSolution("search bounds disagree with incumbent".into()));
     }
-    Ok(SearchResult{schema:"sat-bound-search-v1",solver_name:"SAT-Bisect-Restart",
+    Ok(SearchResult{schema:"sat-bound-search-v1",solver_name:match policy {
+        ThresholdPolicy::Bisect=>"SAT-Bisect-Restart",ThresholdPolicy::CloseUpper=>"SAT-CloseUpper-Restart"},
         status:if interval.lower==interval.upper && elapsed<=timeout {"ok"}else{"timeout"},
         uses_optimum_oracle:false,maxsat_backend:"minisat",maxsat_backend_signature:signature,
         timeout_seconds:timeout,total_time:elapsed,lb:interval.lower,ub:interval.upper,cost,solution:incumbent,
-        initial_lb,initial_ub,initial_solution,queries})
+        initial_lb,initial_ub,initial_solution,queries,threshold_policy:policy})
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::problem::{Train,Visit};
+    #[test]
+    fn close_upper_policy_switches_only_at_small_gap_and_closes_proved_intervals(){
+        assert_eq!(SearchInterval::new(8949,9245).unwrap().target_for(ThresholdPolicy::CloseUpper),Some(9244));
+        assert_eq!(SearchInterval::new(12,118).unwrap().target_for(ThresholdPolicy::CloseUpper),Some(64));
+        assert_eq!(SearchInterval::new(i32::MAX-4,i32::MAX).unwrap().target_for(ThresholdPolicy::CloseUpper),Some(i32::MAX-1));
+        assert_eq!(SearchInterval::new(0,0).unwrap().target_for(ThresholdPolicy::CloseUpper),None);
+        for lower in 0..40 {for upper in lower..60 {for optimum in lower..=upper {
+            let mut s=SearchInterval::new(lower,upper).unwrap();let mut calls=0;
+            while let Some(t)=s.target_for(ThresholdPolicy::CloseUpper){
+                if t<optimum{s.unsat_for(ThresholdPolicy::CloseUpper,t).unwrap();}
+                else{s.sat_for(ThresholdPolicy::CloseUpper,t,t).unwrap();}
+                assert!(s.lower<=optimum && s.upper>=optimum);calls+=1;assert!(calls<=60);
+            }
+            assert_eq!(s.lower,optimum);
+        }}}
+    }
+    #[test]
+    fn close_upper_native_queries_handle_both_sat_improvement_and_unsat_optimality(){
+        let unavoidable=Problem{name:"close-upper-unsat".into(),conflicts:vec![(0,0)],
+            trains:(0..3).map(|_|Train{visits:vec![Visit{resource_id:0,earliest:0,
+                aimed:Some(-100),travel_time:2}]}).collect()};
+        let result=solve_with_policy(&unavoidable,DelayCostType::Continuous,5.0,ThresholdPolicy::CloseUpper,|_,_,_|{}).unwrap();
+        // Each train pays at least 100; three length-two visits must start
+        // no earlier than 0,2,4, giving an exhaustive lower bound of 306.
+        assert_eq!(result.cost,306);assert_eq!(result.status,"ok");
+        assert_eq!(result.queries[0].target,305);assert_eq!(result.queries[0].outcome,"unsat");
+        let improve=Problem{name:"close-upper-sat".into(),conflicts:vec![(0,0),(1,1)],trains:vec![
+            Train{visits:vec![Visit{resource_id:0,earliest:0,aimed:Some(100),travel_time:4}]},
+            Train{visits:vec![Visit{resource_id:0,earliest:0,aimed:Some(0),travel_time:1}]},
+            Train{visits:vec![Visit{resource_id:1,earliest:200,aimed:Some(0),travel_time:1}]},
+        ]};
+        let result=solve_with_policy(&improve,DelayCostType::Continuous,5.0,ThresholdPolicy::CloseUpper,|_,_,_|{}).unwrap();
+        assert_eq!(result.initial_ub,204);assert_eq!(result.cost,200);assert_eq!(result.status,"ok");
+        assert_eq!(result.queries[0].target,203);assert_eq!(result.queries[0].outcome,"sat");
+    }
     #[test]
     fn interval_search_handles_holes_boundaries_and_verified_improvements(){
         for lower in 0..15 {for upper in lower..30 {for optimum in lower..=upper {
@@ -173,10 +242,12 @@ mod tests {
                     let schedule=[a,b,c][..count].iter().map(|&t|vec![t,t+2]).collect::<Vec<_>>();
                     if let Some(cost)=problem.verify_solution(&schedule,objective){optimum=optimum.min(cost);}
                 }}}
-                let result=solve(&problem,objective,5.0,|_,_,_|{}).unwrap();
+                for policy in [ThresholdPolicy::Bisect,ThresholdPolicy::CloseUpper]{
+                let result=solve_with_policy(&problem,objective,5.0,policy,|_,_,_|{}).unwrap();
                 assert_eq!(result.status,"ok");assert_eq!(result.cost,optimum);
                 assert_eq!(result.lb,result.ub);assert!(!result.uses_optimum_oracle);
                 assert_eq!(problem.verify_solution(&result.solution,objective),Some(optimum));
+                }
             }
         }
     }

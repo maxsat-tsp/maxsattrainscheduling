@@ -22,7 +22,7 @@ def run(args):
     solution=root/'schedule.sol'
     command=[str(args.cplex.resolve()),'-c',f'read {lp}','set threads 4',
         'set mip tolerances integrality 1e-9','set simplex tolerances feasibility 1e-9',
-        'set emphasis numerical 1','set mip tolerances mipgap 0','set mip tolerances absmipgap 0',
+        'set emphasis numerical y','set mip tolerances mipgap 0','set mip tolerances absmipgap 0',
         f'set timelimit {args.timeout}','optimize','display solution bestbound',f'write {solution}','quit']
     ex.save(root/'manifest.json',dict(schema='cplex-disputed-bound-recheck-v1',objective=args.objective,
         name=args.name,lp_sha256=ex.focus.sha(lp),witness_sha256=ex.focus.sha(args.witness),
@@ -48,4 +48,8 @@ if __name__=='__main__':
     p.add_argument('--timeout',type=int,default=120)
     args=p.parse_args()
     if args.timeout<=0 or args.name not in ex.common.EXPECTED_NAMES:p.error('invalid name or timeout')
-    run(args)
+    if args.output.exists():p.error('choose a new diagnostic directory; preserve earlier evidence')
+    try:run(args)
+    except BaseException as error:
+        if args.output.is_dir():ex.save(args.output/'failure.json',dict(error=str(error)))
+        raise

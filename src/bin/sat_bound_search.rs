@@ -8,10 +8,12 @@ struct Opt {
     #[structopt(long,parse(from_os_str))] instance:PathBuf,
     #[structopt(long)] objective:String,
     #[structopt(long,default_value="300")] timeout:f64,
+    #[structopt(long,default_value="bisect")] threshold_policy:String,
     #[structopt(long,parse(from_os_str))] output:PathBuf,
 }
 fn main()->Result<(),Box<dyn std::error::Error>>{
     let opt=Opt::from_args();
+    let policy=bound_search::ThresholdPolicy::parse(&opt.threshold_policy)?;
     let objective=match opt.objective.as_str(){
         "finsteps123"=>DelayCostType::FiniteSteps123,"infsteps180"=>DelayCostType::InfiniteSteps180,
         "cont"=>DelayCostType::Continuous,_=>return Err("unsupported objective".into()),
@@ -21,7 +23,7 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
     if let Some(parent)=opt.output.parent(){fs::create_dir_all(parent)?;}
     let mut trace=File::create(opt.output.with_extension("trace.jsonl"))?;
     let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
-        bound_search::solve(&named.problem,objective,opt.timeout,|query,lower,upper|{
+        bound_search::solve_with_policy(&named.problem,objective,opt.timeout,policy,|query,lower,upper|{
             writeln!(trace,"{}",serde_json::json!({"query":query,"lb":lower,"ub":upper})).unwrap();
             trace.flush().unwrap();
         })));

@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.26}
+\fancyhead[R]{\small Phiên bản 5.27}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.26, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.27, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -82,6 +82,73 @@ Mỗi báo cáo phải ghi rõ giả định này.
 \newpage
 
 \section{Sinh viên đọc phần này trước}
+
+\subsection{Thứ tự ưu tiên hiện tại: giải thêm, cải thiện cận, rồi thời gian}
+
+Từ ngày 09-11-2026, chọn hướng cải tiến theo thứ tự sau:
+\begin{enumerate}
+\item \textbf{Giải được nhiều instance hơn.} ``Giải được'' ở đây nghĩa là
+      có lịch hợp lệ và chứng minh được chi phí nhỏ nhất, không chỉ tìm
+      được một lịch chạy tàu.
+\item \textbf{Với các instance còn chưa chứng minh tối ưu, tìm cận tốt
+      hơn kết quả đã biết.} Ghi riêng cận dưới và cận trên của từng ca.
+      Ưu tiên số ca có ít nhất một cận mới tốt hơn; nếu bằng nhau, xem
+      khoảng cách giữa hai cận. Báo cả những cận bị kém đi.
+\item \textbf{Sau đó mới xét thời gian}, gồm PAR-2 và thời gian trên các
+      ca mà cả hai phương pháp cùng chứng minh tối ưu.
+\end{enumerate}
+Vẫn kiểm tra các ca bị mất và coverage từng objective. Một ca mới ở
+\code{cont} không tự xóa được một ca bị mất ở \code{infsteps180}.
+Các mục nhật ký phía sau ghi lại từng mốc cũ; kết quả mới nhất ở đây
+và runbook được dùng để quyết định lượt chạy tiếp theo.
+
+Đây là bài toán giảm chi phí, nên cận dưới $L$ càng lớn càng tốt, còn
+cận trên $U$ càng nhỏ càng tốt. Optimum nằm trong $[L,U]$. Cận trên phải
+đi kèm một lịch đã kiểm tra. Khoảng cách tương đối được báo là
+\[
+ \operatorname{gap}(L,U)=\frac{U-L}{\max\{1,U\}}.
+\]
+Không coi cận bị thiếu là số 0 hoặc gap bằng 0. Với mục tiêu nguyên,
+so sánh các cận sau khi làm tròn hợp lệ; đổi $12{,}2$ thành $13$ không
+phải là một cải tiến thuật toán.
+
+\textbf{Ví dụ đã đo:} với \code{infsteps180/trackA12}, V40 tự tìm được
+lịch hợp lệ chi phí $118$, tốt hơn cận trên $125$ trong các nguồn cũ đã
+nhập, gồm SAT và MILP. Đây là một cận trên mới có ích dù ca này chưa
+chứng minh tối ưu. Tuy nhiên, V40 chỉ tự chứng minh được $L=92$, còn cận
+dưới cũ tốt nhất là $106$. Phải báo đầy đủ $[92,118]$ so với $[106,125]$;
+không viết rằng V40 tốt hơn về cả hai cận. Khoảng $[106,118]$ là thông tin
+ghép từ các nguồn, không phải khoảng mà riêng V40 đã chứng minh.
+
+Báo cáo tách hai câu hỏi: ``có tiến bộ so với các bản SAT cũ không?'' và
+``có cận tốt hơn mọi nguồn đã nhập, kể cả MILP, không?''. Ví dụ V40 tìm
+lịch chi phí $9193$ cho \code{cont/stationA2}, nhưng Big-M đã biết optimum
+$9193$; đây chưa phải cận tốt nhất mới. Các nguồn có timeout khác nhau
+được dùng để xác định điều đã biết, không thay thế so sánh cùng timeout.
+
+\textbf{V40 đã hoàn tất và được kiểm tra lại:} đủ 216 ca độc lập và ba
+lần xác nhận. Coverage là $(72,67,64)$, tổng $203/216$, so với V17
+$(72,68,63)$. \code{cont/origA8} tự chứng minh optimum $23143$ và lặp lại
+thành công 3/3 lần; nhưng \code{infsteps180/stationA8} bị mất. Vì vậy chưa
+tăng tổng coverage và chưa đạt điều kiện không giảm từng objective.
+Giữ kết quả cận trên $118$ làm bằng chứng tiến bộ về cận, không đưa V40
+vào bài báo như phương pháp đã vượt SOTA.
+
+Khi đối chiếu toàn bộ nguồn, auditor còn phát hiện CPLEX báo optimum
+$35$ cho \code{finsteps123/trackA8}, trong khi lịch SAT hợp lệ có chi phí
+$34$. Dữ liệu gốc được giữ nguyên; cận dưới $35$ bị đánh dấu mâu thuẫn
+và không dùng làm cận đã biết. Phải giải quyết mâu thuẫn này trước khi
+chốt bảng baseline cho submission.
+
+Script \file{compare\_search\_bounds.py} kiểm tra lịch, phát lại các lần
+cập nhật cận và sinh bảng so sánh từng instance. Runbook có lệnh chạy.
+File \file{full\_evaluation.json} ghi coverage thật sau hồi quy;
+\file{reference\_pool.json} hoặc các file có hậu tố tương tự khóa các
+nguồn đối chiếu và hash. Các lần xác nhận không được tính thành instance
+độc lập. Nếu còn thiếu dữ liệu cận, báo cáo ghi chưa đủ bằng chứng để
+xếp hạng theo thời gian.
+
+\subsection{Các mốc trước V40}
 
 \textbf{Kết quả đã kiểm tra:} V17 đã chạy đủ 72 instance với cả ba hàm mục
 tiêu, chứng minh tối ưu \textbf{72/72, 68/72 và 63/72}, tổng
@@ -669,7 +736,8 @@ gian thực tế còn phụ thuộc thời gian khởi động và số instance
 bash run_aglr_experiments.sh promote
 \end{verbatim}
 
-Auditor xếp hạng theo thứ tự: số optimum, PAR-2, rồi mức tăng mô hình. Ba cấu
+Auditor xếp hạng theo thứ tự: số optimum, số ca chưa tối ưu có cận tốt
+hơn nguồn đối chiếu, gap trên các ca còn lại, rồi PAR-2. Ba cấu
 hình đầu chạy lại trên tập phát triển với giới hạn 120 giây.
 
 Giai đoạn này có $3\times24\times3=216$ lời gọi solver, tương ứng tối đa khoảng
@@ -763,15 +831,16 @@ AGLR chỉ đạt yêu cầu khi đồng thời có:
 \begin{itemize}
 \item không có lịch sai, sai chi phí, panic, tiến trình crash hoặc file thiếu;
 \item coverage từng objective không thấp hơn $(72,68,60)$ của camera-ready;
-\item tổng coverage ít nhất 201, so với 200 của hội nghị; PAR-2 dùng khi
-      các cấu hình có cùng coverage;
+\item tổng coverage ít nhất 201, so với 200 của hội nghị; nếu bằng nhau,
+      xét tiến bộ về cận trước khi dùng PAR-2;
 \item đủ bốn baseline: MaxSAT-DDD tạp chí trước, CSOnet, Big-M Gurobi và
       Big-M CPLEX.
 \end{itemize}
 
 Trường \code{gate.coverage\_passed} chỉ cho biết đã vượt coverage hội nghị.
 Trường \file{gate.baseline_comparison_passed} yêu cầu so sánh đủ bốn baseline:
-ưu tiên tổng số instance chứng minh tối ưu, rồi PAR-2 nếu tổng bằng nhau.
+ưu tiên tổng số instance chứng minh tối ưu, rồi cận trên các ca còn lại,
+sau đó mới PAR-2 nếu chất lượng cận cũng bằng nhau.
 Ví dụ, 201 optimum vượt hội nghị nhưng vẫn thua baseline có 206 optimum.
 Trường \code{gate.passed} chỉ đạt khi cả hai bước đều đạt và không có lỗi
 audit. Có thể xác nhận ba lần sau khi vượt coverage, nhưng chỉ chốt kết luận
@@ -843,7 +912,7 @@ RUN_ID=core-promote-v1 timeout -k 30 21600 \
 
 Lệnh đầu dùng 24 instance phát triển ở 30 giây để sàng lọc. Lệnh sau dùng
 cùng tập đó ở 120 giây để kiểm tra hai cách mới. Đọc
-\file{aglr_summary.csv}: ưu tiên coverage rồi PAR-2. Các trường
+\file{aglr_summary.csv}: ưu tiên coverage, rồi cận, sau đó mới PAR-2. Các trường
 \code{maxsat\_sat\_calls} và \code{maxsat\_partial\_sat\_calls} giúp biết
 số lời gọi SAT có giảm hay không. Chỉ khóa một cấu hình để chạy đủ 72
 instance sau khi xem kết quả; không ghép các nghiệm tốt nhất từ nhiều cấu
@@ -1919,8 +1988,44 @@ Kết quả đầu tiên của V40: \code{cont/origA8} tự đạt
 $\mathrm{cost}=L=U=23143$ trong 176,52 giây sau 14 truy vấn, không nhận
 đáp án Big-M. Đây là một ca V17 chưa giải được ở 300 giây. Tuy nhiên,
 \code{stationA1} vẫn timeout: cận dưới/trên ghi được là $12729/13197$.
-Kết quả cho thấy hướng tìm ngưỡng có tác dụng ở một ca, chưa chứng minh
-cả phương pháp tốt hơn trên toàn bộ dataset. Vẫn phải xác nhận và hồi quy.
+Kết quả toàn bộ đã có: xác nhận \code{origA8} thành công 3/3 lần, nhưng
+hồi quy mất \code{infsteps180/stationA8}. Coverage V40 là $(72,67,64)$,
+tổng 203, chưa tăng so với V17. Với ca chưa giải \code{infsteps180/trackA12},
+V40 trả lịch hợp lệ chi phí 118, cải thiện cận trên 125 trong nguồn cũ đã
+nhập. Đọc cả hai cận và nguồn đối chiếu như hướng dẫn ở đầu tài liệu.
+
+\section{V41: thử chứng minh rằng lịch đang có không thể cải thiện}
+
+V40 chia đôi khoảng cận ở mọi bước. Trên \code{cont/stationA2}, sau khoảng
+55 giây đã có $L=8949$, $U=9245$. Hai truy vấn nâng cận sau đó dùng thêm
+khoảng 175 giây. Đây là lý do thử một cách chọn ngưỡng khác, chưa phải
+kết luận rằng cách mới sẽ tốt hơn.
+
+V41 chỉ đổi cách chọn ngưỡng. Khi khoảng cách hai cận không quá 5\% cận
+trên, hỏi thẳng xem có lịch rẻ hơn lịch đang giữ không:
+\[
+T=\begin{cases}
+U-1, & 100(U-L)\le 5\max\{1,U\},\\
+L+\left\lfloor (U-L-1)/2\right\rfloor, & \text{các trường hợp còn lại}.
+\end{cases}
+\]
+Nếu tìm được lịch, kiểm tra lại rồi hạ $U$ xuống chi phí lịch đó. Nếu
+chứng minh không có lịch ở $U-1$, ta có ngay $L=U$ và kết thúc. Nếu hết
+thời gian, vẫn giữ nguyên hai cận. Toàn bộ truy vấn dùng chung ngân sách
+300 giây của instance; không cấp thêm thời gian cho phép thử mới.
+
+Cờ \code{--threshold-policy close-upper} bật cách này; mặc định
+\code{bisect} giữ cách chọn của V40. Cả hai cách đều không nhận đáp án
+hoặc lịch Big-M. V41 dùng MiniSAT, cùng bước thêm xung đột và biểu diễn
+chi phí. Lượt chạy gồm 13 ca khó của V17 và ca
+\code{infsteps180/stationA8} mà V40 đã mất. Khi có ca mới, xác nhận ba
+lần rồi mới kiểm tra các ca còn lại. Những ca đã đo trong cùng lượt
+không bị chạy lại khi ghép bảng full.
+
+Báo cáo V41 phải đối chiếu cả V40. Do đó, UB $118$ của V40 đã trở thành
+một cận đã biết; tìm lại $118$ không được tính là cận tốt nhất mới. Giữ
+riêng nhật ký, source, binary và file kết quả của từng lượt. Sinh viên
+xem trạng thái service và lệnh kiểm toán trong runbook.
 
 \section{Nội dung được phép đưa vào bài báo}
 

@@ -1,5 +1,66 @@
 # Tiến độ thử nghiệm trên VM, cập nhật 09-11-2026
 
+## Quyết định hiện tại và kết quả V40 đầy đủ
+
+Thứ tự lựa chọn mới là **số instance chứng minh tối ưu → cận tốt hơn trên
+các instance chưa giải → thời gian**. So với nguồn đối chiếu đã khóa, ghi
+riêng số ca có LB tăng, UB giảm, mức thay đổi và các cận bị kém đi. Khi số
+ca có cận mới bằng nhau, dùng gap `(UB−LB)/max(1,UB)` trước PAR-2. Thiếu
+cận hoặc lịch chưa kiểm tra thì chưa được kết luận thắng nhờ runtime.
+
+V40 đã hoàn tất trên VM, bao gồm 13 ca khó, ba lần xác nhận `origA8` và
+203 ca hồi quy. Đã tải dữ liệu về để kiểm tra lại từng lịch và phát lại
+toàn bộ tiến trình cận; không phát hiện lỗi trong kết quả SAT.
+
+| Objective | V17, 300 s | V40, 300 s | Thay đổi |
+|---|---:|---:|---:|
+| `finsteps123` | 72 | 72 | 0 |
+| `infsteps180` | 68 | 67 | −1 |
+| `cont` | 63 | 64 | +1 |
+| Tổng | 203 | 203 | 0 |
+
+`cont/origA8` là ca mới, cost=LB=UB=23143. Ba lần xác nhận đều thành công
+(177,180; 175,713; 176,949 giây). Ca bị mất là `infsteps180/stationA8`,
+timeout với khoảng cận riêng `[161,163]`. Vì vậy không báo tăng coverage
+và không ghép 203 kết quả V17 với riêng ca mới để gọi là một phương pháp.
+
+**Tiến bộ về cận:** `infsteps180/trackA12` có lịch V40 hợp lệ chi phí 118,
+so với UB 125 tốt nhất trong các nguồn cũ đã nhập, gồm cả CPLEX/Gurobi.
+LB riêng của V40 là 92, thấp hơn LB 106 đã biết. Báo `[92,118]` so với
+`[106,125]`: UB giảm 7 nhưng LB kém 14, chưa phải cải thiện cả khoảng.
+Không gán LB 106 cho V40. Các tham chiếu gồm cutoff 120, 300 và 600 giây;
+đây là đối chiếu với điều đã biết, không phải bảng thắng SOTA cùng timeout.
+`cont/stationA2` có nghiệm 9193 nhưng MILP đã biết optimum 9193, nên không
+được đếm là cận tốt nhất mới. Cả lượt có một ca cải thiện cận so với mọi
+nguồn đã nhập và bốn ca cải thiện ít nhất một cận so với các nguồn SAT.
+
+Đối chiếu toàn bộ nguồn còn phát hiện baseline CPLEX báo optimum 35 cho
+`finsteps123/trackA8`, trái với lịch hợp lệ chi phí 34 của V17/V40. Auditor
+giữ LB gốc trong trường `excluded_lower_bound`, đánh dấu mâu thuẫn và loại
+LB 35 khỏi nguồn cận đối chiếu; UB 35 vẫn là một lịch hợp lệ. Việc này
+không tự sửa bảng coverage CPLEX cũ. Cần kiểm tra lại ca này trước submission.
+Archive V15 không có biên nhận hash nội bộ được ghi riêng là nguồn chưa
+nhập, thay vì âm thầm bỏ qua. Không sửa số liệu trong bản thảo COR.
+
+Mã đánh giá mới đã qua 164 kiểm thử Python. Bảng full chỉ được tạo sau
+khi đủ 216 cặp khác nhau, cùng source/binary/giới hạn và đủ xác nhận.
+Chi tiết và lệnh chạy nằm trong runbook; dữ liệu ở
+`results/sat_research/v40_sat_bound_search_20261109/`.
+
+## V41: chỉ đổi ngưỡng khi hai cận đã gần nhau
+
+Đã cài `--threshold-policy close-upper`: nếu gap không quá 5%, hỏi SAT
+ở `UB−1`; còn lại giữ chia đôi. SAT có thể tìm một lịch rẻ hơn, hoặc
+UNSAT chứng minh ngay lịch đang giữ là tối ưu. Không thay biểu diễn,
+backend MiniSAT hoặc tổng timeout 300 giây. Mặc định vẫn là `bisect`.
+
+Lượt mới dùng worktree và binary riêng, preflight native trước khi chạy
+13 ca khó V17 cùng `infsteps180/stationA8` bị mất ở V40. Kết quả V40 được
+nhập vào nguồn cận tham chiếu; UB 118 từ nay là điều đã biết. Có ca mới
+thì tự xác nhận ba lần và hồi quy các ca còn lại trong vòng tối đa sáu
+giờ. Chưa có kết quả để kết luận V41 tốt hơn; xem service và manifest
+thực tế theo runbook.
+
 ## V39 hoàn tất; V40 tự chọn ngưỡng chi phí
 
 Đã tải đủ và kiểm toán độc lập 16/16 phép thử V39. Không có lịch sai,
@@ -28,15 +89,15 @@ mệnh đề giữa các truy vấn.
 VM đã qua 5 kiểm thử tìm cận/vét cạn, 5 kiểm thử biểu diễn chi phí,
 144 kiểm thử Python, 3 smoke cho ba objective và một probe timeout.
 Các smoke chứng minh các chi phí 11, 34 và 5526 đúng như V17.
-Service `maxsat-sat-bound-search-v40.service` đang thử đúng 13 ca V17
+Service `maxsat-sat-bound-search-v40.service` đã thử đúng 13 ca V17
 chưa giải, mỗi ca có **300 giây cho toàn bộ quá trình**, không phải cho
 mỗi ngưỡng. Nếu có ca mới, tự chạy xác nhận ba lần và kiểm tra hồi quy
-các ca V17 đã giải trong giới hạn sáu giờ. Chưa có kết quả coverage V40.
+các ca V17 đã giải trong giới hạn sáu giờ. Kết quả hoàn tất được ghi ở đầu file.
 
 **Ca tự chứng minh mới đầu tiên:** `cont/origA8` đạt `cost=lb=ub=23143`
 trong 176,520 giây, 14 truy vấn và 3633 lời gọi native SAT. Solver không
 nhận optimum hay lịch Big-M. Đây là kết quả thử đầu tiên, còn chờ xác
-nhận ba lần và hồi quy; chưa cộng với 203 ca cũ để tuyên bố coverage mới.
+nhận ba lần và hồi quy tại thời điểm ghi mốc này; kết quả đầy đủ ở đầu file.
 
 ## V39: chẩn đoán bằng đáp án tối ưu Big-M
 

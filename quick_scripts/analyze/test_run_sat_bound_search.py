@@ -10,7 +10,7 @@ import run_sat_bound_search as search
 
 
 class SearchAuditTests(unittest.TestCase):
-    def fixture(self):
+    def fixture(self,policy='bisect'):
         rows=json.loads((search.ex.REPO/'results/conferences/MaxsatScDefault_cont.json').read_text())
         s=next(r['solves'][0] for r in rows if r['name']=='origA1')
         solution=s['solution'];initial=[[t+1000 for t in train] for train in solution]
@@ -21,7 +21,7 @@ class SearchAuditTests(unittest.TestCase):
         lower=search.initial_lower('origA1','cont');initial_lower=lower;initial_upper=upper;queries=[]
         optimum=s['cost']
         while lower<upper:
-            target=lower+(upper-lower-1)//2;answer='sat' if target>=optimum else 'unsat'
+            target=search.query_target(lower,upper,policy);answer='sat' if target>=optimum else 'unsat'
             q=dict(lower_before=lower,upper_before=upper,target=target,remaining_seconds=299.99-len(queries),
                 seconds=1.0,outcome=answer,cost=optimum if answer=='sat' else None,
                 solution=solution if answer=='sat' else None,native_sat_calls=1,native_sat_seconds=0.9,
@@ -32,7 +32,7 @@ class SearchAuditTests(unittest.TestCase):
             queries.append(q)
             if answer=='sat':upper=optimum
             else:lower=target+1
-        return dict(schema='sat-bound-search-v1',solver_name='SAT-Bisect-Restart',status='ok',
+        return dict(schema='sat-bound-search-v1',solver_name='SAT-Bisect-Restart' if policy=='bisect' else 'SAT-CloseUpper-Restart',status='ok',threshold_policy=policy,
             objective='cont',uses_optimum_oracle=False,maxsat_backend='minisat',
             maxsat_backend_signature='MiniSAT v2.1.0',timeout_seconds=300,total_time=len(queries)+0.2,
             lb=lower,ub=upper,cost=upper,solution=solution,initial_lb=initial_lower,
@@ -42,6 +42,22 @@ class SearchAuditTests(unittest.TestCase):
         result=self.fixture();row,trace=search.check_result(result,'origA1','cont',300,5526)
         self.assertTrue(row['proven']);self.assertEqual(row['cost'],5526)
         self.assertEqual(trace[-1]['lb'],trace[-1]['ub'])
+
+    def test_close_upper_thresholds_are_replayed_and_changed_policy_is_rejected(self):
+        self.assertEqual(search.query_target(8949,9245,'close-upper'),9244)
+        self.assertEqual(search.query_target(12,118,'close-upper'),64)
+        result=self.fixture('close-upper')
+        row,_=search.check_result(result,'origA1','cont',300,5526)
+        self.assertTrue(row['proven']);self.assertEqual(row['threshold_policy'],'close-upper')
+        result['threshold_policy']='bisect';result['solver_name']='SAT-Bisect-Restart'
+        with self.assertRaisesRegex(ValueError,'threshold'):search.check_result(result,'origA1','cont',300,5526)
+
+    def test_extra_regression_cases_do_not_duplicate_the_original_hard_set(self):
+        old=[('cont','origA8')]
+        with patch.object(search,'tasks_for',return_value=old):
+            self.assertEqual(search.hard_tasks(None,[('infsteps180','stationA8')]),[('infsteps180','stationA8')]+old)
+            for extra in ([('cont','origA8')],[('cont','bad')],[('infsteps180','stationA8')]*2):
+                with self.assertRaises(ValueError):search.hard_tasks(None,extra)
 
     def test_lower_bound_must_be_computed_from_input(self):
         result=self.fixture();result['initial_lb']=5526

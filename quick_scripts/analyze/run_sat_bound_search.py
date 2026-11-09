@@ -33,8 +33,16 @@ def validate_schedule(name,objective,solution,cost):
     if errors:raise ValueError(str(errors))
 
 
+def query_target(lower,upper,policy='bisect'):
+    if policy not in ('bisect','close-upper'):raise ValueError('unsupported threshold policy')
+    if not 0<=lower<upper:raise ValueError('query interval is already closed or invalid')
+    return upper-1 if policy=='close-upper' and 100*(upper-lower)<=5*max(1,upper) else lower+(upper-lower-1)//2
+
+
 def check_result(result,name,objective,cutoff,known_optimum=None):
-    if (result.get('schema')!='sat-bound-search-v1' or result.get('solver_name')!='SAT-Bisect-Restart'
+    policy=result.get('threshold_policy','bisect')
+    solver={'bisect':'SAT-Bisect-Restart','close-upper':'SAT-CloseUpper-Restart'}.get(policy)
+    if (solver is None or result.get('schema')!='sat-bound-search-v1' or result.get('solver_name')!=solver
             or result.get('uses_optimum_oracle') is not False or result.get('objective')!=objective):
         raise ValueError('wrong optimizer or oracle provenance')
     if result.get('maxsat_backend')!='minisat' or 'MiniSAT' not in result.get('maxsat_backend_signature',''):
@@ -52,7 +60,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     for q in queries:
         if unknown:raise ValueError('continued after UNKNOWN')
         if lower>=upper:raise ValueError('queried after the gap closed')
-        target=lower+(upper-lower-1)//2
+        target=query_target(lower,upper,policy)
         if (q.get('lower_before'),q.get('upper_before'),q.get('target'))!=(lower,upper,target):
             raise ValueError('threshold or pre-query interval changed')
         remaining=q.get('remaining_seconds');elapsed=q.get('seconds')
@@ -101,7 +109,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
         if seconds<cutoff-0.5:raise ValueError('premature timeout')
     else:raise ValueError('fatal optimizer status: '+str(status))
     return dict(objective=objective,name=name,status=status,proven=status=='ok',seconds=seconds,
-        lb=lower,ub=upper,cost=upper,queries=len(queries),sat_calls=sum(q['native_sat_calls'] for q in queries)),trace
+        lb=lower,ub=upper,cost=upper,queries=len(queries),sat_calls=sum(q['native_sat_calls'] for q in queries),threshold_policy=policy),trace
 
 
 def reference_costs(reference,diagnostic_root):
@@ -124,6 +132,13 @@ def tasks_for(reference):
     return sorted(pairs,key=lambda p:(priority.get(p,3),pairs.index(p)))
 
 
+def hard_tasks(reference,extras=()):
+    existing=tasks_for(reference);extras=[tuple(p) for p in extras]
+    if len(extras)!=len(set(extras)) or any(p in existing or p[0] not in ex.audit.OBJECTIVES or p[1] not in ex.common.EXPECTED_NAMES for p in extras):
+        raise ValueError('extra cases must be distinct supported pairs outside the original hard set')
+    return extras+existing
+
+
 def audit(root,reference,diagnostic_root=None):
     manifest=json.load(open(root/'manifest.json'))
     if manifest.get('schema')!='sat-bound-search-campaign-v1' or manifest.get('uses_optimum_oracle') is not False:
@@ -137,7 +152,7 @@ def audit(root,reference,diagnostic_root=None):
         raise ValueError('build evidence differs from the locked source/binary')
     keys=[(t['objective'],t['name'],t['repeat']) for t in manifest['tasks']]
     if len(keys)!=len(set(keys)):raise ValueError('duplicate campaign tasks')
-    if manifest.get('followup') is None and keys!=[(o,n,0) for o,n in tasks_for(reference)]:
+    if manifest.get('followup') is None and keys!=[(o,n,0) for o,n in hard_tasks(reference,manifest.get('extra_instances',()))]:
         raise ValueError('hard-set selection differs from the unresolved reference pairs')
     known=reference_costs(reference,diagnostic_root);records=[]
     for task in manifest['tasks']:
@@ -148,12 +163,14 @@ def audit(root,reference,diagnostic_root=None):
         expected=dict(binary_sha256=manifest['binary_sha256'],commit=manifest['commit'],
             objective=objective,name=name,repeat=repeat,timeout=manifest['timeout_seconds'],
             ram_kb=manifest['ram_kb'],instance_sha256=ex.focus.sha(ex.common.instance_path(name)))
+        if 'threshold_policy' in manifest:expected['threshold_policy']=manifest['threshold_policy']
         if launch!=expected:raise ValueError('launch provenance changed')
         done=json.load(open(case/'completion.json'))
         if done.get('returncode')!=0 or done.get('result_sha256')!=ex.focus.sha(result):
             raise ValueError('failed process or changed result')
         if done.get('trace_sha256')!=ex.focus.sha(case/'result.trace.jsonl'):raise ValueError('trace changed')
         row,trace=check_result(json.load(open(result)),name,objective,manifest['timeout_seconds'],known.get((objective,name)))
+        if row['threshold_policy']!=manifest.get('threshold_policy','bisect'):raise ValueError('query policy differs from campaign')
         if trace!=[json.loads(line) for line in (case/'result.trace.jsonl').read_text().splitlines()]:
             raise ValueError('progress trace does not match replayed results')
         records.append(dict(row,repeat=repeat))
@@ -168,15 +185,18 @@ def audit(root,reference,diagnostic_root=None):
         submission_passed=False,scope='selected pairs only; full coverage requires regression')
 
 
-def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat):
+def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat,policy=None):
     case.mkdir(parents=True,exist_ok=True)
     if (case/'result.json').exists():return
     if (case/'launch.json').exists():raise ValueError('interrupted case needs review; never overwrite it')
-    ex.save(case/'launch.json',dict(binary_sha256=ex.focus.sha(binary),commit=commit,objective=objective,
-        name=name,repeat=repeat,timeout=cutoff,ram_kb=ram_kb,instance_sha256=ex.focus.sha(ex.common.instance_path(name))))
+    launch=dict(binary_sha256=ex.focus.sha(binary),commit=commit,objective=objective,
+        name=name,repeat=repeat,timeout=cutoff,ram_kb=ram_kb,instance_sha256=ex.focus.sha(ex.common.instance_path(name)))
+    if policy is not None:launch['threshold_policy']=policy
+    ex.save(case/'launch.json',launch)
     def limits():resource.setrlimit(resource.RLIMIT_AS,(ram_kb*1024,ram_kb*1024))
     command=[str(binary.resolve()),'--instance',str(ex.common.instance_path(name)),
         '--objective',objective,'--timeout',str(cutoff),'--output',str(case/'result.json')]
+    if policy is not None:command+=['--threshold-policy',policy]
     with (case/'stdout.log').open('w') as out,(case/'stderr.log').open('w') as err:
         result=subprocess.run(command,cwd=ex.REPO,stdout=out,stderr=err,preexec_fn=limits,timeout=cutoff+45)
     ex.save(case/'completion.json',dict(returncode=result.returncode,
@@ -185,13 +205,14 @@ def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat):
 
 def run(args):
     source,_,_=trial.load_reference(args.reference)
-    tasks=[dict(objective=o,name=n,repeat=0) for o,n in tasks_for(args.reference)]
+    tasks=[dict(objective=o,name=n,repeat=0) for o,n in hard_tasks(args.reference,args.extra_instance)]
     if args.followup is not None:
         previous=audit(args.followup,args.reference,args.diagnostic_root)
         if not previous['complete'] or not previous['newly_solved']:raise ValueError('followup needs an audited complete gain')
         tasks=[dict(objective=r['objective'],name=r['name'],repeat=i) for r in previous['newly_solved'] for i in (1,2,3)]
         old=json.load(open(args.reference/'full_audit.json'))['case_bounds']
-        tasks += [dict(objective=r['objective'],name=r['name'],repeat=0) for r in old if r['proven']]
+        measured={(r['objective'],r['name']) for r in previous['records'] if not r['repeat']}
+        tasks += [dict(objective=r['objective'],name=r['name'],repeat=0) for r in old if r['proven'] and (r['objective'],r['name']) not in measured]
     commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ex.REPO,text=True).strip()
     if subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],cwd=ex.REPO).strip():
         raise ValueError('commit the search before running')
@@ -203,15 +224,15 @@ def run(args):
         reference_manifest_sha256=ex.focus.sha(args.reference/'manifest.json'),tasks=tasks,
         timeout_seconds=source['timeout_seconds'],ram_kb=source['ram_kb'],cpu_affinity=sorted(os.sched_getaffinity(0)),
         source_script_sha256=ex.focus.sha(Path(__file__)),followup=str(args.followup) if args.followup else None,
-        uses_optimum_oracle=False)
+        uses_optimum_oracle=False,threshold_policy=args.threshold_policy,extra_instances=args.extra_instance)
     if (root/'manifest.json').exists() and json.load(open(root/'manifest.json'))!=manifest:raise ValueError('unsafe resume')
     ex.save(root/'manifest.json',manifest);(root/'build_manifest.json').write_bytes(args.build_manifest.read_bytes())
     deadline=time.monotonic()+args.round_seconds
     for task in tasks:
         o,n,i=task['objective'],task['name'],task['repeat'];case=root/'cases'/o/n/str(i)
         if not (case/'result.json').exists() and deadline-time.monotonic()<source['timeout_seconds']+60:break
-        print(f'SAT-Bisect-Restart {o}/{n} repeat={i}',flush=True)
-        run_case(args.binary,source['timeout_seconds'],source['ram_kb'],commit,case,o,n,i)
+        print(f'SAT search ({args.threshold_policy}) {o}/{n} repeat={i}',flush=True)
+        run_case(args.binary,source['timeout_seconds'],source['ram_kb'],commit,case,o,n,i,args.threshold_policy)
         report=audit(root,args.reference,args.diagnostic_root);ex.save(root/'audit.json',report)
         if args.followup is not None and i>0 and not report['records'][-1]['proven']:
             ex.save(root/'followup_stopped.json',dict(reason='a newly solved pair did not repeat',objective=o,name=n,repeat=i))
@@ -224,6 +245,8 @@ def main():
     p.add_argument('--reference',type=Path,required=True);p.add_argument('--results',type=Path,required=True)
     p.add_argument('--diagnostic-root',type=Path);p.add_argument('--binary',type=Path)
     p.add_argument('--build-manifest',type=Path);p.add_argument('--followup',type=Path)
+    p.add_argument('--threshold-policy',choices=['bisect','close-upper'],default='bisect')
+    p.add_argument('--extra-instance',nargs=2,action='append',default=[],metavar=('OBJECTIVE','NAME'))
     p.add_argument('--round-seconds',type=int,default=18000);a=p.parse_args()
     if a.action=='audit':print(json.dumps(audit(a.results,a.reference,a.diagnostic_root),indent=2));return
     if a.binary is None or a.build_manifest is None or not 0<a.round_seconds<=21600:p.error('missing build or invalid round budget')

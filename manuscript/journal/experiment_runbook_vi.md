@@ -1,5 +1,68 @@
 # Runbook thực nghiệm AGLR
 
+## Thứ tự đánh giá từ 09-11-2026
+
+1. Số instance được chứng minh tối ưu, với lịch hợp lệ và `cost=lb=ub`.
+2. Trên các instance chưa chứng minh tối ưu: có LB cao hơn hoặc UB thấp
+   hơn cận đã biết không? Đếm số ca có cận mới trước, rồi xem gap
+   `(UB−LB)/max(1,UB)` khi số ca đó bằng nhau. Ghi cả hai cận và mọi mặt
+   kém đi; giảm một cận trên không có nghĩa là tốt hơn về cả khoảng cận.
+3. Sau đó mới xét PAR-2, median và thời gian trên các ca cùng giải được.
+
+Không xếp hạng thời gian khi còn thiếu bằng chứng cận. So sánh với SAT cũ
+và so sánh với mọi nguồn đã nhập, kể cả MILP, được tách riêng. Cận tốt từ
+lượt chạy lâu hơn có thể là thông tin đã biết, nhưng không phải bằng chứng
+thắng cùng timeout. Cận ghép từ nhiều phương pháp không được ghi thành cận
+của một solver. Các script chọn tham số V16 và lệnh backend phía dưới là
+lịch sử, vẫn giữ quy tắc cũ để tái tạo đúng các quyết định khi đó.
+
+V40 đã chạy xong: coverage thật `(72,67,64)`, tổng 203. Giải mới
+`cont/origA8`, xác nhận 3/3; mất `infsteps180/stationA8`. Không tăng tổng
+coverage so với V17. `infsteps180/trackA12` có UB 118 so với UB 125 trong
+nguồn cũ đã nhập; LB riêng là 92, thấp hơn LB 106 đã biết.
+
+### Báo cáo cận và coverage đầy đủ
+
+`compare_search_bounds.py` kiểm tra lịch, phát lại các cập nhật cận và
+khóa nguồn đối chiếu bằng SHA-256. Chạy từ một checkout đánh giá riêng;
+không sửa source, binary hoặc dữ liệu của lượt đo.
+
+```bash
+python3 quick_scripts/analyze/compare_search_bounds.py \
+  --candidate "$V40_ROOT/hard" --followup "$V40_ROOT/followup" \
+  --reference "$V17_FULL" --diagnostics "$V39_ROOT" \
+  --gurobi-json cont "$MIP_ROOT/cont.json" \
+  --gurobi-json infsteps180 "$MIP_ROOT/infsteps180.json" \
+  --reference-pool "$OUT/full_reference_pool.json" \
+  --output "$OUT/full_evaluation.json"
+```
+
+Các biến là đường dẫn tuyệt đối tới thư mục dữ liệu đã giữ trên VM.
+`--followup` chỉ dùng sau khi đủ xác nhận và hồi quy. Khi còn đang chạy,
+bỏ `--followup`, thêm `--completed-only` và dùng tên pool/output khác cho
+13 ca khó. Script chỉ đọc các ca có biên nhận hoàn tất. Không ghi đè pool
+đã khóa: muốn thêm nguồn mới thì tạo pool có tên mới.
+
+`full_evaluation.json` có bảng coverage từng objective, danh sách được/mất,
+PAR-2 và thời gian ghép cặp; mỗi dòng case có cận riêng, cận tham chiếu,
+`lb_improved`, `ub_improved` và `tradeoff`. Số liệu cận thiếu được ghi rõ,
+không điền gap=0. Các lần xác nhận được lưu riêng, không đếm lại coverage.
+`reference_bound_conflicts` ghi cận tham chiếu mâu thuẫn với một lịch đã
+kiểm tra. Hiện có CPLEX `finsteps123/trackA8`: LB 35 trái với lịch SAT 34;
+phải rà soát lại trước khi chốt bảng MILP, không sửa tay JSON nguồn.
+
+Service `maxsat-bound-priority-report.service` chạy script
+`ops/run_bound_priority_report.sh` trên checkout cố định
+`/home/tuyenkv/projects/bound-priority-eval`. Nó dùng CPU 2,3,6,7, tối đa
+1,5 GB RAM và sáu giờ, chỉ đánh giá dữ liệu, không gọi SAT/MILP. Báo cáo
+tự cập nhật trong `$V40_ROOT/evaluation/`; có `EVALUATION_COMPLETE` khi
+đã đọc hết dữ liệu. Xem lỗi riêng bằng `EVALUATION_FAILED` và journal:
+
+```bash
+systemctl status maxsat-bound-priority-report.service
+journalctl -u maxsat-bound-priority-report.service -n 30 --no-pager
+```
+
 ## Quyết định backend hiện tại
 
 CaDiCaL đã được chạy và audit trong các lượt trước, gồm V28. Các kết quả
@@ -1810,7 +1873,35 @@ python3 quick_scripts/analyze/run_sat_bound_search.py audit \
   --diagnostic-root /home/tuyenkv/projects/bound-diagnostics-v39/results/aglr/bound-diagnostics-v39-20261109
 ```
 
-Số truy vấn ít hơn chưa đủ để kết luận nhanh hơn. Đọc thời gian từng
+Số truy vấn ít hơn chưa đủ để kết luận tốt hơn. Đọc thời gian từng
 ngưỡng: truy vấn gần optimum có thể rất đắt, như V39 đã cho thấy ở
-`stationA1` và `trackA8`. Ưu tiên ca chứng minh tối ưu mới, sau đó mới
-đánh giá thời gian, khả năng lặp lại và các ca cũ bị mất.
+`stationA1` và `trackA8`. Ưu tiên ca chứng minh tối ưu mới, tiếp đến cận
+tốt hơn trên ca chưa giải, rồi thời gian. Luôn ghi khả năng lặp lại và
+các ca cũ bị mất. Kết quả V40 đầy đủ nằm ở đầu runbook này.
+
+## V41: thử ngưỡng ngay dưới lịch tốt nhất
+
+V41 chỉ đổi cách chọn ngưỡng: nếu `100*(UB−LB) <= 5*max(1,UB)`, thử
+`UB−1`; ngoài vùng này tiếp tục chia đôi như V40. Mặc định binary vẫn là
+`--threshold-policy bisect`; cách mới dùng `close-upper`. Không thay
+backend, biểu diễn chi phí hoặc thời gian chung 300 giây.
+
+Service `maxsat-sat-bound-search-v41.service` chạy trong worktree riêng
+`/home/tuyenkv/projects/sat-bound-search-v41`, RUN_ID
+`sat-bound-search-v41-20261109`, tối đa sáu giờ. Trước ca khó, bắt buộc qua
+kiểm thử Rust, Python, ba smoke cho chính sách mới và probe timeout.
+Lượt hard gồm 13 ca khó V17 và `infsteps180/stationA8` bị mất ở V40.
+Ca đo xong được tái sử dụng trong chính lượt; không đo lại ca extra đó
+khi làm hồi quy. Có ca mới thì xác nhận ba lần và chạy các ca còn lại.
+
+```bash
+systemctl status maxsat-sat-bound-search-v41.service
+journalctl -u maxsat-sat-bound-search-v41.service -n 30 --no-pager
+```
+
+Trong thư mục dữ liệu của lượt, đọc `hard-priority-evaluation.json` trước;
+chỉ có `followup-priority-evaluation.json` đầy đủ sau xác nhận/hồi quy.
+Các pool V41 nhập cả dữ liệu V40 đã kiểm tra, nên tìm lại UB 118 không
+được tính là cận tốt nhất mới. Bản chụp của chính binary đang đánh giá
+được loại khỏi nguồn tham chiếu để tránh tự so sánh với chính nó.
+Các mốc dưới đây vẫn là nghiên cứu; chưa cập nhật kết luận COR từ V41.

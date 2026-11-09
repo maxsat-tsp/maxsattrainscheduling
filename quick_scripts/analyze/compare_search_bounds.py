@@ -237,6 +237,31 @@ class Pool:
             self.result(o,n,record['solve'],tag,manifest['timeout_seconds'],
                 str(path)+'#'+str(prefix/'cases'/o/n),log.read_text() if log.exists() else '')
 
+    def search_history(self,reference,diagnostics,exclude_binary):
+        """Earlier autonomous searches are now part of the known-bound pool."""
+        for path in sorted(RESEARCH.glob('v*_sat_bound_search_*/complete_snapshot.tar.gz')):
+            with tempfile.TemporaryDirectory(prefix='previous-sat-search-') as folder:
+                root=Path(folder)
+                with tarfile.open(path) as archive:
+                    for member in archive.getmembers():
+                        dest=(root/member.name).resolve()
+                        if root.resolve() not in dest.parents or member.issym() or member.islnk():
+                            raise ValueError('unsafe previous search archive')
+                    archive.extractall(root)
+                manifest=json.loads((root/'hard/manifest.json').read_text())
+                if manifest['binary_sha256']==exclude_binary:continue
+                hard=search.audit(root/'hard',reference,diagnostics)
+                followup=search.audit(root/'followup',reference,diagnostics)
+                baseline=json.loads((reference/'full_audit.json').read_text())['case_bounds']
+                records,_=combine_full(hard,followup,baseline);self.track(path)
+                if manifest['binary_sha256']!=json.loads((root/'followup/manifest.json').read_text())['binary_sha256']:
+                    raise ValueError('historical search mixes binaries')
+                for r in records:
+                    record=self.add(r['objective'],r['name'],r['lb'],r['ub'],'SAT-search-'+manifest['commit'][:7],
+                        manifest['timeout_seconds'],str(path)+'#'+r['objective']+'/'+r['name'],
+                        'query ledger replayed; every incumbent independently checked')
+                    if record is not None:record['upper_witness_verified']=True
+
 
 def comparison_report(records,pool,expected):
     for objective,name in pool.selection:
@@ -275,7 +300,8 @@ def combine_full(hard,followup,baseline):
     if not hard['complete'] or not followup['complete']:
         raise ValueError('complete hard and regression phases are required')
     gains={(r['objective'],r['name']):r['cost'] for r in hard['newly_solved']}
-    expected={(r['objective'],r['name'],0) for r in baseline if r['proven']}
+    hard_pairs={(r['objective'],r['name']) for r in hard['records'] if not r['repeat']}
+    expected={(r['objective'],r['name'],0) for r in baseline if r['proven'] and (r['objective'],r['name']) not in hard_pairs}
     expected|={(o,n,i) for o,n in gains for i in (1,2,3)}
     actual=[(r['objective'],r['name'],r['repeat']) for r in followup['records']]
     if len(actual)!=len(set(actual)) or set(actual)!=expected:
@@ -323,13 +349,14 @@ def evaluate(args,candidate):
     followup=getattr(args,'followup',None)
     if followup is not None:
         fm=json.loads((followup/'manifest.json').read_text());hm=json.loads((candidate/'manifest.json').read_text())
-        if not fm.get('followup') or any(fm[k]!=hm[k] for k in ('commit','binary_sha256','build_manifest_sha256','dataset_sha256','timeout_seconds','ram_kb')):
+        if not fm.get('followup') or any(fm[k]!=hm[k] for k in ('commit','binary_sha256','build_manifest_sha256','dataset_sha256','timeout_seconds','ram_kb','cpu_affinity')) or fm.get('threshold_policy','bisect')!=hm.get('threshold_policy','bisect'):
             raise ValueError('full evaluation mixes methods or resource limits')
         fa=search.audit(followup,args.reference,args.diagnostics)
         baseline=json.loads((args.reference/'full_audit.json').read_text())['case_bounds']
         records,confirmations=combine_full(audited,fa,baseline);expected=len(baseline)
         full=full_comparison(records,baseline,hm['timeout_seconds'],confirmations)
-    selection=[(o,n) for o in ex.audit.OBJECTIVES for n in ex.common.EXPECTED_NAMES] if full else search.tasks_for(args.reference)
+    selection=([(o,n) for o in ex.audit.OBJECTIVES for n in ex.common.EXPECTED_NAMES] if full else
+        [(t['objective'],t['name']) for t in json.loads((candidate/'manifest.json').read_text())['tasks'] if not t['repeat']])
     pool=Pool(selection)
     if args.reference_pool is not None and args.reference_pool.exists():
         receipt=args.reference_pool.with_suffix('.sha256')
@@ -346,6 +373,7 @@ def evaluate(args,candidate):
         pool.archive(args.cplex_archive,corrected_cplex=True)
         for path in args.extended_archive:pool.archive(path)
         pool.targeted_history(args.reference)
+        pool.search_history(args.reference,args.diagnostics,json.loads((candidate/'manifest.json').read_text())['binary_sha256'])
         pool.check_reference_consistency()
         if args.reference_pool is not None:
             ex.save(args.reference_pool,dict(schema='frozen-bound-reference-pool-v2',

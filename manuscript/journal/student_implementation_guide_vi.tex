@@ -1782,7 +1782,8 @@ của lịch $x$. Thử bốn chế độ trên cùng instance, MiniSAT và time
 \item \code{oracle-ub}: cấp lịch tối ưu Big-M làm nghiệm tốt nhất ban đầu,
       tức $\mathrm{UB}=z^\star$. MaxSAT vẫn tự xây dựng cận dưới. Không
       đưa các mốc thời gian của lịch Big-M vào mô hình; không cần chạy
-      heuristic MIP vì đã có lịch tối ưu.
+      heuristic vì đã có lịch tối ưu. Heuristic ở đường chạy hiện tại
+      dùng lan truyền trên đồ thị, không gọi Gurobi.
 \item \code{at-opt}: chỉ hỏi SAT có tìm được lịch hợp lệ thỏa
       $f(x)\le z^\star$ không. Giữ bước phát hiện xung đột và bổ sung
       mốc thời gian, nhưng bỏ các vòng tối ưu bằng tập mâu thuẫn của RC2.

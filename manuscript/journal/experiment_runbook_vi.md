@@ -1609,3 +1609,8 @@ xung đột đã bị loại vì solver yêu cầu ngân sách dương. Các c�
 transitivity, MiniSAT và
 timeout 300 giây giữ nguyên như V17. Mỗi cấu hình chỉ chạy 13 ca khó; nếu
 có ca mới, cần xác nhận ba lần và hồi quy 203 ca trước khi dùng trong bài.
+
+Sau khi ba cấu hình này không tạo ca mới, service
+`maxsat-v17-core-conflicts200.service` thử riêng ngân sách
+`core_minimize_conflicts=200` trên cùng 13 ca. Đây là một thay đổi duy nhất
+so với V17; ngân sách bằng 0 không được thử vì solver từ chối cấu hình đó.

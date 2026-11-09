@@ -140,10 +140,20 @@ PY
   cat "$dir/audit_stdout.json"
 }
 
-run_variant mincore8 8 100 4
-run_variant mincore16 16 100 4
-run_variant exhaust8 4 100 8
-# A zero conflict budget is rejected by the solver; do not run it.
+case "${ONLY_VARIANT:-all}" in
+  all)
+    run_variant mincore8 8 100 4
+    run_variant mincore16 16 100 4
+    run_variant exhaust8 4 100 8
+    ;;
+  conflicts200)
+    run_variant conflicts200 4 200 4
+    ;;
+  *)
+    echo "unsupported ONLY_VARIANT=$ONLY_VARIANT" >&2
+    exit 2
+    ;;
+esac
 
 python3 - "$CAMPAIGN_DIR" <<'PY'
 import json, sys

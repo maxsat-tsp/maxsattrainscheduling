@@ -39,3 +39,9 @@ counted as a full-dataset measurement.
 for diagnosis only. It is not substituted for an audited proof or a
 returned LB/UB pair. The independent audit checks every raw case against
 the frozen manifest, original V17 reference and the selected 13-pair scope.
+
+## Completed geometric-assumption trial
+
+`geometric_complete/` contains all 13 original geometric results and the
+independently rebuilt audit. All 13 timed out validly, with no new optimum.
+Both V36 variants are now complete; neither changes the V17 coverage.

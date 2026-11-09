@@ -1603,8 +1603,9 @@ chỉ thay một tham số RC2/core trên cùng 13 ca. Vòng đó được báo 
 không gộp telemetry AGLR thích nghi với kết quả V17.
 
 Service `maxsat-v17-legacy-followup.service` thực hiện vòng này tự động sau
-khi service AGLR dừng. Bốn cấu hình là `core_minimize_checks=8`,
-`core_minimize_checks=16`, `core_exhaust_checks=8` và bỏ giới hạn xung đột
-cho core minimization. Các cờ resource-order, transitivity, MiniSAT và
+khi service AGLR dừng. Ba cấu hình hợp lệ là `core_minimize_checks=8`,
+`core_minimize_checks=16` và `core_exhaust_checks=8`. Cấu hình bỏ giới hạn
+xung đột đã bị loại vì solver yêu cầu ngân sách dương. Các cờ resource-order,
+transitivity, MiniSAT và
 timeout 300 giây giữ nguyên như V17. Mỗi cấu hình chỉ chạy 13 ca khó; nếu
 có ca mới, cần xác nhận ba lần và hồi quy 203 ca trước khi dùng trong bài.

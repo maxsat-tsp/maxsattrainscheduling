@@ -143,7 +143,7 @@ PY
 run_variant mincore8 8 100 4
 run_variant mincore16 16 100 4
 run_variant exhaust8 4 100 8
-run_variant unlimited-mincore 4 0 4
+# A zero conflict budget is rejected by the solver; do not run it.
 
 python3 - "$CAMPAIGN_DIR" <<'PY'
 import json, sys

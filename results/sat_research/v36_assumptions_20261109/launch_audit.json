@@ -1,0 +1,50 @@
+{
+  "schema": "v36-launch-audit-v1",
+  "runner_commit": "91a2f6a",
+  "solver_source_commit": "43cae7674338e0468db1c7be04c446cddb983eef",
+  "binary_sha256": "ca8fef89fb275803ec1934950f509dab2e4e1bf42321a01e7e9d2df18d9f0a88",
+  "run_id": "v17-assumptions-v36-20261109",
+  "service": "maxsat-v17-assumptions-v36.service",
+  "pinned_worktree": "/home/tuyenkv/projects/v17-assumptions-v36",
+  "smoke": [
+    {
+      "component": "assumptions-full",
+      "objective": "finsteps123",
+      "cost": 11,
+      "independently_verified": true
+    },
+    {
+      "component": "assumptions-full",
+      "objective": "infsteps180",
+      "cost": 34,
+      "independently_verified": true
+    },
+    {
+      "component": "assumptions-full",
+      "objective": "cont",
+      "cost": 5526,
+      "independently_verified": true
+    },
+    {
+      "component": "assumptions-geometric",
+      "objective": "finsteps123",
+      "cost": 11,
+      "independently_verified": true
+    },
+    {
+      "component": "assumptions-geometric",
+      "objective": "infsteps180",
+      "cost": 34,
+      "independently_verified": true
+    },
+    {
+      "component": "assumptions-geometric",
+      "objective": "cont",
+      "cost": 5526,
+      "independently_verified": true
+    }
+  ],
+  "python_tests_passed": 127,
+  "hardset_result_available": false,
+  "submission_passed": false
+}

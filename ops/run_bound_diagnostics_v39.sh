@@ -18,6 +18,7 @@ while systemctl is-active --quiet maxsat-intrinsic-am1-v38.service; do
     echo 'Waiting for V38; diagnostic measurements run sequentially.'
     sleep 30
 done
+if (( $(remaining) < 360 )); then touch "$root/INCOMPLETE"; exit 0; fi
 source /home/tuyenkv/.cargo/env
 source /home/tuyenkv/miniconda3/etc/profile.d/conda.sh
 conda activate gurobi

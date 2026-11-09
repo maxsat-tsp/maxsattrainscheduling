@@ -410,6 +410,15 @@ impl<L: satcoder::Lit + Copy + 'static> BinaryObjective<L> {
         self.remaining = next_remaining;
     }
 
+    /// A diagnostic asks about one fixed threshold. Pin the initial budget
+    /// to that value instead of making SAT search an unnecessary B <= UB.
+    /// Unspent budget remains allowed: this still encodes sum(costs) <= UB.
+    fn fix_budget(&self, solver: &mut impl SatInstance<L>) {
+        for (index, bit) in self.reg_bits.iter().enumerate() {
+            solver.add_clause([if self.upper_bound & (1usize << index) != 0 { *bit } else { !*bit }]);
+        }
+    }
+
     fn tighten(&mut self, solver: &mut impl SatInstance<L>, upper_bound: usize) -> bool {
         if upper_bound < self.upper_bound {
             assert_binary_le(solver, &build_binary_register(&self.reg_bits), &Binary::constant(upper_bound));
@@ -1422,9 +1431,11 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         ))?.0 };
         let residual_upper=upper.checked_sub(initial_cost_offset).filter(|v|*v>=0)
             .ok_or_else(||SolverError::InvalidSolution("verified upper bound is below initial cost".into()))?;
-        Some(BinaryObjective::new(&mut solver, residual_upper.try_into().map_err(|_| {
+        let objective = BinaryObjective::new(&mut solver, residual_upper.try_into().map_err(|_| {
             SolverError::InvalidSolution("negative objective upper bound".to_string())
-        })?))
+        })?);
+        if fixed_target.is_some() { objective.fix_budget(&mut solver); }
+        Some(objective)
     } else {
         None
     };
@@ -3017,6 +3028,33 @@ fn inject_solution_timepoints_maxsat<L: satcoder::Lit>(
 mod binary_objective_tests {
     use super::*;
     use satcoder::{SatResult, SatSolver};
+
+    #[test]
+    fn fixed_diagnostic_budget_matches_weighted_truth_table() {
+        for upper in [0,1,7,31] {
+            let mut solver=satcoder::solvers::minisat::Solver::new();
+            let literals=(0..3).map(|_|solver.new_var()).collect::<Vec<_>>();
+            let mut objective=BinaryObjective::new(&mut solver,upper);
+            objective.fix_budget(&mut solver);
+            for (&literal,weight) in literals.iter().zip([1,3,17]) {
+                objective.add_term(&mut solver,literal,weight);
+            }
+            for mask in 0..8 {
+                let cost=[1,3,17].iter().enumerate().filter(|(i,_)|mask&(1<<i)!=0)
+                    .map(|(_,weight)|weight).sum::<usize>();
+                match solver.solve_with_assumptions(literals.iter().enumerate()
+                    .map(|(i,lit)|if mask&(1<<i)!=0{*lit}else{!*lit})) {
+                    satcoder::SatResultWithCore::Sat(model) => {
+                        assert!(cost<=upper);
+                        let budget=objective.reg_bits.iter().enumerate()
+                            .map(|(i,bit)|usize::from(model.value(bit))<<i).sum::<usize>();
+                        assert_eq!(budget,upper);
+                    }
+                    satcoder::SatResultWithCore::Unsat(_) => assert!(cost>upper),
+                };
+            }
+        }
+    }
 
     #[test]
     fn comparator_and_subtraction_match_exhaustive_truth_tables() {

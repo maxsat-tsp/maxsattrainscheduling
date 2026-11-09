@@ -986,11 +986,48 @@ where
 
 pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     mk_env: impl Fn() -> grb::Env + Send + 'static,
+    solver: impl SatInstance<L> + SatSolverWithCore<Lit = L> + std::fmt::Debug,
+    problem: &Problem,
+    timeout: f64,
+    delay_cost_type: DelayCostType,
+    settings: MaxSatDddLadderScSettings,
+    debug_out: impl Fn(DebugInfo),
+    output_stats: impl FnMut(String, serde_json::Value),
+) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
+    solve_inner(mk_env, solver, problem, timeout, delay_cost_type, settings, None,
+        debug_out, output_stats)
+}
+
+/// Separate diagnostic entry point. Oracle-assisted results must never enter
+/// coverage tables. A fixed threshold is a SAT decision, not an RC2 lower bound.
+pub enum BoundDiagnostic<'a> {
+    Control,
+    VerifiedUpper(&'a [Vec<i32>]),
+    Decision(i32),
+}
+
+pub fn solve_bound_diagnostic<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
+    mk_env: impl Fn() -> grb::Env + Send + 'static,
+    solver: impl SatInstance<L> + SatSolverWithCore<Lit = L> + std::fmt::Debug,
+    problem: &Problem,
+    timeout: f64,
+    delay_cost_type: DelayCostType,
+    settings: MaxSatDddLadderScSettings,
+    diagnostic: BoundDiagnostic<'_>,
+    output_stats: impl FnMut(String, serde_json::Value),
+) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
+    solve_inner(mk_env, solver, problem, timeout, delay_cost_type, settings,
+        Some(&diagnostic), |_| {}, output_stats)
+}
+
+fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
+    mk_env: impl Fn() -> grb::Env + Send + 'static,
     mut solver: impl SatInstance<L> + SatSolverWithCore<Lit = L> + std::fmt::Debug,
     problem: &Problem,
     timeout: f64,
     delay_cost_type: DelayCostType,
     settings: MaxSatDddLadderScSettings,
+    diagnostic: Option<&BoundDiagnostic<'_>>,
     debug_out: impl Fn(DebugInfo),
     mut output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
@@ -1007,6 +1044,34 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let start_time: Instant = Instant::now();
     let mut solver_time = std::time::Duration::ZERO;
     let mut stats = SolveStats::default();
+
+    let fixed_target = match diagnostic {
+        Some(BoundDiagnostic::Decision(target)) if *target >= 0 => Some(*target),
+        Some(BoundDiagnostic::Decision(_)) => return Err(SolverError::InvalidSolution(
+            "diagnostic threshold must be nonnegative".into())),
+        _ => None,
+    };
+    let oracle_upper = match diagnostic {
+        Some(BoundDiagnostic::VerifiedUpper(solution)) => {
+            if solution.len() != problem.trains.len() || solution.iter().zip(&problem.trains)
+                .any(|(times, train)| times.len() != train.visits.len() + 1) {
+                return Err(SolverError::InvalidSolution("diagnostic incumbent has wrong dimensions".into()));
+            }
+            let cost = problem.verify_solution(solution, delay_cost_type).ok_or_else(||
+                SolverError::InvalidSolution("diagnostic incumbent is not feasible".into()))?;
+            Some((cost, solution.to_vec()))
+        }
+        _ => None,
+    };
+    if diagnostic.is_some() {
+        if settings.order_master || settings.extract_initial_cost || settings.residual_hardening {
+            return Err(SolverError::InvalidSolution(
+                "bound diagnostics require ordinary DDD, no initial cost offset or residual hardening".into()));
+        }
+        output_stats("diagnostic_only".into(), true.into());
+        output_stats("diagnostic_target".into(), fixed_target.into());
+        output_stats("diagnostic_supplied_ub".into(), oracle_upper.as_ref().map(|x|x.0).into());
+    }
 
     assert!(
         settings.aglr.policy == RefinementPolicy::Legacy
@@ -1038,7 +1103,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     assert!(!settings.order_master_cost_levels || settings.order_master,"canonical master cost levels require order master mode");
     assert!(!settings.order_master_batch_cuts || settings.order_master,"batched objective paths require order master mode");
     assert!(!settings.order_master_seed_costs || settings.order_master,"initial order costs require order master mode");
-    let use_objective_bound = settings.use_objective_bound
+    let use_objective_bound = fixed_target.is_some() || settings.use_objective_bound
         || (settings.aglr.use_objective_bound && settings.aglr.policy != RefinementPolicy::Legacy);
 
     output_stats(
@@ -1163,7 +1228,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     // The first iteration (0) does not need a solve call; we
     // know it's SAT because there are no constraints yet.
     let mut iteration = 1;
-    let mut is_sat = !settings.order_master;
+    let mut is_sat = !settings.order_master && fixed_target.is_none();
 
     // Every feasible entry is >= its propagated earliest time. Separate that
     // unavoidable constant from all future CostTree increments, exactly once.
@@ -1309,6 +1374,12 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         }
     }
 
+    if let Some(incumbent) = oracle_upper {
+        // Supply only a verified upper bound. Never assign RC2's lower bound
+        // from an oracle, and do not inject oracle time points into the model.
+        best_heur = Some(incumbent);
+    }
+
     let heuristic_filter = std::sync::Arc::new(heuristic::HeuristicFilter::new(
         best_heur
             .as_ref()
@@ -1317,7 +1388,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     ));
 
     //UB from Gurobi
-    let heur_thread = (USE_HEURISTIC && !settings.order_master).then(|| {
+    let heur_thread = (USE_HEURISTIC && !settings.order_master
+        && !matches!(diagnostic, Some(BoundDiagnostic::VerifiedUpper(_) | BoundDiagnostic::Decision(_)))).then(|| {
         let (sol_in_tx, sol_in_rx) = std::sync::mpsc::channel();
         let (sol_out_tx, sol_out_rx) = std::sync::mpsc::channel();
         let problem = problem.clone();
@@ -1345,9 +1417,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     let mut aglr_history = CandidateHistory::default();
     let mut aglr_telemetry = AglrTelemetry::default();
     let mut binary_objective = if use_objective_bound {
-        let upper = best_heur.as_ref().ok_or_else(|| SolverError::InvalidSolution(
+        let upper = if let Some(target) = fixed_target { target } else { best_heur.as_ref().ok_or_else(|| SolverError::InvalidSolution(
             "objective bound requires a verified initial feasible schedule".to_string()
-        ))?.0;
+        ))?.0 };
         let residual_upper=upper.checked_sub(initial_cost_offset).filter(|v|*v>=0)
             .ok_or_else(||SolverError::InvalidSolution("verified upper bound is below initial cost".into()))?;
         Some(BinaryObjective::new(&mut solver, residual_upper.try_into().map_err(|_| {
@@ -1361,6 +1433,12 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
     // Main DDD loop.
     loop {
+        if diagnostic.is_some() {
+            output_stats("diagnostic_lb".into(), total_cost.into());
+            output_stats("diagnostic_ub".into(), best_heur.as_ref().map(|x|x.0).into());
+            output_stats("diagnostic_iterations".into(), iteration.into());
+            output_stats("diagnostic_checkpoint".into(), start_time.elapsed().as_secs_f64().into());
+        }
         // Check timeout at the start of each iteration.
         if start_time.elapsed().as_secs_f64() > timeout {
             let ub = best_heur.map(|(c, _)| c).unwrap_or(i32::MAX);
@@ -1832,6 +1910,18 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                     panic!()
                 };
 
+                if let Some(target) = fixed_target {
+                    let cost = problem.verify_solution(&trains, delay_cost_type)
+                        .filter(|cost| *cost <= target)
+                        .ok_or_else(|| SolverError::InvalidSolution(
+                            "fixed-bound SAT model failed full schedule/cost validation".into()))?;
+                    do_output_stats(&mut output_stats, iteration, &iteration_types, &stats,
+                        &occupations, start_time, solver_time, initial_cost_offset, cost,
+                        &aglr_telemetry, &heuristic_filter);
+                    output_stats("diagnostic_outcome".into(), "sat".into());
+                    return Ok((trains, stats));
+                }
+
                 if settings.aglr.policy != RefinementPolicy::Legacy || settings.resource_orders || use_objective_bound || settings.residual_hardening || settings.core_minimize_checks > 0 || settings.extract_initial_cost {
                     let validation_start = Instant::now();
                     let verified_cost = problem.verify_solution(&trains, delay_cost_type);
@@ -1962,7 +2052,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
         if let Some(objective) = binary_objective.as_mut() {
             let encoding_start = Instant::now();
-            if let Some((upper, _)) = best_heur.as_ref() {
+            if let Some((upper, _)) = best_heur.as_ref().filter(|_| fixed_target.is_none()) {
                 let residual_upper=upper.checked_sub(initial_cost_offset).filter(|v|*v>=0)
                     .ok_or_else(||SolverError::InvalidSolution("verified upper bound is below initial cost".into()))?;
                 if objective.tighten(&mut solver, residual_upper as usize) {
@@ -1984,7 +2074,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
         //Solve
         //Build asssumption
-        let mut n_assumps = settings.assumption_strategy.initial(soft_constraints.len());
+        let assumption_count = if fixed_target.is_some() { 0 } else { soft_constraints.len() };
+        let mut n_assumps = if fixed_target.is_some() { 0 }
+            else { settings.assumption_strategy.initial(assumption_count) };
         let mut assumptions = soft_constraints
             .iter()
             .map(|(k, (_, w, _))| (*k, *w))
@@ -1997,6 +2089,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         assumptions.sort_by(|a, b| {
             b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
         });
+        if fixed_target.is_some() { assumptions.clear(); }
 
         log::info!(
             "solving it{} with {} timepoints {} conflicts",
@@ -2025,9 +2118,9 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
 
             //Update incumbent
             match result {
-                satcoder::SatResultWithCore::Sat(_) if n_assumps < soft_constraints.len() => {
+                satcoder::SatResultWithCore::Sat(_) if n_assumps < assumption_count => {
                     stats.partial_sat_calls += 1;
-                    n_assumps = settings.assumption_strategy.next(n_assumps, soft_constraints.len());
+                    n_assumps = settings.assumption_strategy.next(n_assumps, assumption_count);
                 }
                 satcoder::SatResultWithCore::Sat(model) => {
                     if settings.order_master{
@@ -2328,6 +2421,21 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         //Core handling RC2
         if let Some(core) = core {
             let _p = hprof::enter("treat core");
+
+            if let Some(target) = fixed_target {
+                // No cost assumptions were used. UNSAT of this relaxation
+                // proves that no valid schedule can meet the fixed threshold.
+                if !core.is_empty() {
+                    return Err(SolverError::InvalidSolution(
+                        "fixed-bound decision unexpectedly returned an assumption core".into()));
+                }
+                do_output_stats(&mut output_stats, iteration, &iteration_types, &stats,
+                    &occupations, start_time, solver_time, target.saturating_add(1),
+                    best_heur.as_ref().map(|x|x.0).unwrap_or(i32::MAX),
+                    &aglr_telemetry, &heuristic_filter);
+                output_stats("diagnostic_outcome".into(), "unsat".into());
+                return Err(SolverError::NoSolution);
+            }
 
             if core.len() == 0 {
                 // SC-specific fallback: when the precedence graph is OFF but
@@ -3064,6 +3172,71 @@ mod aglr_end_to_end_tests {
         let mut env = grb::Env::new("").unwrap();
         env.set(OutputFlag, 0).unwrap();
         env
+    }
+
+    #[test]
+    fn bound_diagnostic_decisions_match_exhaustive_optima() {
+        let problem = two_train_problem();
+        for objective in [DelayCostType::Continuous, DelayCostType::FiniteSteps123,
+            DelayCostType::InfiniteSteps180] {
+            let optimum = (0..=4).flat_map(|a| (0..=4).map(move |b|(a,b)))
+                .filter_map(|(a,b)|problem.verify_solution(&[vec![a,a+2],vec![b,b+2]],objective))
+                .min().unwrap();
+            for resource_orders in [false, true] {
+                for target in 0..=optimum+1 {
+                    let mut settings = MaxSatDddLadderScSettings::default();
+                    settings.resource_orders = resource_orders;
+                    settings.order_transitivity = resource_orders;
+                    let mut output = serde_json::Map::new();
+                    let result = solve_bound_diagnostic(||panic!("decision must not start a MIP heuristic"),
+                        satcoder::solvers::minisat::Solver::new(), &problem, 5.0, objective,
+                        settings, BoundDiagnostic::Decision(target), |k,v|{output.insert(k,v);});
+                    if target < optimum {
+                        assert!(matches!(result,Err(SolverError::NoSolution)),"target={target}");
+                        assert_eq!(output["diagnostic_outcome"],"unsat");
+                    } else {
+                        let solution = result.unwrap().0;
+                        assert!(problem.verify_solution(&solution,objective).unwrap() <= target);
+                        assert_eq!(output["diagnostic_outcome"],"sat");
+                    }
+                    assert_eq!(output["maxsat_core_literals"],0);
+                    assert_eq!(output["maxsat_partial_sat_calls"],0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bound_diagnostic_upper_is_verified_and_not_assigned_to_lower_bound() {
+        let problem = two_train_problem();
+        let schedule = vec![vec![0,2],vec![2,4]];
+        let mut first_lb = None;
+        let result = solve_bound_diagnostic(||panic!("oracle UB must not start a MIP heuristic"),
+            satcoder::solvers::minisat::Solver::new(), &problem, 5.0, DelayCostType::Continuous,
+            MaxSatDddLadderScSettings::default(), BoundDiagnostic::VerifiedUpper(&schedule),
+            |key,value|{if key=="diagnostic_lb" && first_lb.is_none(){first_lb=Some(value);}}).unwrap();
+        assert_eq!(first_lb,Some(serde_json::json!(0)));
+        assert_eq!(problem.verify_solution(&result.0,DelayCostType::Continuous),Some(exhaustive_optimum(&problem)));
+        for invalid in [vec![vec![0,2]], vec![vec![0,2],vec![0,2]]] {
+            assert!(matches!(solve_bound_diagnostic(||panic!("invalid incumbent must be rejected"),
+                satcoder::solvers::minisat::Solver::new(), &problem, 5.0, DelayCostType::Continuous,
+                MaxSatDddLadderScSettings::default(), BoundDiagnostic::VerifiedUpper(&invalid),
+                |_,_|{}),Err(SolverError::InvalidSolution(_))));
+        }
+    }
+
+    #[test]
+    fn bound_diagnostic_zero_cost_and_negative_threshold() {
+        let mut problem = two_train_problem();
+        problem.trains.truncate(1);
+        let result = solve_bound_diagnostic(||panic!("SAT decision starts no heuristic"),
+            satcoder::solvers::minisat::Solver::new(), &problem, 5.0, DelayCostType::Continuous,
+            MaxSatDddLadderScSettings::default(), BoundDiagnostic::Decision(0), |_,_|{}).unwrap();
+        assert_eq!(problem.verify_solution(&result.0,DelayCostType::Continuous),Some(0));
+        assert!(matches!(solve_bound_diagnostic(||panic!("invalid threshold"),
+            satcoder::solvers::minisat::Solver::new(), &problem, 5.0, DelayCostType::Continuous,
+            MaxSatDddLadderScSettings::default(), BoundDiagnostic::Decision(-1), |_,_|{}),
+            Err(SolverError::InvalidSolution(_))));
     }
 
     fn solve_cost(problem: &Problem, policy: RefinementPolicy) -> i32 {

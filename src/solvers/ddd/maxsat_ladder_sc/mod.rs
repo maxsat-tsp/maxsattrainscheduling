@@ -34,5 +34,6 @@ pub use settings::{
     RescueProgressPolicy,
 };
 pub use solve::{
-    solve, solve_debug, solve_debug_with_settings, solve_with_settings, IterationType, SolveStats,
+    solve, solve_debug, solve_debug_with_settings, solve_with_settings, solve_bound_diagnostic,
+    BoundDiagnostic, IterationType, SolveStats,
 };

@@ -6,6 +6,37 @@ import targeted_order_cycles as cycles
 import extended_timeout_experiments as extended
 
 class CycleTrialTests(unittest.TestCase):
+    def test_v17_assumption_contrasts_keep_core_and_resource_settings(self):
+        source=dict(definition=dict(extended.METHODS['Orders-Transitive'],
+            core_minimize_checks='4', core_minimize_conflicts='100', core_exhaust_checks='4'))
+        before=copy.deepcopy(source)
+        for component, strategy in cycles.ASSUMPTION_COMPONENTS.items():
+            config=cycles.candidate_config(source, component)
+            self.assertEqual(config, dict(source['definition'], assumptions=strategy))
+            self.assertEqual(cycles.report_name(component), component.replace('-', '_')+'_audit.json')
+            self.assertEqual(cycles.schema_for(component), 'targeted-'+component+'-v1')
+            with tempfile.TemporaryDirectory() as raw:
+                root=Path(raw)
+                args=SimpleNamespace(binary=root/'ddd', timeout=300, ram_kb=6000000,
+                    method_definitions={'test':config})
+                with patch.object(extended, 'execute') as execute:
+                    extended.run_case('test', 'cont', 'origA1', args, root)
+                    env=execute.call_args.args[4]
+                    self.assertEqual(env['MAXSATDDD_ASSUMPTIONS'], strategy)
+                    self.assertEqual(env['MAXSATDDD_CORE_EXHAUST_CHECKS'], '4')
+                    self.assertEqual(env['RERUN_NON_OK'], '0')
+                solve=dict(status='timeout', total_time=300, timeout_seconds=300, process_exit_code=0)
+                solve.update({'maxsat_'+k:v for k,v in config.items() if k not in ('solver','kind')})
+                extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+                self.assertFalse(extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
+                solve['maxsat_assumptions']='legacy'
+                extended.save(root/'cont.json',[dict(name='origA1',solves=[solve])])
+                self.assertIn('maxsat_assumptions differs from the locked configuration',
+                    extended.assess_case(root,'test','cont','origA1',300,config)['errors'])
+            with self.assertRaisesRegex(ValueError, 'legacy V17'):
+                cycles.candidate_config(dict(definition=config),component)
+        self.assertEqual(source,before)
+
     def test_backend_contrast_retains_all_other_settings_and_common_core_budget(self):
         source=dict(definition=dict(extended.METHODS['Orders-Transitive'],core_minimize_checks='4',core_minimize_conflicts='100',core_exhaust_checks='4'))
         before=copy.deepcopy(source)

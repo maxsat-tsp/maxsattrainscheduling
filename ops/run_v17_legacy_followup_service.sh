@@ -5,8 +5,7 @@
 set -euo pipefail
 
 REPO="${REPO:-/home/tuyenkv/projects/maxsattrainscheduling}"
-DEFAULT_COMMIT="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || printf 'nogit')"
-RUN_ID="${RUN_ID:-v17-legacy-hardset-300-$(date -u +%Y%m%d)-$DEFAULT_COMMIT}"
+: "${RUN_ID:?Set a fixed campaign ID; do not regenerate it on restart}"
 RESULTS_ROOT="${RESULTS_ROOT:-$REPO/results/aglr}"
 CAMPAIGN_DIR="$RESULTS_ROOT/$RUN_ID"
 REFERENCE="${REFERENCE:-$REPO/results/sat_research/core_exhaustion_v17_20261107/full_216}"
@@ -132,7 +131,7 @@ PY
     MAXSATDDD_ASSUMPTIONS=legacy MAXSATDDD_BACKEND=minisat MAXSATDDD_SPARSE_COSTS=false \
     MAXSATDDD_RESOURCE_ORDERS=true MAXSATDDD_ORDER_TRANSITIVITY=true \
     MAXSATDDD_CORE_MINIMIZE_CHECKS="$checks" MAXSATDDD_CORE_MINIMIZE_CONFLICTS="$conflicts" \
-    MAXSATDDD_CORE_EXHAUST_CHECKS="$exhaust" RERUN_NON_OK=1 bash "$RUNNER"
+    MAXSATDDD_CORE_EXHAUST_CHECKS="$exhaust" RERUN_NON_OK=0 bash "$RUNNER"
     python3 "$CSV_BATCH" "$out" --format compact --overwrite >/dev/null
   done
   python3 "$AUDITOR" --variant "$dir" --reference "$REFERENCE" --timeout "$TIMEOUT" \

@@ -1614,3 +1614,36 @@ Sau khi ba cấu hình này không tạo ca mới, service
 `maxsat-v17-core-conflicts200.service` thử riêng ngân sách
 `core_minimize_conflicts=200` trên cùng 13 ca. Đây là một thay đổi duy nhất
 so với V17; ngân sách bằng 0 không được thử vì solver từ chối cấu hình đó.
+
+## V36: gửi điều kiện chi phí nhanh hơn trên V17
+
+Vòng `conflicts200` đã hoàn tất ngày 09-11-2026: 13 timeout hợp lệ,
+không có optimum mới. Raw và audit của tám lượt hard-set gần nhất ở
+`results/sat_research/hardset_followups_20261109/`. Service cũ đã tắt;
+không khởi động lại các file service lịch sử để chạy thêm.
+
+V36 dùng lại đúng binary V17 đã kiểm thử, không build lại solver. Chỉ đổi
+`assumptions=full` hoặc `assumptions=geometric` trên 13 ca chưa giải. Hai
+cách này từng được thử ở cấu hình cũ; vòng này kiểm tra chúng trên nền
+resource-order, transitivity và core V17. MiniSAT, 300 giây mỗi ca và RAM
+6.000.000 KB giữ nguyên. Không có tham số hay đáp án hội nghị đi vào solver.
+
+```bash
+systemctl status maxsat-v17-assumptions-v36.service --no-pager
+journalctl -u maxsat-v17-assumptions-v36.service -f
+```
+
+Worktree `/home/tuyenkv/projects/v17-assumptions-v36` được khóa ở commit
+triển khai; RUN_ID cố định là `v17-assumptions-v36-20261109`. Kết quả nằm ở
+`results/aglr/<RUN_ID>/`, trong worktree đó. Không pull hay sửa worktree đang
+đo. Chạy tiếp sau gián đoạn bằng cùng service, source, binary và RUN_ID.
+Timeout đã hoàn tất được giữ nguyên, không chạy lại chỉ vì chưa tối ưu.
+
+Controller dùng auditor đầy đủ `targeted_order_cycles.py`: đối chiếu raw
+216 ca của V17, hash binary, dependency, manifest của từng lần gọi và
+chi phí các lịch trả về. Sáu smoke test kiểm tra `origA1` ở ba objective
+với cả hai cách gửi trước khi mở ca khó. Nếu có ca mới thì tự xác nhận ba
+lần rồi hồi quy 203 ca. `COMPLETED` chỉ cho biết vòng đã kết thúc;
+`GAIN_REQUIRES_REVIEW` báo có ca mới cần tổng hợp; cả hai đều không đồng
+nghĩa đạt submission. `FAILED` chặn restart lặp vô hạn, giữ log để sửa lỗi;
+`INCOMPLETE` báo đã hết ngân sách sáu giờ và còn việc chưa xong.

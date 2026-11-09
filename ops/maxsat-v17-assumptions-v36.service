@@ -1,0 +1,25 @@
+[Unit]
+Description=V17 full/geometric assumption experiment on 13 unresolved pairs
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=3600
+StartLimitBurst=2
+ConditionPathExists=!/home/tuyenkv/projects/v17-assumptions-v36/results/aglr/v17-assumptions-v36-20261109/COMPLETED
+ConditionPathExists=!/home/tuyenkv/projects/v17-assumptions-v36/results/aglr/v17-assumptions-v36-20261109/FAILED
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/v17-assumptions-v36
+EnvironmentFile=/home/tuyenkv/.config/maxsat/v17-assumptions-v36.env
+ExecStart=/usr/bin/taskset -c 0,1,4,5 /bin/bash /home/tuyenkv/projects/v17-assumptions-v36/ops/run_v17_assumptions_v36.sh
+Restart=on-failure
+RestartPreventExitStatus=78
+RestartSec=30
+RuntimeMaxSec=21600
+TimeoutStopSec=30
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

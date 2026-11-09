@@ -1,4 +1,28 @@
-# Tiến độ thử nghiệm trên VM, cập nhật 07-11-2026
+# Tiến độ thử nghiệm trên VM, cập nhật 09-11-2026
+
+## Vòng hard-set 8–9 tháng 11 và bước tiếp theo
+
+Đã tải dữ liệu từ VM và kiểm toán độc lập tám lượt hợp lệ: bốn biến thể
+AGLR thích nghi, V17 với 8 hoặc 16 lần thu nhỏ core, 8 lần core exhaustion,
+và ngân sách 200 xung đột cho mỗi truy vấn phụ. Mỗi lượt có 13 ca khó ở
+300 giây, không tạo optimum mới. Mốc đã đo đủ vẫn là **V17 (72,68,63),
+203/216**. Không cộng các ca đã giải của V17 vào coverage được công bố
+cho một cấu hình khác. Dữ liệu, cấu hình lỗi đã loại và audit được lưu ở
+`results/sat_research/hardset_followups_20261109/`.
+
+Các service cũ đã được vô hiệu hóa sau khi hoàn tất. Cơ chế cũ sinh lại
+RUN_ID theo ngày/commit và bật chạy lại timeout nên đã làm lặp thừa một số
+ca; những lần đó không được tính thành bằng chứng độc lập. Vòng mới dùng
+worktree cố định, một RUN_ID giữ nguyên, tái sử dụng cả timeout hợp lệ,
+giới hạn tổng thời gian sáu giờ và dừng khi gặp lỗi kiểm toán.
+
+V36 chỉ đổi cách gửi điều kiện chi phí vào SAT trên binary V17 gốc:
+`full` gửi tất cả ngay; `geometric` tăng số điều kiện gấp đôi sau truy vấn
+SAT chưa đủ. Mỗi cách được thử trên cùng 13 ca, giữ nguyên MiniSAT,
+resource-order, transitivity và xử lý core V17. Nếu xuất hiện ca mới,
+controller xác nhận ba lần và kiểm tra lại 203 ca đã giải trong thời gian
+còn lại. Nếu chưa đủ thời gian, báo chưa hoàn tất; không tuyên bố thắng
+SOTA và chưa đưa số liệu này vào bản thảo COR.
 
 ## Quyết định backend từ ngày 07-11-2026
 

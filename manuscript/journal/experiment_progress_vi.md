@@ -37,8 +37,13 @@ nguồn đã nhập và bốn ca cải thiện ít nhất một cận so với c
 Đối chiếu toàn bộ nguồn còn phát hiện baseline CPLEX báo optimum 35 cho
 `finsteps123/trackA8`, trái với lịch hợp lệ chi phí 34 của V17/V40. Auditor
 giữ LB gốc trong trường `excluded_lower_bound`, đánh dấu mâu thuẫn và loại
-LB 35 khỏi nguồn cận đối chiếu; UB 35 vẫn là một lịch hợp lệ. Việc này
-không tự sửa bảng coverage CPLEX cũ. Cần kiểm tra lại ca này trước submission.
+LB 35 khỏi nguồn cận đối chiếu; UB 35 vẫn là một lịch hợp lệ. Chạy lại
+đúng LP với integrality/feasibility tolerance `1e-9` và numerical emphasis
+đã trả `cost=lb=ub=34`, lịch qua kiểm tra độc lập. Bộ CSV dẫn xuất trong
+`cplex_full_120_20261108/bound_recheck_20261109/` sửa riêng ca này, giữ
+nguyên các CSV nguồn. Coverage CPLEX vẫn `(72,67,66)`, tổng 205; runtime
+sửa chỉ dùng chẩn đoán và ghi rõ cách tính. Mọi lần thử, kể cả lệnh CPLEX
+đầu bị loại vì nhập sai kiểu tham số numerical, được giữ trong archive.
 Archive V15 không có biên nhận hash nội bộ được ghi riêng là nguồn chưa
 nhập, thay vì âm thầm bỏ qua. Không sửa số liệu trong bản thảo COR.
 
@@ -54,7 +59,9 @@ Chi tiết và lệnh chạy nằm trong runbook; dữ liệu ở
 UNSAT chứng minh ngay lịch đang giữ là tối ưu. Không thay biểu diễn,
 backend MiniSAT hoặc tổng timeout 300 giây. Mặc định vẫn là `bisect`.
 
-Lượt mới dùng worktree và binary riêng, preflight native trước khi chạy
+Lượt mới khóa source `76bff0c`, dùng worktree và binary riêng. VM đã qua
+7 test Rust tìm cận, 5 test chi phí, 166 test Python, ba smoke và probe
+timeout trước khi chạy
 13 ca khó V17 cùng `infsteps180/stationA8` bị mất ở V40. Kết quả V40 được
 nhập vào nguồn cận tham chiếu; UB 118 từ nay là điều đã biết. Có ca mới
 thì tự xác nhận ba lần và hồi quy các ca còn lại trong vòng tối đa sáu

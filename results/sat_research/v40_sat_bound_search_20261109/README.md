@@ -74,3 +74,8 @@ The service `maxsat-sat-bound-search-v40.service` completed successfully.
 Raw root: `/home/tuyenkv/projects/sat-bound-search-v40/results/aglr/sat-bound-search-v40-20261109/`.
 The separate read-only `maxsat-bound-priority-report.service` completed its
 reports under that root's `evaluation/`, using frozen checkout `15dd0e6`.
+
+Later addendum: the strict CPLEX rerun on the identical LP confirms optimum
+34; see `../cplex_full_120_20261108/bound_recheck_20261109/`. The frozen V40
+pool/report is preserved at its original cutoff, including the flagged old
+bound. New pools can import the verified correction.

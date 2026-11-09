@@ -21,6 +21,7 @@ import extended_timeout_experiments as ex
 import targeted_order_cycles as trial
 import diagnose_optimal_bounds as diagnostic
 import audit_targeted_core_minimization as core_history
+import rebuild_cplex_recheck as cplex_recheck
 
 RESEARCH=ex.REPO/'results/sat_research'
 ALLOWED={'Orders-Transitive','CSOnet','MaxSAT-Journal','BigM-Gurobi','BigM-CPLEX'}
@@ -83,6 +84,8 @@ class Pool:
                 if lb is not None and lb>ub:
                     conflict=dict(objective=o,name=n,source=r['source'],method=r['method'],
                         reported_lb=r['lb'],verified_feasible_ub=ub,witness_source=best['source'])
+                    fixes=[q for q in refs if q['method']=='BigM-CPLEX-Tight' and quality.lower(q['lb'])==ub and quality.upper(q['ub'])==ub]
+                    if r['method']=='BigM-CPLEX' and fixes:conflict['resolved_by_strict_rerun']=fixes[0]['source']
                     self.conflicts.append(conflict);r['excluded_lower_bound']=r['lb'];r['lb']=None
                     r['lower_bound_quarantined']=True
 
@@ -262,6 +265,14 @@ class Pool:
                         'query ledger replayed; every incumbent independently checked')
                     if record is not None:record['upper_witness_verified']=True
 
+    def cplex_rechecks(self):
+        original=RESEARCH/'cplex_full_120_20261108/raw_snapshot.tar.gz'
+        for path in sorted(RESEARCH.glob('cplex_full_120_20261108/bound_recheck_*/raw_snapshot.tar.gz')):
+            checked=cplex_recheck.audit_native(path,original);m=checked['manifest']
+            self.track(path);self.track(original)
+            self.result(m['objective'],m['name'],checked['solve'],'BigM-CPLEX-Tight',
+                m['timeout_seconds'],str(path)+'#tight_recheck')
+
 
 def comparison_report(records,pool,expected):
     for objective,name in pool.selection:
@@ -374,6 +385,7 @@ def evaluate(args,candidate):
         for path in args.extended_archive:pool.archive(path)
         pool.targeted_history(args.reference)
         pool.search_history(args.reference,args.diagnostics,json.loads((candidate/'manifest.json').read_text())['binary_sha256'])
+        pool.cplex_rechecks()
         pool.check_reference_consistency()
         if args.reference_pool is not None:
             ex.save(args.reference_pool,dict(schema='frozen-bound-reference-pool-v2',

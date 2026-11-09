@@ -1,0 +1,69 @@
+{
+  "audit_passed": true,
+  "tests": {
+    "rust-search-tests": 7,
+    "rust-objective-tests": 5,
+    "python": 166
+  },
+  "source_commit": "76bff0c5d69b6014708a456deb1f5d775e7098c7",
+  "binary_sha256": "327fdcb59ad839e2c86390b2245948240170ad5f6c60a359722e617c64df9ec6",
+  "rust_source_files_verified": 55,
+  "threshold_policy": "close-upper",
+  "campaign_tasks": 14,
+  "smokes_and_deadline_probe": [
+    {
+      "objective": "cont",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.243835233,
+      "lb": 5526,
+      "ub": 5526,
+      "cost": 5526,
+      "queries": 4,
+      "sat_calls": 711,
+      "threshold_policy": "close-upper"
+    },
+    {
+      "objective": "finsteps123",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.164849201,
+      "lb": 11,
+      "ub": 11,
+      "cost": 11,
+      "queries": 4,
+      "sat_calls": 304,
+      "threshold_policy": "close-upper"
+    },
+    {
+      "objective": "infsteps180",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.183548696,
+      "lb": 34,
+      "ub": 34,
+      "cost": 34,
+      "queries": 4,
+      "sat_calls": 508,
+      "threshold_policy": "close-upper"
+    },
+    {
+      "objective": "cont",
+      "name": "origA8",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 0.050666353,
+      "lb": 20056,
+      "ub": 37305,
+      "cost": 37305,
+      "queries": 1,
+      "sat_calls": 88,
+      "threshold_policy": "close-upper"
+    }
+  ],
+  "submission_passed": false,
+  "scope": "native preflight only; hard cases and full coverage pending"
+}

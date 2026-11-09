@@ -137,8 +137,10 @@ vào bài báo như phương pháp đã vượt SOTA.
 Khi đối chiếu toàn bộ nguồn, auditor còn phát hiện CPLEX báo optimum
 $35$ cho \code{finsteps123/trackA8}, trong khi lịch SAT hợp lệ có chi phí
 $34$. Dữ liệu gốc được giữ nguyên; cận dưới $35$ bị đánh dấu mâu thuẫn
-và không dùng làm cận đã biết. Phải giải quyết mâu thuẫn này trước khi
-chốt bảng baseline cho submission.
+và không dùng làm cận đã biết. Chạy lại đúng LP với dung sai chặt hơn đã
+trả $L=U=\mathrm{cost}=34$ và lịch hợp lệ. Dùng bộ CSV sửa trong thư mục
+\file{cplex\_full\_120\_20261108/bound\_recheck\_20261109/}; bản CSV cũ
+vẫn giữ nguyên. Coverage CPLEX không đổi, chỉ sửa đáp án của ca này.
 
 Script \file{compare\_search\_bounds.py} kiểm tra lịch, phát lại các lần
 cập nhật cận và sinh bảng so sánh từng instance. Runbook có lệnh chạy.
@@ -2021,6 +2023,10 @@ chi phí. Lượt chạy gồm 13 ca khó của V17 và ca
 \code{infsteps180/stationA8} mà V40 đã mất. Khi có ca mới, xác nhận ba
 lần rồi mới kiểm tra các ca còn lại. Những ca đã đo trong cùng lượt
 không bị chạy lại khi ghép bảng full.
+
+Bản V41 khóa tại \code{76bff0c} đã qua 7 kiểm thử Rust tìm cận, 5 kiểm
+thử biểu diễn chi phí, 166 kiểm thử Python, ba smoke và probe timeout
+trên VM. Lượt 14 ca đang tự chạy, chưa có bảng full mới.
 
 Báo cáo V41 phải đối chiếu cả V40. Do đó, UB $118$ của V40 đã trở thành
 một cận đã biết; tìm lại $118$ không được tính là cận tốt nhất mới. Giữ

@@ -48,8 +48,11 @@ PAR-2 và thời gian ghép cặp; mỗi dòng case có cận riêng, cận tham
 `lb_improved`, `ub_improved` và `tradeoff`. Số liệu cận thiếu được ghi rõ,
 không điền gap=0. Các lần xác nhận được lưu riêng, không đếm lại coverage.
 `reference_bound_conflicts` ghi cận tham chiếu mâu thuẫn với một lịch đã
-kiểm tra. Hiện có CPLEX `finsteps123/trackA8`: LB 35 trái với lịch SAT 34;
-phải rà soát lại trước khi chốt bảng MILP, không sửa tay JSON nguồn.
+kiểm tra. Hiện có CPLEX `finsteps123/trackA8`: LB 35 trái với lịch SAT 34.
+Lượt chạy lại cùng LP với dung sai chặt hơn đã chứng minh 34. Dùng CSV
+trong `results/sat_research/cplex_full_120_20261108/bound_recheck_20261109/cplex_csv/`;
+giữ nguyên JSON/CSV nguồn cũ. Pool cũ vẫn giữ cảnh báo theo đúng nguồn
+đã khóa; pool mới có thêm bằng chứng chạy lại và nguồn giải quyết mâu thuẫn.
 
 Service `maxsat-bound-priority-report.service` chạy script
 `ops/run_bound_priority_report.sh` trên checkout cố định
@@ -107,8 +110,9 @@ V34 là ablation MiniSAT random-polarity. Alias được kiểm tra signature v�
 chạy đủ 13 ca khó, nhưng không giải thêm ca nào; sinh viên chỉ dùng nó để
 tái tạo đối chứng, không dùng thay MiniSAT chuẩn trong bảng submission.
 
-Baseline CPLEX corrected đã hoàn tất 216 ca ở 120 giây. Dùng các CSV trong
-`results/sat_research/cplex_full_120_20261108/cplex_csv/`; auditor yêu cầu
+Baseline CPLEX corrected đã hoàn tất 216 ca ở 120 giây. Với lượt mới, dùng CSV
+trong `results/sat_research/cplex_full_120_20261108/bound_recheck_20261109/cplex_csv/`;
+auditor yêu cầu
 `valid=true` cho lịch và chỉ tính tối ưu khi `cost=lb=ub`. Một dòng
 `invalid_solution` và các dòng cận chưa khớp phải giữ nguyên, không sửa tay.
 Ca `infsteps180/trackA8` có tight rerun riêng trong `tight_fix/`, với

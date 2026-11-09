@@ -50,6 +50,12 @@ năng. V38 giữ trimming tắt, MiniSAT và cấu hình V17; cần kiểm thử
 smoke và probe trước khi mở 13 ca khó. Bộ điều khiển V37 được tái sử dụng
 với worktree và RUN_ID mới, giới hạn sáu giờ, không chạy lại timeout đã xong.
 
+**V38 đã mở ca khó sau khi preflight đạt:** VM chạy thành công ba kiểm thử
+AM1, hai kiểm thử tích hợp/vét cạn, 129 test Python, sáu smoke bật/tắt và
+probe timeout. Chi phí smoke ở ba objective là 11, 34 và 5526, đều khớp
+V17. Source được khóa tại `6acd6c9`, binary có hash trong manifest. Chỉ mới
+bắt đầu đo 13 ca; chưa có kết quả coverage mới và chưa sửa Results của COR.
+
 ## Quyết định backend từ ngày 07-11-2026
 
 Các lượt CaDiCaL đã hoàn tất và được giữ làm đối chứng lịch sử. Từ đây

@@ -21,6 +21,13 @@ OBJECTIVES = aglr.OBJECTIVES
 
 def load_reference(path: Path) -> tuple[dict[str, int], dict[str, list[str]]]:
     data = json.loads((path / "full_audit.json").read_text())
+    if not data.get('complete') or data.get('errors') or data.get('completed_runs') != 216:
+        raise ValueError('reference must be a complete, clean 216-pair audit')
+    pairs = [(row['objective'], row['name']) for row in data['case_bounds']]
+    wanted = {(objective, name) for objective in OBJECTIVES
+              for name in aglr.journal_audit.EXPECTED_NAMES}
+    if len(pairs) != 216 or set(pairs) != wanted:
+        raise ValueError('reference contains missing, duplicate, or unknown pairs')
     coverage = {
         row["objective"]: int(row["proven_optimal"])
         for row in data["summary"]
@@ -31,6 +38,9 @@ def load_reference(path: Path) -> tuple[dict[str, int], dict[str, list[str]]]:
             unresolved[row["objective"]].append(row["name"])
     if set(coverage) != set(OBJECTIVES):
         raise ValueError("reference does not contain all objectives")
+    if any(coverage[o] != sum(bool(row['proven']) for row in data['case_bounds']
+                             if row['objective'] == o) for o in OBJECTIVES):
+        raise ValueError('reference coverage differs from case-level results')
     if sum(map(len, unresolved.values())) != 13:
         raise ValueError(f"expected 13 unresolved V17 cases, got {unresolved}")
     return coverage, unresolved
@@ -43,6 +53,53 @@ def config_from_file(path: Path) -> dict[str, str]:
         if separator:
             values[key] = value
     return values
+
+
+def checked_timeout_record(record: dict, directory: Path, config: dict, timeout: float) -> dict:
+    """Missing telemetry needs a matching launch manifest; a mismatch never does.
+
+    An outer timeout may kill the solver before it can flush its statistics.
+    Keep every other validation error, including any *present* wrong setting.
+    """
+    result = dict(record, errors=list(record.get('errors', [])))
+    solve = record.get('solve', {})
+    if record.get('status') != 'external_timeout' or solve.get('process_exit_code') != 124:
+        return result
+    manifest_path = directory / (record['objective'] + '.logs') / 'manifest.txt'
+    try:
+        launch = config_from_file(manifest_path)
+        expected = {'solver': config['solver'], 'objective': record['objective'],
+                    'instance_timeout_seconds': str(int(timeout))}
+        for key in ('assumptions', 'backend', 'sparse_costs', 'resource_orders',
+                    'order_transitivity', 'core_minimize_checks',
+                    'core_minimize_conflicts', 'core_exhaust_checks'):
+            if key in config:
+                expected['maxsatddd_' + key] = config[key]
+        for key in ('policy', 'min_growth', 'fraction', 'max_wait', 'rescue_progress',
+                    'heuristic_period', 'heuristic_min_gap', 'use_objective_bound', 'filter_duplicates'):
+            if key in config:
+                expected['aglr_' + key] = config[key]
+        if any(launch.get(key) != value for key, value in expected.items()):
+            raise ValueError('external timeout launch settings do not match')
+        if record['name'] not in launch.get('selected_instances', '').split(','):
+            raise ValueError('external timeout instance is absent from launch manifest')
+        wall = aglr.finite_number(solve.get('process_wall_time_seconds'))
+        outer = aglr.finite_number(launch.get('external_timeout_seconds'))
+        if wall is None or outer is None or outer < timeout or wall < outer - 0.5:
+            raise ValueError('external timeout has no matching wall-time evidence')
+    except (OSError, KeyError, ValueError) as error:
+        result['errors'].append(str(error))
+        return result
+    removable = {'nonzero process exit 124'}
+    # Missing values can be explained by the matching process manifest.
+    # Values present in JSON still have to match the locked configuration.
+    for key in expected:
+        telemetry = key.replace('maxsatddd_', 'maxsat_', 1)
+        if key.startswith(('maxsatddd_', 'aglr_')) and telemetry not in solve:
+            removable.add(telemetry + ' differs from the locked configuration')
+    result['errors'] = [error for error in result['errors'] if error not in removable]
+    result['external_timeout_launch_verified'] = True
+    return result
 
 
 def write_summary(path: Path, result: dict) -> None:
@@ -79,21 +136,13 @@ def main() -> int:
     records = aglr.load_json_method(args.variant, config, args.timeout)
     by_objective: dict[str, list[dict]] = {objective: [] for objective in OBJECTIVES}
     errors: list[str] = []
+    records = [checked_timeout_record(record, args.variant, config, args.timeout) for record in records]
     for record in records:
-        # The outer /usr/bin/timeout wrapper returns 124 when a solver has
-        # not exited a few seconds after its internal deadline. This is a
-        # valid non-proven result for a targeted hard-set run, provided the
-        # solver reports an external timeout rather than a crash.
-        if (
-            record.get("status") == "external_timeout"
-            and record.get("solve", {}).get("process_exit_code") == 124
-        ):
-            record["errors"] = [
-                error
-                for error in record.get("errors", [])
-                if error != "nonzero process exit 124"
-                and "differs from the locked configuration" not in error
-            ]
+        if record['status'] in aglr.FATAL_STATUSES:
+            record['errors'].append('fatal solver status ' + record['status'])
+        if record['solve'].get('solution') is not None and record['status'] != 'ok':
+            record['errors'].extend(aglr.journal_audit.independently_verify_solution(
+                record['name'], record['objective'], record['solve']))
         by_objective[record["objective"]].append(record)
         errors.extend(
             f"{record['objective']}/{record['name']}: {message}"
@@ -101,7 +150,7 @@ def main() -> int:
         )
     for objective in OBJECTIVES:
         names = [record["name"] for record in by_objective[objective]]
-        if names != expected[objective]:
+        if sorted(names) != sorted(expected[objective]):
             errors.append(
                 f"{objective}: selected names differ; expected {expected[objective]}, got {names}"
             )
@@ -123,6 +172,9 @@ def main() -> int:
         "selected_unresolved": unresolved,
         "projected_coverage": projected,
         "projected_total": sum(projected.values()),
+        "full_coverage_validated": False,
+        "submission_passed": False,
+        "scope": "Unresolved pairs only. Projected coverage assumes no regression on the 203 untested solved pairs.",
         "newly_solved": newly_solved,
         "audit_passed": not errors,
         "errors": errors,

@@ -109,6 +109,12 @@ pub struct SolveStats {
     pub core_trim_weight_increases: usize,
     pub core_trim_inconclusive: usize,
     pub core_trim_time: Duration,
+    pub am1_calls: usize,
+    pub am1_groups: usize,
+    pub am1_literals: usize,
+    pub am1_inconclusive: usize,
+    pub am1_fixed_cost: usize,
+    pub am1_time: Duration,
     pub core_exhaust_calls: usize,
     pub core_exhaust_steps: usize,
     pub core_exhaust_inconclusive: usize,
@@ -170,6 +176,76 @@ fn bits_needed(max_value: usize) -> usize {
     } else {
         (usize::BITS as usize) - (max_value.leading_zeros() as usize)
     }
+}
+
+/// Adapt only residual Primary preferences. Totalizer preferences are left to
+/// RC2's existing bound/weight restoration path. No pair is assumed exclusive
+/// from a schedule or resource label: every added edge is proved by SAT.
+#[allow(clippy::too_many_arguments)]
+fn adapt_intrinsic_am1<L: satcoder::Lit + Copy + 'static>(
+    solver: &mut (impl SatInstance<L> + SatSolverWithCore<Lit=L>),
+    soft: &mut HashMap<Bool<L>, (Soft<L>, usize, usize)>,
+    core: &[Bool<L>],
+    settings: MaxSatDddLadderScSettings,
+    total_cost: &mut i32,
+    stats: &mut SolveStats,
+    solver_time: &mut Duration,
+    started: Instant,
+    timeout: f64,
+) -> Result<bool,SolverError> {
+    if core.len()!=2 || core.iter().any(|lit|!matches!(soft.get(lit),Some((Soft::Primary,_,_)))) {
+        return Ok(false);
+    }
+    let begin=Instant::now();
+    let mut candidates=soft.iter().filter_map(|(&lit,(kind,weight,_))|
+        (matches!(kind,Soft::Primary) && matches!(lit,Bool::Lit(_))).then_some((lit,*weight)))
+        .collect::<Vec<_>>();
+    candidates.sort_unstable_by(|a,b|b.1.cmp(&a.1).then_with(||a.0.cmp(&b.0)));
+    let clique=super::intrinsic_am1::grow([core[0],core[1]],
+        candidates.into_iter().map(|(lit,_)|lit).collect(),settings.am1_checks,
+        |left,right| {
+            let query_start=Instant::now();stats.sat_calls+=1;
+            let result=match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                crate::solvers::util::minisat_deadline::with_core_check_limit(settings.core_minimize_conflicts,|| {
+                    match solver.solve_with_assumptions([left,right]) {
+                        satcoder::SatResultWithCore::Sat(_)=>Ok(false),
+                        satcoder::SatResultWithCore::Unsat(proof)=> {
+                            if proof.is_empty() {Err("hard model is UNSAT during AM1 detection".to_string())}
+                            else {Ok(true)}
+                        },
+                    }
+                })
+            })) {
+                Ok(result)=>result,
+                Err(payload) if payload.is::<crate::solvers::util::minisat_deadline::CoreCheckInconclusive>()=>{
+                    stats.am1_inconclusive+=1;Ok(false)
+                },
+                Err(payload)=>std::panic::resume_unwind(payload),
+            };
+            *solver_time+=query_start.elapsed();result
+        },||started.elapsed().as_secs_f64()>=timeout,
+    ).map_err(SolverError::InvalidSolution)?;
+    stats.am1_calls+=clique.checks;
+    if clique.literals.len()<3 {stats.am1_time+=begin.elapsed();return Ok(false);}
+    let weights=clique.literals.iter().map(|lit|soft[lit].1).collect::<Vec<_>>();
+    let (fixed,minimum,residual)=super::intrinsic_am1::reweight(&weights)
+        .map_err(SolverError::InvalidSolution)?;
+    // Keep ordinary RC2 if a low-weight extension would charge no more
+    // than the already proved seed core. Its normal processing stays valid.
+    if fixed<=soft[&core[0]].1.min(soft[&core[1]].1) {
+        stats.am1_time+=begin.elapsed();return Ok(false);
+    }
+    let next_cost=i32::try_from(fixed).ok().and_then(|v|total_cost.checked_add(v))
+        .ok_or_else(||SolverError::InvalidSolution("AM1 lower-bound overflow".into()))?;
+    let combined=solver.or_literal(clique.literals.iter().copied());
+    for (&lit,&weight) in clique.literals.iter().zip(&residual) {
+        if weight==0 {soft.remove(&lit);} else {soft.get_mut(&lit).unwrap().1=weight;}
+    }
+    if combined!=true.into() {soft.insert(combined,(Soft::Primary,minimum,minimum));}
+    *total_cost=next_cost;
+    stats.am1_groups+=1;stats.am1_literals+=clique.literals.len();stats.am1_fixed_cost+=fixed;
+    stats.am1_time+=begin.elapsed();
+    Ok(true)
 }
 
 fn build_binary_register<L: satcoder::Lit + Copy + 'static>(reg_bits: &[Bool<L>]) -> Binary<L> {
@@ -946,8 +1022,8 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
         "AGLR fraction must be finite and between zero and one"
     );
     assert!(settings.aglr.max_wait > 0, "AGLR max_wait must be positive");
-    assert!(settings.core_trim_checks == 0 || settings.core_minimize_conflicts > 0,
-            "bounded core trimming requires a positive conflict budget");
+    assert!((settings.core_trim_checks == 0 && settings.am1_checks == 0) || settings.core_minimize_conflicts > 0,
+            "bounded core adaptation requires a positive conflict budget");
     assert!(!settings.resource_orders || settings.aglr.policy == RefinementPolicy::Legacy,
             "resource-order experiments currently require legacy refinement");
     assert!(!settings.order_transitivity || settings.resource_orders,
@@ -1008,6 +1084,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     output_stats("maxsat_core_minimize_checks".to_string(), settings.core_minimize_checks.into());
     output_stats("maxsat_core_minimize_conflicts".to_string(), settings.core_minimize_conflicts.into());
     output_stats("maxsat_core_trim_checks".to_string(), settings.core_trim_checks.into());
+    output_stats("maxsat_am1_checks".to_string(), settings.am1_checks.into());
     output_stats("maxsat_core_exhaust_checks".to_string(), settings.core_exhaust_checks.into());
 
     let mut visits: TiVec<VisitId, (usize, usize)> = TiVec::new();
@@ -2367,6 +2444,27 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
                 core = outcome.core;
             }
 
+            if settings.am1_checks>0 {
+                let applied=adapt_intrinsic_am1(&mut solver,&mut soft_constraints,&core,settings,
+                    &mut total_cost,&mut stats,&mut solver_time,start_time,timeout)?;
+                output_am1_stats(&mut output_stats,&stats);
+                if applied {
+                    *iteration_types.entry(IterationType::Objective).or_default()+=1;
+                    last_progress_iteration=iteration;
+                    if let Some((upper,solution))=&best_heur {
+                        if total_cost>*upper {return Err(SolverError::InvalidSolution("AM1 bound exceeds verified feasible cost".into()));}
+                        if total_cost==*upper {
+                            do_output_stats(&mut output_stats,iteration,&iteration_types,&stats,&occupations,
+                                start_time,solver_time,total_cost,*upper,&aglr_telemetry,&heuristic_filter);
+                            return Ok((solution.clone(),stats));
+                        }
+                    }
+                    println!("    LB={}",total_cost);
+                    iteration+=1;
+                    continue;
+                }
+            }
+
             *iteration_types.entry(IterationType::Objective).or_default() += 1;
             debug_actions.push(SolverAction::Core(core.len()));
 
@@ -2530,6 +2628,15 @@ fn output_trim_stats(output: &mut impl FnMut(String, serde_json::Value), stats: 
     output("maxsat_core_trim_time".into(), stats.core_trim_time.as_secs_f64().into());
 }
 
+fn output_am1_stats(output: &mut impl FnMut(String, serde_json::Value), stats: &SolveStats) {
+    output("maxsat_am1_calls".into(),stats.am1_calls.into());
+    output("maxsat_am1_groups".into(),stats.am1_groups.into());
+    output("maxsat_am1_literals".into(),stats.am1_literals.into());
+    output("maxsat_am1_inconclusive".into(),stats.am1_inconclusive.into());
+    output("maxsat_am1_fixed_cost".into(),stats.am1_fixed_cost.into());
+    output("maxsat_am1_time".into(),stats.am1_time.as_secs_f64().into());
+}
+
 fn do_output_stats<L: satcoder::Lit>(
     output_stats: &mut impl FnMut(String, serde_json::Value),
     iteration: usize,
@@ -2544,6 +2651,7 @@ fn do_output_stats<L: satcoder::Lit>(
     heuristic_filter: &heuristic::HeuristicFilter,
 ) {
     output_trim_stats(output_stats, stats);
+    output_am1_stats(output_stats, stats);
     output_stats("iterations".to_string(), iteration.into());
     output_stats("maxsat_sat_calls".to_string(), stats.sat_calls.into());
     output_stats("maxsat_partial_sat_calls".to_string(), stats.partial_sat_calls.into());
@@ -3444,6 +3552,63 @@ mod aglr_end_to_end_tests {
             }}
         }
         assert!(observed_checks>0,"test must exercise whole-core trimming");
+    }
+
+    #[test]
+    fn intrinsic_am1_reweighting_matches_all_sat_assignments() {
+        let mut solver=crate::solvers::util::minisat_deadline::Solver::new(30.0);
+        let a=solver.new_var();let b=solver.new_var();let c=solver.new_var();
+        for pair in [[a,b],[a,c],[b,c]] {solver.add_clause(vec![!pair[0],!pair[1]]);}
+        assert!(matches!(solver.solve_with_assumptions([a,b]),satcoder::SatResultWithCore::Unsat(_)));
+        let mut soft=HashMap::from([(a,(Soft::Primary,2,2)),(b,(Soft::Primary,3,3)),(c,(Soft::Primary,4,4))]);
+        let mut settings=MaxSatDddLadderScSettings::default();settings.am1_checks=16;
+        settings.core_minimize_conflicts=100;
+        let mut bound=0;let mut stats=SolveStats::default();let mut elapsed=Duration::ZERO;
+        assert!(adapt_intrinsic_am1(&mut solver,&mut soft,&[a,b],settings,&mut bound,
+            &mut stats,&mut elapsed,Instant::now(),30.0).unwrap());
+        assert_eq!(bound,4);assert_eq!(stats.am1_groups,1);assert_eq!(stats.am1_literals,3);
+        for mask in [0usize,1,2,4] {
+            let assumptions=[a,b,c].into_iter().enumerate().map(|(i,lit)|if mask&(1<<i)!=0{lit}else{!lit});
+            let model=match solver.solve_with_assumptions(assumptions) {
+                satcoder::SatResultWithCore::Sat(model)=>model,_=>panic!("allowed AM1 assignment was removed"),
+            };
+            let original=[2usize,3,4].into_iter().enumerate().filter(|(i,_)|mask&(1<<i)==0).map(|(_,w)|w).sum::<usize>();
+            let transformed=bound as usize+soft.iter().filter(|(lit,_)|!model.value(*lit)).map(|(_,(_,w,_))|w).sum::<usize>();
+            assert_eq!(original,transformed);
+        }
+        let mut unequal=HashMap::from([(a,(Soft::Primary,5,5)),(b,(Soft::Primary,7,7)),(c,(Soft::Primary,1,1))]);
+        let mut unchanged_bound=0;let mut unchanged_stats=SolveStats::default();
+        assert!(!adapt_intrinsic_am1(&mut solver,&mut unequal,&[a,b],settings,&mut unchanged_bound,
+            &mut unchanged_stats,&mut elapsed,Instant::now(),30.0).unwrap());
+        assert_eq!(unchanged_bound,0);assert_eq!(unequal.len(),3);
+        assert_eq!(unequal[&a].1,5);assert_eq!(unequal[&b].1,7);assert_eq!(unequal[&c].1,1);
+    }
+
+    #[test]
+    fn bounded_intrinsic_am1_matches_exhaustive_schedules() {
+        let problem=Problem {name:"intrinsic-am1-schedules".into(),
+            trains:(0..3).map(|_|Train {visits:vec![Visit {resource_id:0,earliest:0,aimed:Some(0),travel_time:2}]}).collect(),
+            conflicts:vec![(0,0)]};
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180] {
+            let mut optimum=i32::MAX;
+            for a in 0..=6 {for b in 0..=6 {for c in 0..=6 {
+                if let Some(cost)=problem.verify_solution(&vec![vec![a,a+2],vec![b,b+2],vec![c,c+2]],objective) {
+                    optimum=optimum.min(cost);
+                }
+            }}}
+            for budget in [1,100] {for checks in [0,16] {
+                let mut settings=MaxSatDddLadderScSettings::default();
+                settings.resource_orders=true;settings.order_transitivity=true;
+                settings.core_minimize_checks=4;settings.core_minimize_conflicts=budget;
+                settings.core_exhaust_checks=4;settings.am1_checks=checks;
+                let (solution,stats)=solve_with_settings(&quiet_env,
+                    crate::solvers::util::minisat_deadline::Solver::new(30.0),
+                    &problem,30.0,objective,settings,|_,_|{}).unwrap();
+                assert_eq!(problem.verify_solution(&solution,objective),Some(optimum));
+                assert!(stats.am1_calls<=checks*stats.n_unsat);
+                if checks==0 {assert_eq!(stats.am1_groups,0);assert_eq!(stats.am1_calls,0);}
+            }}
+        }
     }
 
     #[test]

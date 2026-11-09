@@ -130,6 +130,8 @@ pub struct MaxSatDddLadderScSettings {
     pub core_minimize_conflicts: usize,
     /// Bounded whole-core rechecks before deletion minimization; default off.
     pub core_trim_checks: usize,
+    /// Pair-proof budget for intrinsic AM1 adaptation; default off.
+    pub am1_checks: usize,
     /// Extra cardinality-floor checks per new core; zero preserves legacy RC2.
     pub core_exhaust_checks: usize,
     pub use_precedence_graph: bool,
@@ -169,6 +171,7 @@ impl Default for MaxSatDddLadderScSettings {
             core_minimize_checks: 0,
             core_minimize_conflicts: 0,
             core_trim_checks: 0,
+            am1_checks: 0,
             core_exhaust_checks: 0,
             use_precedence_graph: true,
             use_eager_chain_expansion: false,

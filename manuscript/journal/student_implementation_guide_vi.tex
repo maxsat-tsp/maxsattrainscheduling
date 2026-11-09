@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.23}
+\fancyhead[R]{\small Phiên bản 5.24}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.23, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.24, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -1721,6 +1721,51 @@ lại dữ liệu V36. Chỉ khi V36 không có ca mới và mọi kiểm thử 
 chạy đúng 13 ca chưa giải, mỗi ca 300 giây. Nếu có ca mới thì xác nhận
 ba lần, sau đó kiểm tra lại 203 ca cũ. Không cộng ca mới với kết quả V17
 để tuyên bố coverage của V37 khi chưa kiểm tra hồi quy.
+
+\section{V38: tính trước chi phí của một nhóm điều kiện loại trừ nhau}
+
+V36 và V37 đã chạy đủ 13 ca khó mà chưa tìm thêm optimum. V37 rút ngắn
+được nhiều tập mâu thuẫn, nhưng không làm tăng trọng số nhỏ nhất. V38 thử
+một cách khác đã có trong
+\href{https://pysathq.github.io/docs/html/api/examples/rc2.html\#pysat.examples.rc2.RC2.process_am1}{RC2/PySAT}:
+tìm nhóm điều kiện chi phí mà nhiều nhất một điều kiện có thể đúng.
+Quan hệ này thường được gọi là AM1, viết tắt của \emph{at most one}.
+
+Ví dụ, ba điều kiện $s_1,s_2,s_3$ đều có trọng số 1 và nhiều nhất một
+điều kiện có thể đúng. Khi đó luôn phải trả chi phí ít nhất 2. Solver có
+thể tính trước phần 2 này, rồi chỉ cần xét thêm chi phí 1 nếu cả ba đều sai.
+
+Với $n$ điều kiện và trọng số $w_i>0$, đặt $m=\min_i w_i$.
+Khi nhóm thật sự có tính chất AM1, ta có:
+\[
+ \sum_{i=1}^n w_i[\neg s_i]
+ =m(n-1)+m[\neg(s_1\lor\cdots\lor s_n)]
+  +\sum_{i=1}^n(w_i-m)[\neg s_i].
+\]
+Ký hiệu $[P]$ bằng 1 nếu $P$ đúng và bằng 0 nếu $P$ sai. Công thức cho
+biết phần chi phí bắt buộc, điều kiện mới cần xét và trọng số còn lại của
+từng điều kiện cũ. Nhờ đó, phép biến đổi giữ nguyên chi phí của mỗi cách
+gán được phép, kể cả khi các trọng số khác nhau.
+
+Mã bắt đầu từ một cặp điều kiện vừa được SAT chứng minh không thể cùng
+đúng. Một điều kiện mới chỉ được đưa vào nhóm sau khi SAT chứng minh nó
+không thể cùng đúng với \emph{từng} thành viên đã có. Nếu một truy vấn
+chưa kết luận được, điều kiện đó không được thêm. V38 giới hạn 16 truy
+vấn cho mỗi lần tìm nhóm, mỗi truy vấn tối đa 100 xung đột. Chỉ biến đổi
+nhóm khi phần chi phí bắt buộc lớn hơn phần mà cặp ban đầu đã chứng minh.
+
+Cờ \file{--maxsat-ladder-sc-am1-checks} mặc định bằng 0. V38 đặt bằng 16,
+giữ bước trimming V37 tắt và giữ các thành phần V17 còn lại. Phép biến
+đổi chỉ áp dụng cho các điều kiện chi phí thông thường; các điều kiện
+bộ đếm do RC2 tạo tiếp tục được xử lý bằng đường cũ. Mỗi cặp loại trừ
+đều có chứng minh SAT, không lấy đáp án từ bảng kết quả hội nghị.
+
+Service \file{maxsat-intrinsic-am1-v38.service} tái sử dụng bộ điều khiển
+V37: kiểm toán vòng trước, build, kiểm thử bảng chân trị có trọng số,
+so với lịch nhỏ vét cạn, smoke test và timeout ngắn. Mọi kiểm thử phải
+đạt trước khi chạy 13 ca khó ở 300 giây. Theo dõi số truy vấn, số nhóm
+đã dùng, phần chi phí tính trước và thời gian thêm. Chỉ kết luận có cải
+thiện sau khi có ca mới được kiểm tra độc lập, lặp lại và qua hồi quy.
 
 \section{Nội dung được phép đưa vào bài báo}
 

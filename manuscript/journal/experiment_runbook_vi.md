@@ -1677,3 +1677,33 @@ Telemetry mới: `maxsat_core_trim_calls`, `maxsat_core_trim_removed`,
 `maxsat_core_trim_weight_increases`, `maxsat_core_trim_inconclusive` và
 `maxsat_core_trim_time`. Các số này được lưu ngay sau mỗi bước rút gọn để
 giữ tiến độ khi instance dừng trong một truy vấn SAT về sau.
+
+## V38: nhóm AM1 của các điều kiện chi phí
+
+V36 đã hoàn tất cả hai cách gửi điều kiện; V37 hoàn tất trimming. Ba lượt
+đều có 13 timeout hợp lệ, không có optimum mới. Trimming giảm số điều kiện
+nhưng không tăng trọng số nhỏ nhất, nên V38 thử tính trước chi phí bắt
+buộc của nhóm điều kiện loại trừ nhau. Công thức và ví dụ nằm trong hướng
+dẫn sinh viên, phiên bản 5.24. Kỹ thuật AM1 đã có trong
+[RC2/PySAT](https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.process_am1).
+
+Cờ mới `--maxsat-ladder-sc-am1-checks` mặc định 0. V38 đặt 16: bắt đầu từ
+cặp điều kiện chi phí thường đã được chứng minh không thể cùng đúng,
+rồi kiểm tra từng quan hệ với thành viên mới. Mỗi truy vấn tối đa 100
+xung đột. SAT hoặc chưa kết luận đều không tạo quan hệ mới. Chỉ dùng nhóm
+khi phần chi phí bắt buộc lớn hơn mức đã biết từ cặp ban đầu. Bộ đếm
+RC2 không được đưa vào phép biến đổi này; trọng số dư được giữ nguyên.
+
+Giữ các thành phần V17, tắt trimming V37, dùng MiniSAT và chỉ chạy 13 ca
+khó ở 300 giây, RAM 6.000.000 KB. Service
+`maxsat-intrinsic-am1-v38.service` dùng lại controller V37 với
+`COMPONENT=intrinsic-am1`, worktree `/home/tuyenkv/projects/intrinsic-am1-v38`
+và RUN_ID `intrinsic-am1-v38-20261109`. V37 phải được kiểm toán lại trước;
+ba kiểm thử thuật toán, hai kiểm thử tích hợp/vét cạn, 129 test Python,
+sáu smoke bật/tắt tính năng và probe timeout phải đạt trước ca khó.
+Giới hạn sáu giờ và các marker dừng/tiếp tục giữ như V37.
+
+Theo dõi `maxsat_am1_calls`, `maxsat_am1_groups`, `maxsat_am1_literals`,
+`maxsat_am1_fixed_cost`, `maxsat_am1_inconclusive` và `maxsat_am1_time`.
+Số nhóm hoặc phần cận tính trước chỉ là telemetry. Chỉ tính tăng coverage
+sau khi có lịch tối ưu được kiểm tra, lặp lại ba lần và giữ được các ca cũ.

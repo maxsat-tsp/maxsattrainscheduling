@@ -24,22 +24,31 @@ controller xác nhận ba lần và kiểm tra lại 203 ca đã giải trong th
 còn lại. Nếu chưa đủ thời gian, báo chưa hoàn tất; không tuyên bố thắng
 SOTA và chưa đưa số liệu này vào bản thảo COR.
 
-**V36 đang chạy:** lượt `full` đã hoàn tất 13/13 ca, không có optimum mới;
-`geometric` tiếp tục chạy, chưa được coi là kết quả đầy đủ. Log của `full`
+**V36 đã hoàn tất:** cả `full` và `geometric` đều hoàn tất 13/13 ca,
+không có optimum mới; mọi ca đều timeout hợp lệ. Log của `full`
 cho thấy số lời gọi SAT giảm nhưng mô hình có thể lớn hơn, nên chưa suy
 ra cải thiện chỉ từ số lời gọi. Binary V17 gốc và worktree V36 không đổi.
 
-**V37 được chuẩn bị để chạy sau V36:** bổ sung tối đa ba truy vấn rút gọn
+**V37 đã hoàn tất:** bổ sung tối đa ba truy vấn rút gọn
 lại toàn bộ tập mâu thuẫn trước bước thử bỏ từng điều kiện. Chỉ dùng tập
 nhỏ hơn sau chứng minh UNSAT mới; truy vấn chưa kết luận được giữ nguyên
 tập cũ. Đây là kỹ thuật core trimming đã có trong
 [RC2/PySAT](https://pysathq.github.io/docs/html/api/examples/rc2.html#pysat.examples.rc2.RC2.trim_core),
 không coi kỹ thuật chuẩn này là đóng góp mới. Tính năng mặc định tắt.
-Kiểm thử Python và kiểm tra kiểu Rust đã đạt trên máy phát triển; kiểm thử
-thực thi Rust và sáu lịch smoke trên VM vẫn là điều kiện bắt buộc trước ca
-khó. V37 giữ MiniSAT, các thành phần V17 và thứ tự điều kiện đã cố định từ
-V30. Chỉ nếu V36 kết thúc không có ca mới, service mới bắt đầu build và
-kiểm thử V37, tránh cạnh tranh tài nguyên với phép đo đang chạy.
+VM đã qua sáu kiểm thử nhân SAT, bài lịch vét cạn, sáu smoke và probe
+timeout. Cả 13 ca khó đều timeout hợp lệ, không có optimum mới. Trimming
+loại được nhiều điều kiện dư nhưng không tăng trọng số nhỏ nhất ở bất kỳ
+lần nào; chi phí trimming dưới một giây mỗi ca. V17 vẫn là mốc SAT tốt nhất.
+
+**V38 chuyển sang thích nghi nhóm AM1:** từ một cặp điều kiện chi phí đã
+chứng minh không thể cùng đúng, tìm thêm các điều kiện loại trừ từng thành
+viên. Mỗi quan hệ cần chứng minh UNSAT mới, tối đa 16 truy vấn phụ ở 100
+xung đột. Với nhóm $n$ điều kiện, trọng số nhỏ nhất $m$, tính trước phần
+chi phí $m(n-1)$ và giữ đầy đủ phần chi phí còn lại theo đồng nhất thức.
+Đây là kỹ thuật có trong RC2, chưa phải bằng chứng về đóng góp hay hiệu
+năng. V38 giữ trimming tắt, MiniSAT và cấu hình V17; cần kiểm thử thực thi,
+smoke và probe trước khi mở 13 ca khó. Bộ điều khiển V37 được tái sử dụng
+với worktree và RUN_ID mới, giới hạn sáu giờ, không chạy lại timeout đã xong.
 
 ## Quyết định backend từ ngày 07-11-2026
 

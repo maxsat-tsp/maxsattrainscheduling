@@ -23,6 +23,7 @@ mod sc_amo;
 mod settings;
 mod hardening;
 mod core_minimize;
+mod intrinsic_am1;
 mod core_exhaust;
 #[cfg(test)]
 mod backend_tests;

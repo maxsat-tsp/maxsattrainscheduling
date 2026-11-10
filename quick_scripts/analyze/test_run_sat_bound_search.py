@@ -88,7 +88,7 @@ class SearchAuditTests(unittest.TestCase):
             queries.append(q)
             if answer=='sat':upper=optimum
             else:lower=target+1
-        return dict(schema='sat-bound-search-v1',solver_name='SAT-Bisect-Restart' if policy=='bisect' else 'SAT-CloseUpper-Restart',status='ok',threshold_policy=policy,
+        return dict(schema='sat-bound-search-v1',solver_name={'bisect':'SAT-Bisect-Restart','close-upper':'SAT-CloseUpper-Restart','upper':'SAT-Upper-Restart'}[policy],status='ok',threshold_policy=policy,
             objective='cont',uses_optimum_oracle=False,maxsat_backend='minisat',
             maxsat_backend_signature='MiniSAT v2.1.0',timeout_seconds=300,total_time=len(queries)+0.2,
             lb=lower,ub=upper,cost=upper,solution=solution,initial_lb=initial_lower,
@@ -98,6 +98,15 @@ class SearchAuditTests(unittest.TestCase):
         result=self.fixture();row,trace=search.check_result(result,'origA1','cont',300,5526)
         self.assertTrue(row['proven']);self.assertEqual(row['cost'],5526)
         self.assertEqual(trace[-1]['lb'],trace[-1]['ub'])
+
+    def test_upper_policy_proves_the_incumbent_without_bisection(self):
+        result=self.fixture('upper');row,trace=search.check_result(result,'origA1','cont',300,5526)
+        self.assertTrue(row['proven'])
+        self.assertTrue(all(q['target']==q['upper_before']-1 for q in result['queries']))
+        self.assertEqual(result['queries'][-1]['outcome'],'unsat')
+        self.assertEqual(trace[-1]['lb'],5526)
+        result['threshold_policy']='bisect';result['solver_name']='SAT-Bisect-Restart'
+        with self.assertRaisesRegex(ValueError,'threshold'):search.check_result(result,'origA1','cont',300,5526)
 
     def test_close_upper_thresholds_are_replayed_and_changed_policy_is_rejected(self):
         self.assertEqual(search.query_target(8949,9245,'close-upper'),9244)

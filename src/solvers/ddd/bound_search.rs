@@ -9,10 +9,11 @@ use std::time::Instant;
 pub enum ThresholdPolicy {
     #[serde(rename="bisect")] Bisect,
     #[serde(rename="close-upper")] CloseUpper,
+    #[serde(rename="upper")] Upper,
 }
 impl ThresholdPolicy {
     pub fn parse(value:&str)->Result<Self,String>{
-        match value {"bisect"=>Ok(Self::Bisect),"close-upper"=>Ok(Self::CloseUpper),
+        match value {"bisect"=>Ok(Self::Bisect),"close-upper"=>Ok(Self::CloseUpper),"upper"=>Ok(Self::Upper),
             _=>Err("unsupported threshold policy".into())}
     }
 }
@@ -29,6 +30,7 @@ impl SearchInterval {
     }
     pub fn target_for(&self,policy:ThresholdPolicy)->Option<i32>{
         if self.lower>=self.upper{return None;}
+        if policy==ThresholdPolicy::Upper{return Some(self.upper-1);}
         // At a relative gap of at most 5%, ask for any strict improvement
         // over the incumbent. All arithmetic remains integral and overflow-safe.
         if policy==ThresholdPolicy::CloseUpper && 100i64*i64::from(self.upper-self.lower)<=5i64*i64::from(self.upper.max(1)) {
@@ -222,7 +224,9 @@ pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,po
     }
     Ok(SearchResult{schema:"sat-bound-search-v1",solver_name:match (warmup_seconds>0.0,policy) {
         (false,ThresholdPolicy::Bisect)=>"SAT-Bisect-Restart",(false,ThresholdPolicy::CloseUpper)=>"SAT-CloseUpper-Restart",
-        (true,ThresholdPolicy::Bisect)=>"RC2-Warm-SAT-Bisect-Restart",(true,ThresholdPolicy::CloseUpper)=>"RC2-Warm-SAT-CloseUpper-Restart"},
+        (false,ThresholdPolicy::Upper)=>"SAT-Upper-Restart",
+        (true,ThresholdPolicy::Bisect)=>"RC2-Warm-SAT-Bisect-Restart",(true,ThresholdPolicy::CloseUpper)=>"RC2-Warm-SAT-CloseUpper-Restart",
+        (true,ThresholdPolicy::Upper)=>"RC2-Warm-SAT-Upper-Restart"},
         status:if interval.lower==interval.upper && elapsed<=timeout {"ok"}else{"timeout"},
         uses_optimum_oracle:false,maxsat_backend:"minisat",maxsat_backend_signature:signature,
         timeout_seconds:timeout,total_time:elapsed,lb:interval.lower,ub:interval.upper,cost,solution:incumbent,
@@ -233,6 +237,24 @@ pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,po
 mod tests {
     use super::*;
     use crate::problem::{Train,Visit};
+    #[test]
+    fn upper_policy_descends_on_sat_and_closes_the_gap_on_unsat(){
+        assert_eq!(SearchInterval::new(0,i32::MAX).unwrap().target_for(ThresholdPolicy::Upper),Some(i32::MAX-1));
+        assert_eq!(SearchInterval::new(0,0).unwrap().target_for(ThresholdPolicy::Upper),None);
+        for lower in 0..12 {for upper in lower..30 {for optimum in lower..=upper {
+            let mut s=SearchInterval::new(lower,upper).unwrap();let mut calls=0;
+            while let Some(t)=s.target_for(ThresholdPolicy::Upper){
+                let old_upper=s.upper;
+                if t<optimum{s.unsat_for(ThresholdPolicy::Upper,t).unwrap();assert_eq!(s.lower,old_upper);}
+                else{s.sat_for(ThresholdPolicy::Upper,t,t).unwrap();assert!(s.upper<old_upper);}
+                assert!(s.lower<=optimum && optimum<=s.upper);calls+=1;assert!(calls<=30);
+            }
+            assert_eq!(s.lower,optimum);
+        }}}
+        let mut s=SearchInterval::new(0,100).unwrap();
+        assert!(s.unsat_for(ThresholdPolicy::Upper,49).is_err());
+        assert!(s.sat_for(ThresholdPolicy::Upper,99,100).is_err());
+    }
     #[test]
     fn rc2_warmup_preserves_exhaustive_optima_for_every_objective(){
         for count in 1..=3 {
@@ -335,7 +357,7 @@ mod tests {
                     let schedule=[a,b,c][..count].iter().map(|&t|vec![t,t+2]).collect::<Vec<_>>();
                     if let Some(cost)=problem.verify_solution(&schedule,objective){optimum=optimum.min(cost);}
                 }}}
-                for policy in [ThresholdPolicy::Bisect,ThresholdPolicy::CloseUpper]{
+                for policy in [ThresholdPolicy::Bisect,ThresholdPolicy::CloseUpper,ThresholdPolicy::Upper]{
                 let result=solve_with_policy(&problem,objective,5.0,policy,|_,_,_|{}).unwrap();
                 assert_eq!(result.status,"ok");assert_eq!(result.cost,optimum);
                 assert_eq!(result.lb,result.ub);assert!(!result.uses_optimum_oracle);

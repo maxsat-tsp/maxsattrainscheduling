@@ -1,0 +1,21 @@
+[Unit]
+Description=Complete six missing Gurobi observations at 300 seconds after V43
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/sat-bound-search-v43
+EnvironmentFile=/home/tuyenkv/.config/maxsat/gurobi-reference-tail-v43.env
+ExecStart=/bin/bash /home/tuyenkv/projects/sat-bound-search-v43/ops/run_gurobi_reference_tail_v43.sh
+Restart=on-failure
+RestartPreventExitStatus=78
+RestartSec=30
+RuntimeMaxSec=21600
+TimeoutStopSec=30
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

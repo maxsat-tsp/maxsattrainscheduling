@@ -1,4 +1,41 @@
-# Tiến độ thử nghiệm trên VM, cập nhật 09-11-2026
+# Tiến độ thử nghiệm trên VM, cập nhật 10-11-2026
+
+## V42 hoàn tất: 205/216 và một cận trên tốt nhất mới
+
+Đã tải đủ dữ liệu V42 về, kiểm tra lại từng lịch/cost, cả hai giai đoạn
+RC2/SAT, ba lần xác nhận và đúng 216 cặp độc lập. Coverage thật là
+`(72,68,65)`, tổng **205/216**; khôi phục `infsteps180/stationA8`, không
+mất ca nào so với V41. Ba xác nhận optimum 161 đều thành công trong
+34,844; 35,281; 35,057 giây. Toàn bộ raw và bảng full đã lưu ở
+`results/sat_research/v42_sat_bound_search_20261109/`.
+
+Trên `infsteps180/trackA11`, UB mới **109** tốt hơn UB 127 tốt nhất trong
+nguồn cũ đã nhập. LB riêng của V42 chỉ 92, thấp hơn LB 101 đã biết. Báo
+`[92,109]` so với `[101,127]`, không gán cận ghép `[101,109]` cho V42.
+Còn 11 ca chưa tối ưu; một ca có cận tốt hơn mọi nguồn SAT/MILP và hai
+ca có cận tốt hơn ít nhất một mặt so với các nguồn SAT cũ.
+
+## V43: chỉ đổi cách chọn ngưỡng thành UB−1
+
+Năm truy vấn UNKNOWN cuối của V42 nằm dưới LB đã biết trong dữ liệu đối
+chiếu: `cont/trackA11`, `cont/stationA8`, `cont/stationA11`,
+`cont/stationA12`, `infsteps180/trackA11`. V43 thử luôn hỏi `UB−1` để tìm
+lịch tốt hơn. SAT có lịch thì hạ UB; UNSAT thì chứng minh ngay optimum;
+UNKNOWN không đổi cận. Giữ MiniSAT, 60 giây RC2 đầu và tổng 300 giây.
+Đây là đúng một thay đổi thuật toán, chưa có kết quả để kết luận tốt hơn.
+
+Lượt mới chọn đúng 11 ca từ archive full V42 đã kiểm tra và khóa hash;
+chỉ xác nhận/hồi quy 205 ca cũ sau khi có optimum mới. Mọi kết quả cũ
+được giữ để đối chiếu, không chuyển cận/đáp án vào binary.
+
+Đã rà soát lại Gurobi: full-120 là `(72,67,67)`, tổng 206. Các quan sát
+đã có trong 300 giây chứng minh ít nhất `(72,67,68)`, tổng **207**, nhưng
+còn sáu ca thiếu quan sát tại cutoff này. Script bổ sung chỉ chạy sáu
+ca đó sau khi V43 có marker kết thúc, dùng binary Gurobi đã có build
+evidence; runner/source binary được ghi riêng. Không chạy đo cùng lúc
+với SAT. Sau audit, tạo pool và báo cáo V43 mới để tính lại các cận đối
+chiếu; giữ nguyên pool ban đầu. Chưa có kết luận vượt SOTA hoặc cập nhật
+Abstract/Results/Conclusion COR. CPLEX vẫn cần đối chứng đủ ở cutoff 300.
 
 ## V41 đã hoàn tất: tăng lên 204/216; V42 thử cận RC2 ban đầu
 

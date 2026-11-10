@@ -1977,3 +1977,54 @@ cận đã biết vẫn lấy từ mọi nguồn đã nhập, gồm V40, V41 và
 systemctl status maxsat-bound-priority-report-v42.service
 journalctl -u maxsat-bound-priority-report-v42.service -n 20 --no-pager
 ```
+
+## V43 và phần Gurobi còn thiếu ở 300 giây
+
+V42 đã kiểm toán đủ `(72,68,65)`, 205/216, không mất ca nào so với V41.
+`stationA8/infsteps180` xác nhận 3/3. UB 109 ở `trackA11/infsteps180` là
+cận trên tốt hơn 127 trong nguồn cũ; LB riêng 92 yếu hơn LB đã biết 101.
+Bản full và bảng từng ca ở `results/sat_research/v42_sat_bound_search_20261109/`.
+
+V43 chỉ thay `--threshold-policy close-upper` bằng `upper`: luôn hỏi
+`UB−1`. Các cận còn lại, MiniSAT, RC2 60 giây và đồng hồ chung 300 giây
+được giữ. Cờ `bisect` vẫn là mặc định của binary; luôn ghi rõ cấu hình.
+Worktree `/home/tuyenkv/projects/sat-bound-search-v43`, RUN_ID cố định
+`sat-bound-search-v43-20261110`. Script chỉ chọn 11 ca V42 chưa tối ưu;
+có ca mới thì xác nhận ba lần và hồi quy 205 ca còn lại. Vòng tối đa sáu giờ.
+
+```bash
+systemctl status maxsat-sat-bound-search-v43.service
+journalctl -u maxsat-sat-bound-search-v43.service -n 25 --no-pager
+systemctl status maxsat-bound-priority-report-v43.service
+```
+
+Đọc `evaluation/priority_evaluation.json` trong lúc chạy; chỉ dùng
+`evaluation/full_evaluation.json` sau đủ xác nhận/hồi quy. Mọi cận mới
+phải so với cả V42, không đếm lại UB 109. Hướng dẫn công thức trong LaTeX
+phiên bản 5.29; chưa dùng số provisional cho kết luận COR.
+
+Inventory Gurobi đã có ít nhất 207 proof trong 300 giây; còn sáu ca thiếu:
+`infsteps180/{trackA11,trackA12,stationA8,stationA11,stationA12}` và
+`cont/stationA12`. Nguồn, hash và cách tái tạo ở
+`results/sat_research/baseline_inventory_20261110/`. Đây là inventory các
+quan sát được tái sử dụng, không phải bảng thời gian ghép cặp.
+
+`maxsat-gurobi-reference-tail-v43.service` đợi marker kết thúc của V43,
+chạy ba smoke, rồi đúng sáu ca thiếu ở 300 giây và RAM 6.000.000 KB.
+Không chạy lại các proof nhanh đã có. Binary thường của V39 được giữ,
+kiểm tra hash/build evidence và ghi source riêng với source của runner.
+Gurobi giữ 4 threads theo cấu hình cũ và được dùng toàn bộ CPU VM khi
+SAT đã dừng. Vòng này cũng tối đa sáu giờ, kể cả thời gian đợi.
+
+```bash
+systemctl status maxsat-gurobi-reference-tail-v43.service
+journalctl -u maxsat-gurobi-reference-tail-v43.service -n 20 --no-pager
+```
+
+Raw và audit ở `results/aglr/gurobi-reference300-v43-20261110/` trong
+worktree V43. Auditor kiểm tra lịch, bounds và đối chiếu với các cận/lịch
+SAT đã kiểm toán; dữ liệu tham chiếu không được gửi vào solver. Nếu đủ
+sáu ca và đủ quan sát tại cutoff, inventory mới được đánh dấu đầy đủ.
+Sau đó có `evaluation/post_gurobi_evaluation.json` của V43 với pool mới;
+pool khởi đầu không bị sửa. Nếu V43 chưa có full thì không tự tạo coverage
+full. CPLEX ở cutoff dài vẫn là một việc cần hoàn tất trước submission.

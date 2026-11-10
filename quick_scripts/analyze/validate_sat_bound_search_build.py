@@ -15,7 +15,7 @@ def validate(root,reference,policy='bisect',warmup=0):
     if subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],cwd=ex.REPO).strip():
         raise ValueError('preflight requires a clean pinned source')
     counts={}
-    checks=[('rust-search-tests',10 if warmup>0 else 6 if policy=='close-upper' else 5),('rust-objective-tests',5)]
+    checks=[('rust-search-tests',11 if policy=='upper' else 10 if warmup>0 else 6 if policy=='close-upper' else 5),('rust-objective-tests',5)]
     if warmup>0:checks.extend([('rust-rc2-tests',1),('rust-legacy-tests',1)])
     for name,minimum in checks:
         m=re.search(r'test result: ok\. (\d+) passed; 0 failed;',(root/(name+'.log')).read_text())
@@ -65,6 +65,6 @@ def validate(root,reference,policy='bisect',warmup=0):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=Path,required=True)
     p.add_argument('--reference',type=Path,required=True)
-    p.add_argument('--threshold-policy',choices=['bisect','close-upper'],default='bisect')
+    p.add_argument('--threshold-policy',choices=['bisect','close-upper','upper'],default='bisect')
     p.add_argument('--rc2-warmup-seconds',type=float,default=0)
     a=p.parse_args();validate(a.root.resolve(),a.reference.resolve(),a.threshold_policy,a.rc2_warmup_seconds)

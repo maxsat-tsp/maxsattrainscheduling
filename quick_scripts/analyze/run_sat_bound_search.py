@@ -37,9 +37,9 @@ def validate_schedule(name,objective,solution,cost):
 
 
 def query_target(lower,upper,policy='bisect'):
-    if policy not in ('bisect','close-upper'):raise ValueError('unsupported threshold policy')
+    if policy not in ('bisect','close-upper','upper'):raise ValueError('unsupported threshold policy')
     if not 0<=lower<upper:raise ValueError('query interval is already closed or invalid')
-    return upper-1 if policy=='close-upper' and 100*(upper-lower)<=5*max(1,upper) else lower+(upper-lower-1)//2
+    return upper-1 if policy=='upper' or (policy=='close-upper' and 100*(upper-lower)<=5*max(1,upper)) else lower+(upper-lower-1)//2
 
 
 def replay_warmup(result,name,objective,cutoff,lower,upper):
@@ -98,7 +98,7 @@ def replay_warmup(result,name,objective,cutoff,lower,upper):
 
 def check_result(result,name,objective,cutoff,known_optimum=None):
     policy=result.get('threshold_policy','bisect')
-    solver={'bisect':'SAT-Bisect-Restart','close-upper':'SAT-CloseUpper-Restart'}.get(policy)
+    solver={'bisect':'SAT-Bisect-Restart','close-upper':'SAT-CloseUpper-Restart','upper':'SAT-Upper-Restart'}.get(policy)
     requested=result.get('rc2_warmup_seconds',0)
     if isinstance(requested,bool) or not isinstance(requested,(int,float)) or not math.isfinite(requested) or requested<0:raise ValueError('invalid RC2 warmup allocation')
     if requested>0 and solver is not None:solver='RC2-Warm-'+solver
@@ -361,7 +361,7 @@ def main():
     p.add_argument('--reference',type=Path,required=True);p.add_argument('--results',type=Path,required=True)
     p.add_argument('--diagnostic-root',type=Path);p.add_argument('--binary',type=Path)
     p.add_argument('--build-manifest',type=Path);p.add_argument('--followup',type=Path)
-    p.add_argument('--threshold-policy',choices=['bisect','close-upper'],default='bisect')
+    p.add_argument('--threshold-policy',choices=['bisect','close-upper','upper'],default='bisect')
     p.add_argument('--extra-instance',nargs=2,action='append',default=[],metavar=('OBJECTIVE','NAME'))
     p.add_argument('--rc2-warmup-seconds',type=float,default=0)
     p.add_argument('--selection-archive',type=Path,help='audited previous full search; test only its unresolved pairs')

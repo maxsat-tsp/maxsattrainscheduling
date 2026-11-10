@@ -1,0 +1,87 @@
+{
+  "audit_passed": true,
+  "source_commit": "cc13eb47f7d78b48b6a27c6b52118405acc95d19",
+  "binary_sha256": "01ef16721d25e867c32f996b3c6b4821a9ec9f19918852a906c4b5c3f214c3ea",
+  "rust_source_hashes_verified": 56,
+  "tests": {
+    "rust-search-tests": 11,
+    "rust-objective-tests": 5,
+    "rust-rc2-tests": 1,
+    "rust-legacy-tests": 1,
+    "python": 182
+  },
+  "smokes_and_probes": [
+    {
+      "objective": "cont",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.15865921,
+      "lb": 5526,
+      "ub": 5526,
+      "cost": 5526,
+      "queries": 0,
+      "sat_calls": 505,
+      "threshold_policy": "upper",
+      "rc2_warmup_seconds": 60.0
+    },
+    {
+      "objective": "finsteps123",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.103168003,
+      "lb": 11,
+      "ub": 11,
+      "cost": 11,
+      "queries": 0,
+      "sat_calls": 87,
+      "threshold_policy": "upper",
+      "rc2_warmup_seconds": 60.0
+    },
+    {
+      "objective": "infsteps180",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.107753044,
+      "lb": 34,
+      "ub": 34,
+      "cost": 34,
+      "queries": 0,
+      "sat_calls": 161,
+      "threshold_policy": "upper",
+      "rc2_warmup_seconds": 60.0
+    },
+    {
+      "objective": "cont",
+      "name": "origA8",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 0.050279129,
+      "lb": 21202,
+      "ub": 37305,
+      "cost": 37305,
+      "queries": 0,
+      "sat_calls": 147,
+      "threshold_policy": "upper",
+      "rc2_warmup_seconds": 60.0
+    },
+    {
+      "objective": "cont",
+      "name": "origA1",
+      "status": "ok",
+      "proven": true,
+      "seconds": 0.517814615,
+      "lb": 5526,
+      "ub": 5526,
+      "cost": 5526,
+      "queries": 6,
+      "sat_calls": 1099,
+      "threshold_policy": "upper",
+      "rc2_warmup_seconds": 1e-06
+    }
+  ],
+  "submission_passed": false,
+  "scope": "native preflight plus two completed hard cases; full V43 pending"
+}

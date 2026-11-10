@@ -2098,8 +2098,9 @@ Bản cài V42 khóa tại \code{c53cd29} đã qua 17 kiểm thử Rust, 173 ki�
 thử Python, ba smoke, probe timeout và probe chuyển từ RC2 sang SAT trên
 VM. Ca đầu khôi phục \code{stationA8} với đúng optimum 161 trong
 35,20 giây. Bằng chứng từng checkpoint và lịch nằm trong
-\file{v42\_sat\_bound\_search\_20261109/}. Đây mới là một ca trong
-12 ca thử; chưa có bảng full V42.
+\file{v42\_sat\_bound\_search\_20261109/}. Lượt V42 hiện đã hoàn tất:
+đủ 216 cặp, ba lần xác nhận và hồi quy 204 ca cũ. Kết quả là
+$(72,68,65)$, tổng $205/216$, không mất ca nào so với V41.
 
 \section{V43: luôn thử một lịch rẻ hơn lịch đang giữ}
 
@@ -2122,6 +2123,13 @@ cách \code{close-upper} vẫn được giữ để tái tạo V40--V42. RC2 v�
 đa 60 giây đầu; SAT dùng phần thời gian còn lại của cùng 300 giây.
 Cả hai dùng MiniSAT. Solver tự tìm mọi cận và lịch; các cận đã biết chỉ
 dùng chọn ca và đối chiếu sau khi chạy.
+
+Bản V43 khóa tại \code{cc13eb4} đã qua 18 kiểm thử Rust, 182 kiểm thử
+Python và các kiểm tra timeout, chuyển pha trên VM. Hai ca đầu chưa
+chứng minh tối ưu: \code{stationA1/cont} có UB $12934$ và
+\code{trackA8/cont} có UB $25043$. Cả hai tốt hơn UB của V42 nhưng vẫn
+kém optimum MILP đã biết ($12884$ và $24441$). Chưa tính đây là cận tốt
+nhất mới, và chưa có bảng full V43.
 
 Lượt mới chỉ thử 11 ca V42 chưa giải. Nếu có ca tối ưu mới, xác nhận ba
 lần rồi mới hồi quy 205 ca cũ. Chưa xong hồi quy thì chưa có coverage

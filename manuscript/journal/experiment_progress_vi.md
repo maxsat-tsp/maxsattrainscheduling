@@ -22,7 +22,14 @@ chiếu: `cont/trackA11`, `cont/stationA8`, `cont/stationA11`,
 `cont/stationA12`, `infsteps180/trackA11`. V43 thử luôn hỏi `UB−1` để tìm
 lịch tốt hơn. SAT có lịch thì hạ UB; UNSAT thì chứng minh ngay optimum;
 UNKNOWN không đổi cận. Giữ MiniSAT, 60 giây RC2 đầu và tổng 300 giây.
-Đây là đúng một thay đổi thuật toán, chưa có kết quả để kết luận tốt hơn.
+Đây là đúng một thay đổi thuật toán, chưa có kết quả full để kết luận tốt hơn.
+
+V43 khóa tại `cc13eb4`, đã qua 18 kiểm thử Rust, 182 kiểm thử Python,
+ba smoke và hai probe trên VM. Đã tải về và kiểm toán hai ca đầu: đều
+timeout, với UB `stationA1/cont=12934` và `trackA8/cont=25043`. Cả hai
+tốt hơn UB SAT cũ, nhưng vẫn kém optimum MILP 12884 và 24441. Chưa có
+optimum mới hoặc cận tốt nhất mới trong bản chụp này. Mã/binary đang
+chạy được giữ nguyên; dữ liệu ở `v43_sat_bound_search_20261110/`.
 
 Lượt mới chọn đúng 11 ca từ archive full V42 đã kiểm tra và khóa hash;
 chỉ xác nhận/hồi quy 205 ca cũ sau khi có optimum mới. Mọi kết quả cũ

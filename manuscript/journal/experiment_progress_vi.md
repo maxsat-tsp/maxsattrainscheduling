@@ -1,5 +1,27 @@
 # Tiến độ thử nghiệm trên VM, cập nhật 10-11-2026
 
+## V44 đang chuẩn bị: cải thiện chính lịch SAT vừa tìm được
+
+Kiểm tra ngoại tuyến trên các lịch của V42/V43 cho thấy một số lịch còn
+có thể đi sớm hơn hoặc đổi thứ tự hai lượt liền nhau. Với chính lịch
+V42 `trackA12/infsteps180`, chi phí giảm `123 → 122 → 114`. Lịch 114
+đã qua kiểm tra độc lập; UB tốt nhất trong nguồn trước đó là 118. Đây
+chỉ là cận trên của một lịch dẫn xuất, chưa phải proof tối ưu hoặc một
+lượt benchmark mới. Giữ nguyên dữ liệu V42. Đã đăng ký UB 114 trong
+pool đối chiếu tương lai để không đếm lại lần sau.
+
+V44 bổ sung bước cải thiện lịch sau mỗi câu trả lời SAT: bỏ chờ không
+cần thiết, thử đổi chỗ hai lượt liền nhau, giữ chi phí tốt hơn. Giới hạn
+4096 phép thử cho mỗi lịch; mọi xử lý dùng chung timeout 300 giây.
+Không đổi LB và không nhận lịch/cận ngoài vào solver. So với V42, chỉ
+đổi thành phần này; giữ close-upper, RC2 60 giây và MiniSAT.
+
+Đã qua 8 unit test Rust mới trong harness dùng nguyên mã Problem và
+polisher, 191 test Python, cùng cargo check toàn bộ tests/binary. Native
+preflight trên VM còn chờ V43 và Gurobi kết thúc; chỉ chạy đo khi toàn
+bộ preflight qua. Hướng dẫn sinh viên phiên bản 5.30 giải thích công
+thức và cách chạy. Không lấy kết quả ngoại tuyến để tăng coverage.
+
 ## V42 hoàn tất: 205/216 và một cận trên tốt nhất mới
 
 Đã tải đủ dữ liệu V42 về, kiểm tra lại từng lịch/cost, cả hai giai đoạn

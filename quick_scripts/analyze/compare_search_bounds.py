@@ -273,6 +273,29 @@ class Pool:
             self.result(m['objective'],m['name'],checked['solve'],'BigM-CPLEX-Tight',
                 m['timeout_seconds'],str(path)+'#tight_recheck')
 
+    def offline_upper_witness(self,path):
+        """A valid derived schedule is known UB evidence, never coverage/LB."""
+        data=json.loads(path.read_text())
+        receipt=json.loads((path.parent/'archive_hashes.json').read_text())
+        if receipt.get(path.name)!=ex.focus.sha(path):raise ValueError('offline witness hash changed')
+        if (data.get('schema')!='checked-offline-upper-bound-v1' or data.get('lb') is not None
+                or data.get('coverage_claim') is not False or data.get('runtime_comparable') is not False
+                or data.get('dataset_sha256')!=ex.focus.dataset_hash()):
+            raise ValueError('invalid offline upper-bound provenance')
+        source=(ex.REPO/data['source_archive']).resolve()
+        if ex.REPO.resolve() not in source.parents or ex.focus.sha(source)!=data['source_archive_sha256']:
+            raise ValueError('offline witness source changed')
+        with tarfile.open(source) as archive:raw=json.load(archive.extractfile(data['source_member']))
+        o,n=data['objective'],data['name']
+        search.validate_schedule(n,o,raw['solution'],raw['cost'])
+        search.validate_schedule(n,o,data['solution'],data['ub'])
+        if raw.get('objective')!=o or raw['cost']!=data['source_cost'] or data['ub']>raw['cost']:
+            raise ValueError('offline witness is not an improvement of its recorded source')
+        self.track(path);self.track(source)
+        row=self.add(o,n,None,data['ub'],data['method'],None,str(path),
+            'derived incumbent independently verified; no new lower bound or timed coverage')
+        if row is not None:row['upper_witness_verified']=True;row['runtime_comparable']=False
+
 
 def comparison_report(records,pool,expected):
     for objective,name in pool.selection:
@@ -368,6 +391,8 @@ def evaluate(args,candidate):
         pool.targeted_history(args.reference)
         pool.search_history(args.reference,args.diagnostics,json.loads((candidate/'manifest.json').read_text())['binary_sha256'])
         pool.cplex_rechecks()
+        for path in sorted(RESEARCH.glob('offline_incumbent_polish_*/witness.json')):
+            pool.offline_upper_witness(path)
         pool.check_reference_consistency()
         if args.reference_pool is not None:
             ex.save(args.reference_pool,dict(schema='frozen-bound-reference-pool-v2',

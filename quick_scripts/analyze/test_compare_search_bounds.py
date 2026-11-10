@@ -1,8 +1,38 @@
 import unittest
+import json
+from pathlib import Path
+import tempfile
+from unittest.mock import patch
 from compare_search_bounds import Pool,comparison_report,logged_bounds,combine_full
 
 
 class SearchBoundComparisonTests(unittest.TestCase):
+    def test_offline_polished_witness_is_only_an_upper_bound_and_is_not_rediscovered(self):
+        from compare_search_bounds import RESEARCH
+        p=Pool([('infsteps180','trackA12')])
+        p.add('infsteps180','trackA12',106,118,'old',300,'previous','known interval')
+        p.offline_upper_witness(RESEARCH/'offline_incumbent_polish_20261110/witness.json')
+        self.assertIsNone(p.records[-1]['lb']);self.assertEqual(p.records[-1]['ub'],114)
+        self.assertFalse(p.records[-1]['runtime_comparable']);self.assertIsNone(p.records[-1]['timeout_seconds'])
+        r=comparison_report([dict(objective='infsteps180',name='trackA12',repeat=0,proven=False,lb=97,ub=114)],p,1)
+        self.assertEqual(r['summary']['new_best_bound_cases'],0)
+
+    def test_offline_witness_cannot_claim_a_lower_bound_or_an_invalid_cost(self):
+        from compare_search_bounds import RESEARCH,ex
+        original=json.loads((RESEARCH/'offline_incumbent_polish_20261110/witness.json').read_text())
+        for update in [dict(lb=106),dict(coverage_claim=True),dict(ub=113),dict(dataset_sha256='changed')]:
+            with tempfile.TemporaryDirectory() as folder:
+                p=Path(folder)/'witness.json';p.write_text(json.dumps(dict(original,**update)))
+                (p.parent/'archive_hashes.json').write_text(json.dumps({'witness.json':ex.focus.sha(p)}))
+                with self.assertRaises(ValueError):Pool([('infsteps180','trackA12')]).offline_upper_witness(p)
+
+    def test_offline_witness_requires_an_unchanged_hash_receipt(self):
+        from compare_search_bounds import RESEARCH
+        with tempfile.TemporaryDirectory() as folder:
+            p=Path(folder)/'witness.json';p.write_bytes((RESEARCH/'offline_incumbent_polish_20261110/witness.json').read_bytes())
+            (p.parent/'archive_hashes.json').write_text('{}')
+            with self.assertRaisesRegex(ValueError,'hash changed'):Pool([]).offline_upper_witness(p)
+
     def pool(self):
         p=Pool([('cont','origA8'),('cont','stationA2')])
         p.add('cont','stationA2',8398,9974,'V17',300,'old-SAT','reported progress')

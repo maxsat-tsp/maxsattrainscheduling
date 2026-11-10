@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.29}
+\fancyhead[R]{\small Phiên bản 5.30}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.29, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.30, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -2143,6 +2143,45 @@ thiếu sau khi lượt SAT đã dừng. Những ca đã có proof trong 120 gi�
 được giữ nguyên làm dữ liệu tham chiếu. Bảng ghép ghi rõ nguồn và không
 dùng để kết luận runtime ghép cặp. CPLEX cũng cần đối chứng đủ ở cùng
 cutoff trước khi chốt kết luận thắng toàn bộ MILP.
+
+\section{V44: cải thiện lịch SAT trước khi chọn ngưỡng tiếp theo}
+
+Một lịch SAT hợp lệ chưa chắc đã tận dụng hết khả năng đi sớm. Ta có
+thể bỏ thời gian chờ không cần thiết và thử đổi chỗ hai lượt sử dụng
+liền nhau trên cùng tài nguyên. Trong kiểm tra ngoại tuyến, lịch
+\code{trackA12/infsteps180} do V42 tự tìm có chi phí $123$. Bỏ thời
+gian chờ hạ xuống $122$; bốn lần đổi chỗ hạ xuống $114$. Lịch $114$
+đã được kiểm tra độc lập, tốt hơn UB $118$ trong nguồn đã nhập trước đó.
+Đây là một cận trên mới; chưa phải nghiệm tối ưu hay kết quả full V44.
+
+Với một thứ tự sử dụng tài nguyên đã cố định, tính lại lịch sớm nhất
+bằng các điều kiện
+\[
+ t_v\ge e_v,\qquad t_{s(v)}\ge t_v+p_v,\qquad
+ t_w\ge t_{s(v)}\quad\text{nếu }v\text{ đi trước }w.
+\]
+Ở đây $s(v)$ là mốc tiếp theo của cùng tàu, $e_v$ là thời điểm sớm
+nhất cho phép và $p_v$ là thời gian di chuyển. Bắt đầu từ $e_v$ rồi
+đẩy các mốc còn vi phạm về sau. Thử đổi chỗ hai lượt liền nhau, tính
+lại lịch và giữ thay đổi có chi phí nhỏ nhất. Nếu nhiều lịch bằng chi
+phí theo objective đang xét, ưu tiên tổng độ trễ liên tục nhỏ hơn.
+Thứ tự gây vòng phụ thuộc được bỏ qua; luôn giữ lại lịch hợp lệ cũ.
+
+Trong V44, bước này chỉ chạy sau khi SAT vừa trả một lịch hợp lệ. Cờ
+\code{--incumbent-polish-checks 4096} giới hạn số thứ tự lân cận được
+thử cho mỗi lịch; mặc định $0$ để giữ đường chạy cũ. Mọi xử lý đều
+nằm trong cùng 300 giây. Bước này chỉ hạ UB, không tăng LB; LB vẫn cần
+chứng minh UNSAT. Nhật ký giữ lịch SAT ban đầu, lịch sau cải thiện,
+số lần thử, số đổi chỗ được giữ và thời gian.
+
+V44 đối chứng với V42: giữ \code{close-upper}, RC2 tối đa 60 giây,
+MiniSAT và chỉ bổ sung bước cải thiện lịch. Service đợi V43 và sáu ca
+Gurobi kết thúc rồi mới build, kiểm thử và chạy 11 ca khó. Có optimum
+mới thì xác nhận ba lần và hồi quy thực tế 205 ca cũ. Tám kiểm thử Rust
+của bước mới và 191 kiểm thử Python đã qua trên máy local; kiểm thử
+toàn bộ binary trên VM phải qua trước khi bắt đầu đo. UB $114$ ngoại
+tuyến đã được lưu làm cận đã biết, nên tìm lại $114$ không được đếm
+thành tiến bộ mới. Không đưa lịch hoặc cận từ file này vào solver.
 
 \section{Nội dung được phép đưa vào bài báo}
 

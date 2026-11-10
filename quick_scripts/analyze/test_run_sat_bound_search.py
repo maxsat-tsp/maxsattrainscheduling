@@ -10,6 +10,47 @@ import run_sat_bound_search as search
 
 
 class SearchAuditTests(unittest.TestCase):
+    def polished_fixture(self):
+        r=self.fixture('upper');r['incumbent_polish_checks']=4096
+        for q in r['queries']:
+            if q['outcome']=='sat':q['polish']=dict(source_cost=q['cost'],source_solution=q['solution'],
+                retimed_cost=q['cost'],checks=10,accepted_moves=0,seconds=0.1)
+        return r
+
+    def test_polished_witness_is_independently_checked_and_budgeted(self):
+        r=self.polished_fixture();row,_=search.check_result(r,'origA1','cont',300,5526)
+        self.assertTrue(row['proven']);self.assertEqual(row['incumbent_polish_checks'],4096)
+
+    def test_polishing_cannot_fabricate_an_original_sat_witness(self):
+        r=self.polished_fixture();q=next(q for q in r['queries'] if q['outcome']=='sat')
+        q['polish']['source_cost']+=1
+        with self.assertRaises(ValueError):search.check_result(r,'origA1','cont',300,5526)
+
+    def test_polishing_must_be_requested_and_evidenced(self):
+        for mutate in [lambda r:r.update(incumbent_polish_checks=0),
+                       lambda r:r.update(incumbent_polish_checks=True),
+                       lambda r:r.update(incumbent_polish_checks=-1),
+                       lambda r:[q.pop('polish',None) for q in r['queries']]]:
+            r=self.polished_fixture();mutate(r)
+            with self.assertRaises(ValueError):search.check_result(r,'origA1','cont',300,5526)
+
+    def test_polishing_cannot_change_a_lower_bound_or_an_unknown_answer(self):
+        r=self.polished_fixture();q=r['queries'][-1];self.assertEqual(q['outcome'],'unsat')
+        q['polish']=r['queries'][0]['polish']
+        with self.assertRaisesRegex(ValueError,'without a SAT witness'):search.check_result(r,'origA1','cont',300,5526)
+        q['outcome']='unknown'
+        with self.assertRaisesRegex(ValueError,'without a SAT witness'):search.check_result(r,'origA1','cont',300,5526)
+
+    def test_polishing_limits_cost_and_shared_time_are_enforced(self):
+        for update in [dict(checks=4097),dict(checks=True),dict(accepted_moves=11),
+                       dict(seconds=1.01),dict(seconds=float('nan')),dict(retimed_cost=0)]:
+            r=self.polished_fixture();next(q for q in r['queries'] if q['outcome']=='sat')['polish'].update(update)
+            with self.assertRaises(ValueError):search.check_result(r,'origA1','cont',300,5526)
+
+    def test_full_search_cannot_mix_polished_and_unpolished_configurations(self):
+        a={k:0 for k in ('commit','binary_sha256','build_manifest_sha256','dataset_sha256','timeout_seconds','ram_kb','cpu_affinity')}
+        with self.assertRaisesRegex(ValueError,'mixes methods'):search.same_method(dict(a,incumbent_polish_checks=4096),a)
+
     def warm_fixture(self,optimal=True):
         r=self.fixture();schedule=r['solution'];cost=r['cost']
         evidence=dict(aglr_policy='legacy',maxsat_assumptions='legacy',maxsat_resource_orders=True,

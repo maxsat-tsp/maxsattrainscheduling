@@ -1,6 +1,6 @@
 //! Oracle-free binary search using independently rebuilt SAT-DDD decisions.
 use crate::{problem::{Problem,DelayCostType},solvers::SolverError};
-use super::{maxsat_ladder_sc as sc,shared::{greedy,precedence}};
+use super::{maxsat_ladder_sc as sc,incumbent_polish,shared::{greedy,precedence}};
 use crate::solvers::util::{counting_solver,minisat_deadline,cadical_deadline::DeadlineReached};
 use serde::Serialize;
 use std::time::Instant;
@@ -65,6 +65,7 @@ pub struct QueryRecord {
     pub native_budgeted_calls:usize,
     pub variables:usize,pub clauses:usize,
     pub threshold_evidence:serde_json::Map<String,serde_json::Value>,
+    pub polish:Option<incumbent_polish::PolishRecord>,
 }
 
 #[derive(Serialize)]
@@ -86,6 +87,7 @@ pub struct SearchResult {
     pub queries:Vec<QueryRecord>,
     pub threshold_policy:ThresholdPolicy,
     pub rc2_warmup_seconds:f64,pub warmup:Option<WarmupRecord>,
+    pub incumbent_polish_checks:usize,
 }
 
 /// Costs at chain-propagated earliest starts are an input-only lower bound.
@@ -118,6 +120,12 @@ pub fn solve_with_policy(problem:&Problem,objective:DelayCostType,timeout:f64,po
 
 pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,policy:ThresholdPolicy,
     warmup_seconds:f64,
+    checkpoint:impl FnMut(&QueryRecord,i32,i32))->Result<SearchResult,SolverError>{
+    solve_with_polish(problem,objective,timeout,policy,warmup_seconds,0,checkpoint)
+}
+
+pub fn solve_with_polish(problem:&Problem,objective:DelayCostType,timeout:f64,policy:ThresholdPolicy,
+    warmup_seconds:f64,polish_checks:usize,
     mut checkpoint:impl FnMut(&QueryRecord,i32,i32))->Result<SearchResult,SolverError>{
     if !timeout.is_finite() || timeout<=0.0 {
         return Err(SolverError::InvalidSolution("search timeout must be finite and positive".into()));
@@ -126,6 +134,10 @@ pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,po
         return Err(SolverError::InvalidSolution("warmup budget must be finite and nonnegative".into()));
     }
     let started=Instant::now();
+    let duration=std::time::Duration::try_from_secs_f64(timeout)
+        .map_err(|_|SolverError::InvalidSolution("search timeout exceeds Duration range".into()))?;
+    let deadline=started.checked_add(duration)
+        .ok_or_else(||SolverError::InvalidSolution("search deadline exceeds Instant range".into()))?;
     let (mut interval,mut incumbent)=initial_bounds(problem,objective)?;
     let initial_lb=interval.lower;let initial_ub=interval.upper;let initial_solution=incumbent.clone();
     let mut queries=Vec::new();
@@ -185,6 +197,7 @@ pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,po
         let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
             sc::solve_cost_threshold(counting_solver::CountingSolver::new(solver),problem,
                 remaining,objective,settings,target,|key,value|{evidence.insert(key,value);})));
+        let mut polish=None;
         let (outcome,cost,solution)=match result {
             Ok(Ok((schedule,_)))=>{
                 if evidence.get("threshold_outcome").and_then(|x|x.as_str())!=Some("sat") {
@@ -192,6 +205,13 @@ pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,po
                 }
                 let cost=problem.verify_solution(&schedule,objective)
                     .ok_or_else(||SolverError::InvalidSolution("threshold schedule is invalid".into()))?;
+                if cost<before.lower || cost>target {
+                    return Err(SolverError::InvalidSolution("raw SAT witness does not fit its search interval".into()));
+                }
+                let (schedule,cost)=if polish_checks>0 {
+                    let (schedule,cost,record)=incumbent_polish::improve(problem,objective,schedule,cost,polish_checks,deadline)?;
+                    polish=Some(record);(schedule,cost)
+                }else{(schedule,cost)};
                 interval.sat_for(policy,target,cost).map_err(SolverError::InvalidSolution)?;
                 incumbent=schedule.clone();("sat",Some(cost),Some(schedule))
             },
@@ -212,7 +232,7 @@ pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,po
             remaining_seconds:remaining,seconds:query_started.elapsed().as_secs_f64(),
             outcome:outcome.into(),cost,solution,native_sat_calls:stats.calls,
             native_sat_seconds:stats.sat_time.as_secs_f64(),native_budgeted_calls:stats.budgeted_calls,
-            variables,clauses,threshold_evidence:evidence};
+            variables,clauses,threshold_evidence:evidence,polish};
         checkpoint(&record,interval.lower,interval.upper);queries.push(record);
         if outcome=="unknown" {break;}
     }
@@ -230,13 +250,31 @@ pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,po
         status:if interval.lower==interval.upper && elapsed<=timeout {"ok"}else{"timeout"},
         uses_optimum_oracle:false,maxsat_backend:"minisat",maxsat_backend_signature:signature,
         timeout_seconds:timeout,total_time:elapsed,lb:interval.lower,ub:interval.upper,cost,solution:incumbent,
-        initial_lb,initial_ub,initial_solution,queries,threshold_policy:policy,rc2_warmup_seconds:warmup_seconds,warmup})
+        initial_lb,initial_ub,initial_solution,queries,threshold_policy:policy,rc2_warmup_seconds:warmup_seconds,warmup,
+        incumbent_polish_checks:polish_checks})
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::problem::{Train,Visit};
+    #[test]
+    fn polished_search_matches_exhaustive_optima_and_never_raises_a_sat_cost(){
+        let p=Problem{name:"polished-search".into(),conflicts:vec![(0,0)],trains:vec![
+            Train{visits:vec![Visit{resource_id:0,earliest:0,aimed:Some(0),travel_time:2}]},
+            Train{visits:vec![Visit{resource_id:0,earliest:0,aimed:Some(0),travel_time:1}]}]};
+        for objective in [DelayCostType::Continuous,DelayCostType::FiniteSteps123,DelayCostType::InfiniteSteps180]{
+            let expected=(0..=5).flat_map(|a|(0..=5).map(move|b|(a,b)))
+                .filter_map(|(a,b)|p.verify_solution(&[vec![a,a+2],vec![b,b+1]],objective)).min().unwrap();
+            for policy in [ThresholdPolicy::Bisect,ThresholdPolicy::CloseUpper,ThresholdPolicy::Upper]{
+                let r=solve_with_polish(&p,objective,5.0,policy,0.0,32,|q,_,_|{
+                    if q.outcome=="sat" {let x=q.polish.as_ref().unwrap();assert!(q.cost.unwrap()<=x.source_cost);}
+                    else {assert!(q.polish.is_none());}
+                }).unwrap();
+                assert_eq!(r.status,"ok");assert_eq!(r.lb,expected);assert_eq!(r.ub,expected);
+            }
+        }
+    }
     #[test]
     fn upper_policy_descends_on_sat_and_closes_the_gap_on_unsat(){
         assert_eq!(SearchInterval::new(0,i32::MAX).unwrap().target_for(ThresholdPolicy::Upper),Some(i32::MAX-1));

@@ -1978,6 +1978,49 @@ systemctl status maxsat-bound-priority-report-v42.service
 journalctl -u maxsat-bound-priority-report-v42.service -n 20 --no-pager
 ```
 
+## V44: cải thiện lịch trong cùng timeout, chạy sau V43/Gurobi
+
+Đối chứng V42 bằng đúng một thay đổi: sau mỗi lịch SAT hợp lệ, tính lại
+lịch sớm nhất với thứ tự tài nguyên hiện tại, rồi thử đổi chỗ hai lượt
+liền nhau. Cờ `--incumbent-polish-checks 4096`; mặc định 0. Giữ
+`--threshold-policy close-upper --rc2-warmup-seconds 60`, MiniSAT,
+300 giây tổng, RAM 6,000,000 KB, CPU affinity `0,1,4,5`.
+
+Nhật ký `query.polish` giữ cost/lịch SAT gốc, cost sau bỏ chờ, số phép
+thử, số đổi chỗ được giữ và thời gian. Cost/lịch cuối query đã qua kiểm
+tra độc lập. Không thay LB bằng kết quả heuristic, không nhận incumbent
+từ tệp đáp án. Auditor từ chối thiếu bằng chứng, lịch sai, cost tăng,
+vượt số phép thử, thay cấu hình khi resume hoặc thời gian ngoài query.
+
+Service `maxsat-sat-bound-search-v44.service` đợi marker kết thúc của
+V43 và Gurobi, đồng thời đợi cả hai service ngừng, rồi mới build/test.
+Lượt có giới hạn sáu giờ kể cả thời gian chờ. Chạy native 12 search,
+8 polish, 5 objective, 1 checkpoint và 1 legacy/exhaustive test; 191
+test Python; ba smoke và probe timeout/chuyển pha. Chỉ sau khi qua
+preflight mới đo 11 ca chưa giải của archive full V42 đã khóa hash.
+Có proof mới mới chạy ba xác nhận và hồi quy 205 ca V42 đã giải.
+
+Kết quả nằm tại worktree `/home/tuyenkv/projects/sat-bound-search-v44`,
+`results/aglr/sat-bound-search-v44-20261110`. Theo dõi:
+
+```bash
+sudo systemctl status maxsat-sat-bound-search-v44.service
+journalctl -u maxsat-sat-bound-search-v44.service -n 30 --no-pager
+```
+
+Sau mỗi ca có `hard/audit.json`; hết phase có
+`hard-priority-evaluation.json`, và nếu đủ hồi quy có
+`followup-priority-evaluation.json`. Pool mới nhập sáu quan sát Gurobi
+nếu lượt bổ sung đã qua audit. Nếu Gurobi không hoàn tất, vẫn được thử
+SAT nhưng chưa kết luận thắng đầy đủ baseline.
+
+Thử ngoại tuyến đã có UB 114 từ chính lịch V42 trên
+`trackA12/infsteps180`; dữ liệu và lịch nằm tại
+`results/sat_research/offline_incumbent_polish_20261110/`. Chỉ nhập UB,
+không nhập LB, coverage hay runtime benchmark. Các pool mới coi 114 là
+cận đã biết; tìm lại không được đếm là tiến bộ mới. Các pool cũ vẫn giữ
+nguyên. Hướng dẫn sinh viên đã lên phiên bản 5.30.
+
 ## V43 và phần Gurobi còn thiếu ở 300 giây
 
 V42 đã kiểm toán đủ `(72,68,65)`, 205/216, không mất ca nào so với V41.

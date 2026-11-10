@@ -1,6 +1,6 @@
 # Tiến độ thử nghiệm trên VM, cập nhật 10-11-2026
 
-## V44 đang chuẩn bị: cải thiện chính lịch SAT vừa tìm được
+## V44 đã xếp hàng tự động: cải thiện chính lịch SAT vừa tìm được
 
 Kiểm tra ngoại tuyến trên các lịch của V42/V43 cho thấy một số lịch còn
 có thể đi sớm hơn hoặc đổi thứ tự hai lượt liền nhau. Với chính lịch
@@ -19,8 +19,18 @@ Không đổi LB và không nhận lịch/cận ngoài vào solver. So với V42
 Đã qua 8 unit test Rust mới trong harness dùng nguyên mã Problem và
 polisher, 191 test Python, cùng cargo check toàn bộ tests/binary. Native
 preflight trên VM còn chờ V43 và Gurobi kết thúc; chỉ chạy đo khi toàn
-bộ preflight qua. Hướng dẫn sinh viên phiên bản 5.30 giải thích công
+bộ preflight qua. Service đã cài và bật tại source `6a67a14`, xác nhận
+đang đợi đúng hai lượt trước, chưa build hoặc chạy chồng lên SAT.
+Hướng dẫn sinh viên phiên bản 5.30 giải thích công
 thức và cách chạy. Không lấy kết quả ngoại tuyến để tăng coverage.
+
+V43 hiện đã tải và kiểm toán 7/11 ca khó: cả bảy `cont` đều timeout,
+chưa có optimum hoặc cận tốt nhất mới. Ngoài hai ca có UB tốt hơn SAT
+cũ, năm ca còn lại hết thời gian ngay ở truy vấn `UB−1` đầu tiên. Vì
+vậy khó khăn không chỉ nằm ở việc thử nhiều ngưỡng: bản thân truy vấn
+SAT cũng khó tìm lịch tốt hơn lịch RC2 trên các ca này. Bốn ca
+`infsteps180` còn đang chạy. Giữ riêng bản chụp bảy ca và bản hai ca
+đầu, không cộng vào coverage full.
 
 ## V42 hoàn tất: 205/216 và một cận trên tốt nhất mới
 

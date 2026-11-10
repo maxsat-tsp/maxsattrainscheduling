@@ -1,5 +1,8 @@
 # V43: ask for a strict incumbent improvement throughout SAT search
 
+Latest saved progress: **7/11 hard cases**, with no new optimum or global
+best bound. The original two-case preflight snapshot is preserved below.
+
 Frozen source `cc13eb4`; MiniSAT; RC2 warmup 60 seconds included in the
 shared 300-second limit. The only algorithm change from V42 is the target
 `T = U - 1` at every SAT decision. SAT lowers U using a verified schedule;
@@ -39,3 +42,17 @@ Gurobi service waits for the SAT terminal marker before running exactly
 six missing 300-second observations. Existing Gurobi data already proves
 at least 207 pairs at this cutoff; CPLEX also needs complete longer-cutoff
 comparison. No SOTA or submission claim is made.
+
+## Seven-case progress, independently replayed
+
+`progress_7_snapshot.tar.gz`, `progress_7_audit.json` and
+`progress_7_evaluation.json` preserve all seven completed cont cases, with
+the same frozen source/binary and original reference pool. Every witness,
+checkpoint, query and receipt passed replay. All seven timed out; only
+stationA1 and trackA8 improve UBs over earlier SAT runs, and neither beats
+MILP. On the other five cases even the first UB-1 decision is UNKNOWN.
+Thus slow interval narrowing alone does not explain those cases: the SAT
+decision itself has difficulty finding a strict improvement of its own
+RC2 witness. No lower bound is inferred from UNKNOWN. Four infsteps180
+cases remain in progress. This is still a hard-set report, not full V43
+coverage. It is separate from the later offline witness-polishing probe.

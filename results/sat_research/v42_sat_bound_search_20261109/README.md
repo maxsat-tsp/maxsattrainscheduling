@@ -53,3 +53,43 @@ Services: `maxsat-sat-bound-search-v42.service` and the separate read-only
 and updates the reports under `evaluation/` every minute. The full report
 compares the new method with V41, then records bounds relative to all
 imported methods. Missing/unfinished cases cannot pass the full gate.
+
+## Complete round, independently audited 10 November
+
+All twelve hard cases, three confirmations and 204 regression cases have
+completed successfully. `complete_snapshot.tar.gz` preserves the unmodified
+full VM campaign. `full_evaluation.json` rechecks every schedule/cost and
+replays both RC2 and SAT bound updates, then requires 216 distinct pairs
+from the same source/binary/configuration. Coverage is now measured:
+
+| Objective | V17 / 300 s | V41 / 300 s | V42 / 300 s |
+|---|---:|---:|---:|
+| finsteps123 | 72 | 72 | 72 |
+| infsteps180 | 68 | 67 | 68 |
+| cont | 63 | 65 | 65 |
+| Total | 203 | 204 | 205 |
+
+The restored stationA8/infsteps180 optimum 161 reproduces in all three
+confirmations: 34.843569 / 35.281195 / 35.056550 seconds. No previously
+V41-solved case is lost. There are eleven unresolved pairs.
+
+V42 also improves the best imported UB for infsteps180/trackA11 from 127
+to **109**, with an independently checked schedule. Its own LB is 92,
+weaker than the previous best 101. Report [92,109] versus [101,127];
+[101,109] is pooled knowledge and is not V42's independently obtained
+interval. No other unresolved case improves a bound over all imported
+SAT/MILP references; two improve a bound relative to prior SAT runs.
+
+Five final UNKNOWN thresholds are below the previously known LB:
+trackA11/cont 14694, stationA8/cont 26492, stationA11/cont 14849,
+stationA12/cont 15936 and trackA11/infsteps180 100. This motivates testing
+UB-1 throughout the SAT phase, rather than only within the 5% gap region.
+Reference bounds remain audit-only; that test still computes every target
+from its own incumbent.
+
+`full_summary.csv`, `unresolved_bounds.csv` and `full_reference_pool.json`
+(with a SHA-256 receipt) accompany the complete evaluation. The earlier
+one-case snapshot is preserved unchanged as historical evidence. There is
+no SOTA claim: the Gurobi source inventory already contains **at least 207**
+proved pairs within 300 seconds, with six remaining cutoff observations
+yet to be completed. See `../baseline_inventory_20261110/`.

@@ -38,6 +38,12 @@ giây. Dữ liệu MiniSAT đã lưu bổ sung lên ít nhất 200 proof ở 300
 giây cho mỗi solver, với chín quan sát còn thiếu cho mỗi solver.
 Bảng theo cutoff giữ riêng mốc này và kết quả hội nghị gốc.
 
+Ca đầu `cont/stationA1` ở chế độ giữ mô hình đã tìm lịch chi phí
+12.884 sau 245,06 giây, khớp optimum Big-M và tốt hơn UB 12.934 của
+V43. Sau sáu quyết định trên cùng một mô hình, câu hỏi ở ngưỡng
+12.883 hết giờ. Cận riêng của V45 là [12.504, 12.884], nên ca này
+vẫn tính là timeout. Lịch và từng cập nhật cận đã qua kiểm toán.
+
 ## Nhật ký lúc xếp hàng V44
 
 Kiểm tra ngoại tuyến trên các lịch của V42/V43 cho thấy một số lịch còn

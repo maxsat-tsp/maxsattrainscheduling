@@ -1,0 +1,94 @@
+{
+  "schema": "sat-bound-search-audit-v1",
+  "audit_passed": true,
+  "complete": false,
+  "completed_runs": 1,
+  "expected_runs": 11,
+  "records": [
+    {
+      "objective": "cont",
+      "name": "stationA1",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.00328966,
+      "lb": 12504,
+      "ub": 12884,
+      "cost": 12884,
+      "queries": 6,
+      "sat_calls": 5410,
+      "threshold_policy": "upper",
+      "rc2_warmup_seconds": 60.0,
+      "incumbent_polish_checks": 0,
+      "threshold_session": "reuse",
+      "sat_model_builds": 1,
+      "first_query_outcome": "sat",
+      "first_query_seconds": 31.171497888,
+      "later_query_seconds": 208.803543585,
+      "repeat": 0
+    }
+  ],
+  "newly_solved": [],
+  "evaluation_priorities": [
+    "proven_optimal",
+    "new_best_bound_cases",
+    "mean_unsolved_relative_gap",
+    "runtime"
+  ],
+  "bound_quality": {
+    "unsolved_instances": 1,
+    "unsolved_bounds_missing": 0,
+    "unsolved_gap_sum": 0.02949394597950947,
+    "mean_unsolved_relative_gap": 0.02949394597950947,
+    "bounds_complete": true,
+    "bounds_verified": true
+  },
+  "bound_quality_scope": "completed nonrepeat cases in this phase; confirmations are separate",
+  "submission_passed": false,
+  "scope": "selected pairs only; full coverage requires regression",
+  "query_summary": [
+    {
+      "target": 14120,
+      "outcome": "sat",
+      "cost": 13525,
+      "seconds": 31.171497888,
+      "accumulated_seconds": 91.193450926
+    },
+    {
+      "target": 13524,
+      "outcome": "sat",
+      "cost": 12978,
+      "seconds": 15.330979037,
+      "accumulated_seconds": 106.52547577200001
+    },
+    {
+      "target": 12977,
+      "outcome": "sat",
+      "cost": 12934,
+      "seconds": 124.692181486,
+      "accumulated_seconds": 231.218813769
+    },
+    {
+      "target": 12933,
+      "outcome": "sat",
+      "cost": 12899,
+      "seconds": 6.37298294,
+      "accumulated_seconds": 237.59307056
+    },
+    {
+      "target": 12898,
+      "outcome": "sat",
+      "cost": 12884,
+      "seconds": 7.468548239,
+      "accumulated_seconds": 245.06298628
+    },
+    {
+      "target": 12883,
+      "outcome": "unknown",
+      "cost": null,
+      "seconds": 54.938851883,
+      "accumulated_seconds": 300.002898769
+    }
+  ],
+  "reference_optimum": 12884,
+  "solver_received_only_instance": true
+}

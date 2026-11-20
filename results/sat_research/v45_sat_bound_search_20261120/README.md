@@ -28,3 +28,13 @@ VM services `maxsat-sat-bound-search-v45.service` and
 The first measured V45 case started at 14:23 on 20 November (Vietnam
 time). At this checkpoint CPLEX was waiting and the full SAT comparison
 was pending.
+
+## First hard case
+
+In reuse mode, `cont/stationA1` found a verified schedule of cost 12884
+at 245.06 seconds using one SAT model across all six decisions. This
+matches the audited Big-M optimum and improves on V43's SAT UB 12934.
+The final decision at 12883 returned UNKNOWN, so the solver timed out
+with its own interval [12504,12884]. The paired rebuild control and
+the other hard cases are still running. The snapshot and independent
+audit cover this one completed case.

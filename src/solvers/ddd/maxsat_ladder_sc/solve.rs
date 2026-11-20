@@ -414,9 +414,15 @@ impl<L: satcoder::Lit + Copy + 'static> BinaryObjective<L> {
     /// to that value instead of making SAT search an unnecessary B <= UB.
     /// Unspent budget remains allowed: this still encodes sum(costs) <= UB.
     fn fix_budget(&self, solver: &mut impl SatInstance<L>) {
-        for (index, bit) in self.reg_bits.iter().enumerate() {
-            solver.add_clause([if self.upper_bound & (1usize << index) != 0 { *bit } else { !*bit }]);
+        for bit in self.budget_bits(self.upper_bound) {
+            solver.add_clause([bit]);
         }
+    }
+
+    fn budget_bits(&self, target: usize) -> impl Iterator<Item = Bool<L>> + '_ {
+        self.reg_bits.iter().enumerate().map(move |(index, &bit)| {
+            if target & (1usize << index) != 0 { bit } else { !bit }
+        })
     }
 
     fn tighten(&mut self, solver: &mut impl SatInstance<L>, upper_bound: usize) -> bool {
@@ -1003,7 +1009,7 @@ pub fn solve_debug_with_settings<L: satcoder::Lit + Copy + std::fmt::Debug + 'st
     debug_out: impl Fn(DebugInfo),
     output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
-    solve_inner(mk_env, solver, problem, timeout, delay_cost_type, settings, None, None,
+    solve_inner(mk_env, solver, problem, timeout, delay_cost_type, settings, None, None, None,
         debug_out, output_stats)
 }
 
@@ -1015,7 +1021,7 @@ pub fn solve_with_progress<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     output_stats:impl FnMut(String,serde_json::Value),
 )->Result<(Vec<Vec<i32>>,SolveStats),SolverError>{
     solve_inner(||panic!("the legacy graph heuristic does not create a Gurobi environment"),
-        solver,problem,timeout,objective,settings,None,Some(progress),|_|{},output_stats)
+        solver,problem,timeout,objective,settings,None,Some(progress),None,|_|{},output_stats)
 }
 
 /// Separate diagnostic entry point. Oracle-assisted results must never enter
@@ -1037,7 +1043,7 @@ pub fn solve_bound_diagnostic<L: satcoder::Lit + Copy + std::fmt::Debug + 'stati
     output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
     solve_inner(mk_env, solver, problem, timeout, delay_cost_type, settings,
-        Some(&diagnostic), None, |_| {}, output_stats)
+        Some(&diagnostic), None, None, |_| {}, output_stats)
 }
 
 /// Solve a cost decision chosen by an optimizer, without any optimum oracle.
@@ -1053,12 +1059,50 @@ pub fn solve_cost_threshold<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
     solve_inner(|| panic!("a threshold decision never starts a MIP heuristic"),
         solver, problem, timeout, delay_cost_type, settings,
-        Some(&BoundDiagnostic::Decision(target)), None, |_| {}, |key,value| {
-            if key=="diagnostic_only" || key=="diagnostic_supplied_ub" {return;}
-            let key=key.strip_prefix("diagnostic_")
-                .map(|suffix|format!("threshold_{suffix}")).unwrap_or(key);
-            output_stats(key,value);
-        })
+        Some(&BoundDiagnostic::Decision(target)), None, None, |_| {}, threshold_stats(&mut output_stats))
+}
+
+fn threshold_stats(
+    output: &mut impl FnMut(String, serde_json::Value),
+) -> impl FnMut(String, serde_json::Value) + '_ {
+    move |key, value| {
+        if key == "diagnostic_only" || key == "diagnostic_supplied_ub" {
+            return;
+        }
+        let key = key.strip_prefix("diagnostic_")
+            .map(|suffix| format!("threshold_{suffix}")).unwrap_or(key);
+        output(key, value);
+    }
+}
+
+type AfterSat<'a> = dyn FnMut(i32, i32, &[Vec<i32>]) -> Result<Option<i32>, SolverError> + 'a;
+
+struct BudgetSession<'a> {
+    capacity: i32,
+    target: i32,
+    after_sat: &'a mut AfterSat<'a>,
+}
+
+/// Pin the budget for one native call at a time. The callback may request
+/// another, strictly tighter decision while retaining the full DDD state.
+pub(crate) fn solve_threshold_session<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
+    solver: impl SatInstance<L> + SatSolverWithCore<Lit = L> + std::fmt::Debug,
+    problem: &Problem,
+    timeout: f64,
+    objective: DelayCostType,
+    settings: MaxSatDddLadderScSettings,
+    capacity: i32,
+    target: i32,
+    mut after_sat: impl FnMut(i32, i32, &[Vec<i32>]) -> Result<Option<i32>, SolverError>,
+    mut output_stats: impl FnMut(String, serde_json::Value),
+) -> Result<(), SolverError> {
+    if target < 0 || capacity < target {
+        return Err(SolverError::InvalidSolution("invalid threshold session budget".into()));
+    }
+    solve_inner(|| panic!("a threshold decision never starts a MIP heuristic"),
+        solver, problem, timeout, objective, settings, None, None,
+        Some(BudgetSession { capacity, target, after_sat: &mut after_sat }),
+        |_| {}, threshold_stats(&mut output_stats)).map(|_| ())
 }
 
 fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
@@ -1070,6 +1114,7 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     settings: MaxSatDddLadderScSettings,
     diagnostic: Option<&BoundDiagnostic<'_>>,
     mut progress:Option<&mut super::progress::Rc2Progress>,
+    mut threshold_session: Option<BudgetSession<'_>>,
     debug_out: impl Fn(DebugInfo),
     mut output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(Vec<Vec<i32>>, SolveStats), SolverError> {
@@ -1087,11 +1132,11 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     let mut solver_time = std::time::Duration::ZERO;
     let mut stats = SolveStats::default();
 
-    let fixed_target = match diagnostic {
+    let mut fixed_target = match diagnostic {
         Some(BoundDiagnostic::Decision(target)) if *target >= 0 => Some(*target),
         Some(BoundDiagnostic::Decision(_)) => return Err(SolverError::InvalidSolution(
             "diagnostic threshold must be nonnegative".into())),
-        _ => None,
+        _ => threshold_session.as_ref().map(|session| session.target),
     };
     let oracle_upper = match diagnostic {
         Some(BoundDiagnostic::VerifiedUpper(solution)) => {
@@ -1105,7 +1150,7 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         }
         _ => None,
     };
-    if diagnostic.is_some() {
+    if diagnostic.is_some() || threshold_session.is_some() {
         if settings.order_master || settings.extract_initial_cost || settings.residual_hardening {
             return Err(SolverError::InvalidSolution(
                 "bound diagnostics require ordinary DDD, no initial cost offset or residual hardening".into()));
@@ -1113,6 +1158,10 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         output_stats("diagnostic_only".into(), true.into());
         output_stats("diagnostic_target".into(), fixed_target.into());
         output_stats("diagnostic_supplied_ub".into(), oracle_upper.as_ref().map(|x|x.0).into());
+    }
+    if let Some(session) = threshold_session.as_ref() {
+        output_stats("threshold_budget_capacity".into(), session.capacity.into());
+        output_stats("threshold_budget_assumptions".into(), true.into());
     }
 
     assert!(
@@ -1430,7 +1479,7 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     ));
 
     //UB from Gurobi
-    let heur_thread = (USE_HEURISTIC && !settings.order_master
+    let heur_thread = (USE_HEURISTIC && !settings.order_master && threshold_session.is_none()
         && !matches!(diagnostic, Some(BoundDiagnostic::VerifiedUpper(_) | BoundDiagnostic::Decision(_)))).then(|| {
         let (sol_in_tx, sol_in_rx) = std::sync::mpsc::channel();
         let (sol_out_tx, sol_out_rx) = std::sync::mpsc::channel();
@@ -1459,7 +1508,9 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     let mut aglr_history = CandidateHistory::default();
     let mut aglr_telemetry = AglrTelemetry::default();
     let mut binary_objective = if use_objective_bound {
-        let upper = if let Some(target) = fixed_target { target } else { best_heur.as_ref().ok_or_else(|| SolverError::InvalidSolution(
+        let upper = if let Some(target) = fixed_target {
+            threshold_session.as_ref().map_or(target, |session| session.capacity)
+        } else { best_heur.as_ref().ok_or_else(|| SolverError::InvalidSolution(
             "objective bound requires a verified initial feasible schedule".to_string()
         ))?.0 };
         let residual_upper=upper.checked_sub(initial_cost_offset).filter(|v|*v>=0)
@@ -1467,7 +1518,7 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         let objective = BinaryObjective::new(&mut solver, residual_upper.try_into().map_err(|_| {
             SolverError::InvalidSolution("negative objective upper bound".to_string())
         })?);
-        if fixed_target.is_some() { objective.fix_budget(&mut solver); }
+        if fixed_target.is_some() && threshold_session.is_none() { objective.fix_budget(&mut solver); }
         Some(objective)
     } else {
         None
@@ -1969,6 +2020,18 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
                         &occupations, start_time, solver_time, initial_cost_offset, cost,
                         &aglr_telemetry, &heuristic_filter);
                     output_stats("diagnostic_outcome".into(), "sat".into());
+                    if let Some(session) = threshold_session.as_mut() {
+                        if let Some(next) = (session.after_sat)(target, cost, &trains)? {
+                            if next < 0 || next >= target || next >= cost {
+                                return Err(SolverError::InvalidSolution("threshold failed to tighten".into()));
+                            }
+                            fixed_target = Some(next);
+                            output_stats("diagnostic_target".into(), next.into());
+                            is_sat = false;
+                            iteration += 1;
+                            continue;
+                        }
+                    }
                     return Ok((trains, stats));
                 }
 
@@ -2140,6 +2203,12 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
             b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
         });
         if fixed_target.is_some() { assumptions.clear(); }
+        let budget_assumptions: Vec<_> = if threshold_session.is_some() {
+            binary_objective.as_ref().unwrap()
+                .budget_bits(fixed_target.unwrap() as usize).collect()
+        } else {
+            Vec::new()
+        };
 
         log::info!(
             "solving it{} with {} timepoints {} conflicts",
@@ -2161,7 +2230,8 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
                 let _p = hprof::enter("sat check");
                 SatSolverWithCore::solve_with_assumptions(
                     &mut solver,
-                    assumptions.iter().map(|(k, _)| *k).take(n_assumps),
+                    assumptions.iter().map(|(k, _)| *k).take(n_assumps)
+                        .chain(budget_assumptions.iter().copied()),
                 )
             };
             solver_time += solve_start.elapsed();
@@ -2473,11 +2543,11 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
             let _p = hprof::enter("treat core");
 
             if let Some(target) = fixed_target {
-                // No cost assumptions were used. UNSAT of this relaxation
-                // proves that no valid schedule can meet the fixed threshold.
-                if !core.is_empty() {
+                // This relaxation contains every feasible schedule within
+                // the active budget. Its core may cite only budget bits.
+                if core.iter().any(|&lit| !budget_assumptions.contains(&Bool::Lit(lit))) {
                     return Err(SolverError::InvalidSolution(
-                        "fixed-bound decision unexpectedly returned an assumption core".into()));
+                        "threshold core contains a non-budget assumption".into()));
                 }
                 do_output_stats(&mut output_stats, iteration, &iteration_types, &stats,
                     &occupations, start_time, solver_time, target.saturating_add(1),

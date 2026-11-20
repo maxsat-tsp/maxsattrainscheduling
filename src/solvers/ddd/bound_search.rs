@@ -5,6 +5,8 @@ use crate::solvers::util::{counting_solver,minisat_deadline,cadical_deadline::De
 use serde::Serialize;
 use std::time::Instant;
 
+pub use super::threshold_session::ThresholdSession;
+
 #[derive(Clone,Copy,Debug,PartialEq,Serialize)]
 pub enum ThresholdPolicy {
     #[serde(rename="bisect")] Bisect,
@@ -66,6 +68,8 @@ pub struct QueryRecord {
     pub variables:usize,pub clauses:usize,
     pub threshold_evidence:serde_json::Map<String,serde_json::Value>,
     pub polish:Option<incumbent_polish::PolishRecord>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_generation: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -88,6 +92,8 @@ pub struct SearchResult {
     pub threshold_policy:ThresholdPolicy,
     pub rc2_warmup_seconds:f64,pub warmup:Option<WarmupRecord>,
     pub incumbent_polish_checks:usize,
+    pub threshold_session: ThresholdSession,
+    pub sat_model_builds: usize,
 }
 
 /// Costs at chain-propagated earliest starts are an input-only lower bound.
@@ -126,12 +132,23 @@ pub fn solve_with_warmup(problem:&Problem,objective:DelayCostType,timeout:f64,po
 
 pub fn solve_with_polish(problem:&Problem,objective:DelayCostType,timeout:f64,policy:ThresholdPolicy,
     warmup_seconds:f64,polish_checks:usize,
+    checkpoint:impl FnMut(&QueryRecord,i32,i32))->Result<SearchResult,SolverError>{
+    solve_with_session(problem, objective, timeout, policy, warmup_seconds, polish_checks,
+        ThresholdSession::Restart, checkpoint)
+}
+
+pub fn solve_with_session(problem:&Problem,objective:DelayCostType,timeout:f64,policy:ThresholdPolicy,
+    warmup_seconds:f64,polish_checks:usize,session:ThresholdSession,
     mut checkpoint:impl FnMut(&QueryRecord,i32,i32))->Result<SearchResult,SolverError>{
     if !timeout.is_finite() || timeout<=0.0 {
         return Err(SolverError::InvalidSolution("search timeout must be finite and positive".into()));
     }
     if !warmup_seconds.is_finite() || warmup_seconds<0.0 {
         return Err(SolverError::InvalidSolution("warmup budget must be finite and nonnegative".into()));
+    }
+    if session != ThresholdSession::Restart && (policy != ThresholdPolicy::Upper || polish_checks != 0) {
+        return Err(SolverError::InvalidSolution(
+            "assumption sessions require the upper policy and polishing disabled".into()));
     }
     let started=Instant::now();
     let duration=std::time::Duration::try_from_secs_f64(timeout)
@@ -181,6 +198,7 @@ pub fn solve_with_polish(problem:&Problem,objective:DelayCostType,timeout:f64,po
             solution:incumbent.clone(),checkpoints:progress.checkpoints,native_sat_calls:stats.calls,
             native_sat_seconds:stats.sat_time.as_secs_f64(),evidence})
     }else{None};
+    let sat_model_builds = if session == ThresholdSession::Restart {
     while let Some(target)=interval.target_for(policy){
         let remaining=timeout-started.elapsed().as_secs_f64();
         if remaining<=0.0 {break;}
@@ -232,32 +250,77 @@ pub fn solve_with_polish(problem:&Problem,objective:DelayCostType,timeout:f64,po
             remaining_seconds:remaining,seconds:query_started.elapsed().as_secs_f64(),
             outcome:outcome.into(),cost,solution,native_sat_calls:stats.calls,
             native_sat_seconds:stats.sat_time.as_secs_f64(),native_budgeted_calls:stats.budgeted_calls,
-            variables,clauses,threshold_evidence:evidence,polish};
+            variables,clauses,threshold_evidence:evidence,polish,model_generation:None};
         checkpoint(&record,interval.lower,interval.upper);queries.push(record);
         if outcome=="unknown" {break;}
     }
+    queries.len()
+    } else {
+        super::threshold_session::search(problem, objective, deadline, session,
+            &mut interval, &mut incumbent, &mut queries, &mut checkpoint)?
+    };
     let elapsed=started.elapsed().as_secs_f64();
     let cost=problem.verify_solution(&incumbent,objective)
         .ok_or_else(||SolverError::InvalidSolution("final incumbent failed validation".into()))?;
     if cost!=interval.upper || interval.lower>cost {
         return Err(SolverError::InvalidSolution("search bounds disagree with incumbent".into()));
     }
-    Ok(SearchResult{schema:"sat-bound-search-v1",solver_name:match (warmup_seconds>0.0,policy) {
+    let solver_name = if session == ThresholdSession::Restart { match (warmup_seconds>0.0,policy) {
         (false,ThresholdPolicy::Bisect)=>"SAT-Bisect-Restart",(false,ThresholdPolicy::CloseUpper)=>"SAT-CloseUpper-Restart",
         (false,ThresholdPolicy::Upper)=>"SAT-Upper-Restart",
         (true,ThresholdPolicy::Bisect)=>"RC2-Warm-SAT-Bisect-Restart",(true,ThresholdPolicy::CloseUpper)=>"RC2-Warm-SAT-CloseUpper-Restart",
-        (true,ThresholdPolicy::Upper)=>"RC2-Warm-SAT-Upper-Restart"},
+        (true,ThresholdPolicy::Upper)=>"RC2-Warm-SAT-Upper-Restart"}
+    } else { session.solver_name(warmup_seconds > 0.0) };
+    Ok(SearchResult{schema:"sat-bound-search-v1",solver_name,
         status:if interval.lower==interval.upper && elapsed<=timeout {"ok"}else{"timeout"},
         uses_optimum_oracle:false,maxsat_backend:"minisat",maxsat_backend_signature:signature,
         timeout_seconds:timeout,total_time:elapsed,lb:interval.lower,ub:interval.upper,cost,solution:incumbent,
         initial_lb,initial_ub,initial_solution,queries,threshold_policy:policy,rc2_warmup_seconds:warmup_seconds,warmup,
-        incumbent_polish_checks:polish_checks})
+        incumbent_polish_checks:polish_checks,threshold_session:session,sat_model_builds})
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::problem::{Train,Visit};
+
+    #[test]
+    fn threshold_sessions_match_exhaustive_optima_and_count_models() {
+        let problem = Problem {
+            name: "threshold-sessions".into(),
+            conflicts: vec![(1, 1)],
+            trains: [2, 1].into_iter().map(|travel_time| Train {
+                visits: vec![Visit { resource_id: 1, earliest: 0, aimed: Some(0), travel_time }],
+            }).collect(),
+        };
+        for objective in [DelayCostType::Continuous, DelayCostType::FiniteSteps123, DelayCostType::InfiniteSteps180] {
+            let optimum = (0..=5).flat_map(|a| (0..=5).map(move |b| (a,b)))
+                .filter_map(|(a,b)| problem.verify_solution(&[vec![a,a+2],vec![b,b+1]],objective))
+                .min().unwrap();
+            for session in [ThresholdSession::Restart, ThresholdSession::RestartAssumptions, ThresholdSession::Reuse] {
+                let result = solve_with_session(&problem, objective, 5.0, ThresholdPolicy::Upper,
+                    0.0, 0, session, |_,_,_| {}).unwrap();
+                assert_eq!((result.status, result.lb, result.ub), ("ok", optimum, optimum));
+                let builds = if session == ThresholdSession::Reuse { 1 } else { result.queries.len() };
+                assert_eq!(result.sat_model_builds, builds);
+                assert_eq!(result.queries.last().unwrap().target, optimum - 1);
+                assert_eq!(result.queries.last().unwrap().outcome, "unsat");
+                if matches!(objective, DelayCostType::Continuous) {
+                    assert!(result.queries.len() >= 2);
+                    assert_eq!(result.queries.last().unwrap().target, 0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn unsupported_session_combinations_fail_before_search() {
+        let problem=Problem{name:"empty".into(),conflicts:vec![],trains:vec![]};
+        for (policy, polish) in [(ThresholdPolicy::Bisect, 0), (ThresholdPolicy::Upper, 1)] {
+            assert!(matches!(solve_with_session(&problem, DelayCostType::Continuous, 1.0,
+                policy, 0.0, polish, ThresholdSession::Reuse, |_,_,_| {}), Err(SolverError::InvalidSolution(_))));
+        }
+    }
     #[test]
     fn polished_search_matches_exhaustive_optima_and_never_raises_a_sat_cost(){
         let p=Problem{name:"polished-search".into(),conflicts:vec![(0,0)],trains:vec![

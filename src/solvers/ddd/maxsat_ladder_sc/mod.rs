@@ -35,6 +35,7 @@ pub use settings::{
     AglrSettings, AssumptionStrategy, MaxSatDddLadderScSettings, RefinementPolicy,
     RescueProgressPolicy,
 };
+pub(crate) use solve::solve_threshold_session;
 pub use solve::{
     solve, solve_debug, solve_debug_with_settings, solve_with_settings, solve_bound_diagnostic,
     solve_cost_threshold, solve_with_progress, BoundDiagnostic, IterationType, SolveStats,

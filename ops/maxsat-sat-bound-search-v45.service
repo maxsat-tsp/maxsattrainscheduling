@@ -1,0 +1,18 @@
+[Unit]
+Description=V45 MiniSAT threshold sessions and exact-optimum regressions
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/sat-bound-search-v45
+EnvironmentFile=/home/tuyenkv/.config/maxsat/sat-bound-search-v45.env
+ExecStart=/usr/bin/taskset -c 0,1,4,5 /bin/bash /home/tuyenkv/projects/sat-bound-search-v45/ops/run_sat_bound_search_v45.sh
+RuntimeMaxSec=21600
+TimeoutStopSec=30
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

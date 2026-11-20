@@ -20,12 +20,12 @@ def checked_bounds(row,reference):
         raise ValueError('new MILP bounds contradict the audited SAT reference')
 
 
-def audit(root):
-    m=json.loads((root/'manifest.json').read_text());inventory=Path(m['inventory'])
+def audit(root, inventory_override=None, reference_override=None):
+    m=json.loads((root/'manifest.json').read_text());inventory=inventory_override or Path(m['inventory'])
     if ex.focus.sha(inventory)!=m['inventory_sha256'] or m['dataset_sha256']!=ex.focus.dataset_hash():raise ValueError('inventory or dataset changed')
     old=json.loads(inventory.read_text())
     if m['tasks']!=old['at_target']['missing_at_cutoff']:raise ValueError('tail selection changed')
-    checked=Path(m['checked_reference'])
+    checked=reference_override or Path(m['checked_reference'])
     if ex.focus.sha(checked)!=m['checked_reference_sha256']:raise ValueError('checked reference changed')
     reference=json.loads(checked.read_text())
     if not reference.get('candidate_audit_passed') or not (reference.get('full_comparison') or {}).get('complete'):raise ValueError('reference is not an audited full search')

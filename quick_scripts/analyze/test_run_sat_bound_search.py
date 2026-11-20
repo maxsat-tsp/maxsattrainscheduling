@@ -10,6 +10,34 @@ import run_sat_bound_search as search
 
 
 class SearchAuditTests(unittest.TestCase):
+    def test_reused_threshold_session_requires_one_model_and_the_same_initial_capacity(self):
+        data = self.fixture('upper')
+        data.update(solver_name='SAT-Upper-Reuse', threshold_session='reuse', sat_model_builds=1)
+        for query in data['queries']:
+            query['model_generation'] = 1
+            query['threshold_evidence'].update(
+                threshold_budget_assumptions=True, threshold_budget_capacity=data['initial_ub']-1)
+        row, _ = search.check_result(data,'origA1','cont',300,5526)
+        self.assertTrue(row['proven'])
+        self.assertEqual(row['first_query_outcome'], 'sat')
+        for bad in ('generation', 'budget', 'size'):
+            changed = copy.deepcopy(data)
+            query = changed['queries'][-1]
+            if bad == 'generation':
+                query['model_generation'] = 2
+            elif bad == 'budget':
+                query['threshold_evidence']['threshold_budget_capacity'] = query['target']
+            else:
+                query['variables'] = 0
+            with self.assertRaises(ValueError):
+                search.check_result(changed,'origA1','cont',300,5526)
+
+    def test_confirmation_cannot_switch_threshold_session(self):
+        manifest = {k: 0 for k in ('commit','binary_sha256','build_manifest_sha256',
+                                   'dataset_sha256','timeout_seconds','ram_kb','cpu_affinity')}
+        with self.assertRaisesRegex(ValueError,'mixes methods'):
+            search.same_method(dict(manifest, threshold_session='reuse'), manifest)
+
     def polished_fixture(self):
         r=self.fixture('upper');r['incumbent_polish_checks']=4096
         for q in r['queries']:

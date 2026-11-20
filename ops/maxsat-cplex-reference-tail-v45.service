@@ -1,0 +1,18 @@
+[Unit]
+Description=Complete the corrected CPLEX baseline at 300 seconds after V45
+After=network-online.target maxsat-sat-bound-search-v45.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tuyenkv
+WorkingDirectory=/home/tuyenkv/projects/sat-bound-search-v45
+EnvironmentFile=/home/tuyenkv/.config/maxsat/sat-bound-search-v45.env
+ExecStart=/bin/bash /home/tuyenkv/projects/sat-bound-search-v45/ops/run_cplex_reference_tail_v45.sh
+RuntimeMaxSec=43200
+TimeoutStopSec=30
+KillMode=control-group
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

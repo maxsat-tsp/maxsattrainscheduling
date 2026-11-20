@@ -18,6 +18,8 @@ import extended_timeout_experiments as ex
 import targeted_order_cycles as trial
 import bound_quality
 
+SESSIONS = ('restart', 'restart-assumptions', 'reuse')
+
 
 def initial_lower(name,objective):
     total=0
@@ -100,7 +102,12 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     polish_checks=result.get('incumbent_polish_checks',0)
     if type(polish_checks) is not int or polish_checks<0:raise ValueError('invalid incumbent polish check limit')
     policy=result.get('threshold_policy','bisect')
+    session=result.get('threshold_session','restart')
     solver={'bisect':'SAT-Bisect-Restart','close-upper':'SAT-CloseUpper-Restart','upper':'SAT-Upper-Restart'}.get(policy)
+    if session not in SESSIONS or (session != 'restart' and (policy != 'upper' or polish_checks)):
+        raise ValueError('invalid SAT threshold session')
+    if session != 'restart':
+        solver = {'reuse': 'SAT-Upper-Reuse', 'restart-assumptions': 'SAT-Upper-RestartAssumptions'}[session]
     requested=result.get('rc2_warmup_seconds',0)
     if isinstance(requested,bool) or not isinstance(requested,(int,float)) or not math.isfinite(requested) or requested<0:raise ValueError('invalid RC2 warmup allocation')
     if requested>0 and solver is not None:solver='RC2-Warm-'+solver
@@ -121,7 +128,13 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     if known_optimum is not None and not lower<=known_optimum<=upper:raise ValueError('RC2 warmup contradicts a known optimum')
     queries=result.get('queries');unknown=False;last_remaining=float('inf');trace=[]
     if not isinstance(queries,list):raise ValueError('missing query ledger')
-    for q in queries:
+    expected_builds = min(1, len(queries)) if session == 'reuse' else len(queries)
+    if (session != 'restart' or 'sat_model_builds' in result) and (
+            type(result.get('sat_model_builds')) is not int or result['sat_model_builds'] != expected_builds):
+        raise ValueError('wrong SAT model build count')
+    capacity = upper - 1
+    model_size = (0, 0)
+    for index, q in enumerate(queries, 1):
         if unknown:raise ValueError('continued after UNKNOWN')
         if lower>=upper:raise ValueError('queried after the gap closed')
         target=query_target(lower,upper,policy)
@@ -139,6 +152,17 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
         required=dict(threshold_target=target,maxsat_objective_bound=True,
             maxsat_resource_orders=True,maxsat_order_transitivity=True,maxsat_sparse_costs=False)
         if any(evidence.get(k)!=v for k,v in required.items()):raise ValueError('wrong fixed-bound query definition')
+        if session != 'restart':
+            generation = 1 if session == 'reuse' else index
+            if (q.get('model_generation') != generation or
+                    evidence.get('threshold_budget_assumptions') is not True or
+                    evidence.get('threshold_budget_capacity') != capacity):
+                raise ValueError('wrong assumption budget or SAT model generation')
+            size = (q.get('variables'), q.get('clauses'))
+            if any(type(n) is not int or n < 0 for n in size) or (
+                    session == 'reuse' and any(n < old for n, old in zip(size, model_size))):
+                raise ValueError('SAT model size decreased within a reused session')
+            model_size = size
         if any(k.startswith('diagnostic_') for k in evidence):raise ValueError('diagnostic oracle metadata leaked into optimizer')
         answer=q.get('outcome')
         polish=q.get('polish')
@@ -188,7 +212,11 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     else:raise ValueError('fatal optimizer status: '+str(status))
     return dict(objective=objective,name=name,status=status,proven=status=='ok',seconds=seconds,
         lb=lower,ub=upper,cost=upper,queries=len(queries),sat_calls=warm_calls+sum(q['native_sat_calls'] for q in queries),
-        threshold_policy=policy,rc2_warmup_seconds=result.get('rc2_warmup_seconds',0),incumbent_polish_checks=polish_checks),trace
+        threshold_policy=policy,rc2_warmup_seconds=result.get('rc2_warmup_seconds',0),incumbent_polish_checks=polish_checks,
+        threshold_session=session,sat_model_builds=expected_builds,
+        first_query_outcome=queries[0]['outcome'] if queries else None,
+        first_query_seconds=queries[0]['seconds'] if queries else None,
+        later_query_seconds=sum(q['seconds'] for q in queries[1:])),trace
 
 
 def reference_costs(reference,diagnostic_root):
@@ -240,7 +268,8 @@ def _selection_records(path,digest,reference,diagnostic_root,reference_digest):
 def same_method(a,b):
     keys=('commit','binary_sha256','build_manifest_sha256','dataset_sha256','timeout_seconds','ram_kb','cpu_affinity')
     if any(a[k]!=b[k] for k in keys) or any(a.get(k,d)!=b.get(k,d) for k,d in
-            [('threshold_policy','bisect'),('rc2_warmup_seconds',0),('incumbent_polish_checks',0),('selection_archive',None),('selection_archive_sha256',None)]):
+            [('threshold_policy','bisect'),('rc2_warmup_seconds',0),('incumbent_polish_checks',0),
+             ('threshold_session','restart'),('selection_archive',None),('selection_archive_sha256',None)]):
         raise ValueError('full evaluation mixes methods, selection sources or resource limits')
 
 
@@ -285,6 +314,7 @@ def audit(root,reference,diagnostic_root=None):
         if 'threshold_policy' in manifest:expected['threshold_policy']=manifest['threshold_policy']
         if 'rc2_warmup_seconds' in manifest:expected['rc2_warmup_seconds']=manifest['rc2_warmup_seconds']
         if 'incumbent_polish_checks' in manifest:expected['incumbent_polish_checks']=manifest['incumbent_polish_checks']
+        if 'threshold_session' in manifest:expected['threshold_session']=manifest['threshold_session']
         if launch!=expected:raise ValueError('launch provenance changed')
         done=json.load(open(case/'completion.json'))
         if done.get('returncode')!=0 or done.get('result_sha256')!=ex.focus.sha(result):
@@ -294,6 +324,7 @@ def audit(root,reference,diagnostic_root=None):
         if row['threshold_policy']!=manifest.get('threshold_policy','bisect'):raise ValueError('query policy differs from campaign')
         if row['rc2_warmup_seconds']!=manifest.get('rc2_warmup_seconds',0):raise ValueError('warmup allocation differs from campaign')
         if row['incumbent_polish_checks']!=manifest.get('incumbent_polish_checks',0):raise ValueError('polish check limit differs from campaign')
+        if row['threshold_session']!=manifest.get('threshold_session','restart'):raise ValueError('SAT session differs from campaign')
         if trace!=[json.loads(line) for line in (case/'result.trace.jsonl').read_text().splitlines()]:
             raise ValueError('progress trace does not match replayed results')
         records.append(dict(row,repeat=repeat))
@@ -308,7 +339,7 @@ def audit(root,reference,diagnostic_root=None):
         submission_passed=False,scope='selected pairs only; full coverage requires regression')
 
 
-def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat,policy=None,warmup=None,polish_checks=None):
+def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat,policy=None,warmup=None,polish_checks=None,session=None):
     case.mkdir(parents=True,exist_ok=True)
     if (case/'result.json').exists():return
     if (case/'launch.json').exists():raise ValueError('interrupted case needs review; never overwrite it')
@@ -317,6 +348,7 @@ def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat,policy=None,
     if policy is not None:launch['threshold_policy']=policy
     if warmup is not None:launch['rc2_warmup_seconds']=warmup
     if polish_checks is not None:launch['incumbent_polish_checks']=polish_checks
+    if session is not None:launch['threshold_session']=session
     ex.save(case/'launch.json',launch)
     def limits():resource.setrlimit(resource.RLIMIT_AS,(ram_kb*1024,ram_kb*1024))
     command=[str(binary.resolve()),'--instance',str(ex.common.instance_path(name)),
@@ -324,6 +356,7 @@ def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat,policy=None,
     if policy is not None:command+=['--threshold-policy',policy]
     if warmup is not None:command+=['--rc2-warmup-seconds',str(warmup)]
     if polish_checks is not None:command+=['--incumbent-polish-checks',str(polish_checks)]
+    if session is not None:command+=['--threshold-session',session]
     with (case/'stdout.log').open('w') as out,(case/'stderr.log').open('w') as err:
         result=subprocess.run(command,cwd=ex.REPO,stdout=out,stderr=err,preexec_fn=limits,timeout=cutoff+45)
     ex.save(case/'completion.json',dict(returncode=result.returncode,
@@ -331,6 +364,7 @@ def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat,policy=None,
 
 
 def run(args):
+    session = getattr(args, 'threshold_session', None)
     source,_,_=trial.load_reference(args.reference)
     selection={}
     if args.selection_archive is not None:
@@ -361,14 +395,16 @@ def run(args):
         timeout_seconds=source['timeout_seconds'],ram_kb=source['ram_kb'],cpu_affinity=sorted(os.sched_getaffinity(0)),
         source_script_sha256=ex.focus.sha(Path(__file__)),followup=str(args.followup) if args.followup else None,
         uses_optimum_oracle=False,threshold_policy=args.threshold_policy,extra_instances=args.extra_instance,rc2_warmup_seconds=args.rc2_warmup_seconds,incumbent_polish_checks=args.incumbent_polish_checks,**selection)
+    if session is not None:manifest['threshold_session']=session
+    if args.followup is not None:same_method(previous_manifest,manifest)
     if (root/'manifest.json').exists() and json.load(open(root/'manifest.json'))!=manifest:raise ValueError('unsafe resume')
     ex.save(root/'manifest.json',manifest);(root/'build_manifest.json').write_bytes(args.build_manifest.read_bytes())
     deadline=time.monotonic()+args.round_seconds
     for task in tasks:
         o,n,i=task['objective'],task['name'],task['repeat'];case=root/'cases'/o/n/str(i)
         if not (case/'result.json').exists() and deadline-time.monotonic()<source['timeout_seconds']+60:break
-        print(f'SAT search ({args.threshold_policy}) {o}/{n} repeat={i}',flush=True)
-        run_case(args.binary,source['timeout_seconds'],source['ram_kb'],commit,case,o,n,i,args.threshold_policy,args.rc2_warmup_seconds,args.incumbent_polish_checks)
+        print(f'SAT search ({args.threshold_policy}, {session or "restart"}) {o}/{n} repeat={i}',flush=True)
+        run_case(args.binary,source['timeout_seconds'],source['ram_kb'],commit,case,o,n,i,args.threshold_policy,args.rc2_warmup_seconds,args.incumbent_polish_checks,session)
         report=audit(root,args.reference,args.diagnostic_root);ex.save(root/'audit.json',report)
         if args.followup is not None and i>0 and not report['records'][-1]['proven']:
             ex.save(root/'followup_stopped.json',dict(reason='a newly solved pair did not repeat',objective=o,name=n,repeat=i))
@@ -385,10 +421,13 @@ def main():
     p.add_argument('--extra-instance',nargs=2,action='append',default=[],metavar=('OBJECTIVE','NAME'))
     p.add_argument('--rc2-warmup-seconds',type=float,default=0)
     p.add_argument('--incumbent-polish-checks',type=int,default=0)
+    p.add_argument('--threshold-session',choices=SESSIONS)
     p.add_argument('--selection-archive',type=Path,help='audited previous full search; test only its unresolved pairs')
     p.add_argument('--round-seconds',type=int,default=18000);a=p.parse_args()
     if a.action=='audit':print(json.dumps(audit(a.results,a.reference,a.diagnostic_root),indent=2));return
     if a.binary is None or a.build_manifest is None or not 0<a.round_seconds<=21600 or not math.isfinite(a.rc2_warmup_seconds) or a.rc2_warmup_seconds<0 or a.incumbent_polish_checks<0:p.error('missing build or invalid round/warmup budget')
+    if a.threshold_session in SESSIONS[1:] and (a.threshold_policy != 'upper' or a.incumbent_polish_checks):
+        p.error('assumption sessions require the upper policy and polishing disabled')
     try:run(a)
     except BaseException as error:
         if a.results.exists():ex.save(a.results/'failure.json',dict(error=str(error) or type(error).__name__))

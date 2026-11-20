@@ -242,7 +242,9 @@ class Pool:
 
     def search_history(self,reference,diagnostics,exclude_binary):
         """Earlier autonomous searches are now part of the known-bound pool."""
-        for path in sorted(RESEARCH.glob('v*_sat_bound_search_*/complete_snapshot.tar.gz')):
+        archives = list(RESEARCH.glob('v*_sat_bound_search_*/complete_snapshot.tar.gz'))
+        archives += list(RESEARCH.glob('v*_*/hard_snapshot.tar.gz'))
+        for path in sorted(archives):
             with tempfile.TemporaryDirectory(prefix='previous-sat-search-') as folder:
                 root=Path(folder)
                 with tarfile.open(path) as archive:
@@ -254,11 +256,16 @@ class Pool:
                 manifest=json.loads((root/'hard/manifest.json').read_text())
                 if manifest['binary_sha256']==exclude_binary:continue
                 hard=search.audit(root/'hard',reference,diagnostics)
-                followup=search.audit(root/'followup',reference,diagnostics)
-                baseline,_=search.baseline_for_manifest(manifest,reference,diagnostics)
-                records,_=combine_full(hard,followup,baseline);self.track(path)
-                if manifest['binary_sha256']!=json.loads((root/'followup/manifest.json').read_text())['binary_sha256']:
-                    raise ValueError('historical search mixes binaries')
+                if not hard['complete'] or not (root/'COMPLETED').exists():
+                    raise ValueError('archived search is incomplete')
+                if path.name == 'complete_snapshot.tar.gz':
+                    followup=search.audit(root/'followup',reference,diagnostics)
+                    baseline,_=search.baseline_for_manifest(manifest,reference,diagnostics)
+                    search.same_method(manifest,json.loads((root/'followup/manifest.json').read_text()))
+                    records,_=combine_full(hard,followup,baseline)
+                else:
+                    records=hard['records']
+                self.track(path)
                 for r in records:
                     record=self.add(r['objective'],r['name'],r['lb'],r['ub'],'SAT-search-'+manifest['commit'][:7],
                         manifest['timeout_seconds'],str(path)+'#'+r['objective']+'/'+r['name'],
@@ -272,6 +279,46 @@ class Pool:
             self.track(path);self.track(original)
             self.result(m['objective'],m['name'],checked['solve'],'BigM-CPLEX-Tight',
                 m['timeout_seconds'],str(path)+'#tight_recheck')
+
+    def gurobi_tail(self):
+        from run_gurobi_reference_tail import audit
+        source = RESEARCH/'baseline_inventory_20261110'
+        snapshot = source/'gurobi_tail_snapshot.tar.gz'
+        if not snapshot.exists():
+            return
+        reference = RESEARCH/'v42_sat_bound_search_20261109/full_evaluation.json'
+        inventory = source/'gurobi_inventory.json'
+        self.track(snapshot)
+        self.track(reference)
+        self.track(inventory)
+        with tempfile.TemporaryDirectory(prefix='gurobi-tail-') as folder:
+            root = Path(folder)
+            with tarfile.open(snapshot) as archive:
+                for member in archive.getmembers():
+                    if (root.resolve() not in (root/member.name).resolve().parents
+                            or not (member.isfile() or member.isdir())):
+                        raise ValueError('unsafe Gurobi tail archive')
+                archive.extractall(root)
+            report = audit(root,inventory,reference)
+            if not report['complete']:
+                raise ValueError('incomplete archived Gurobi tail')
+            for row in report['cases']:
+                o,n = row['objective'],row['name']
+                relative = Path('cases/BigM-Gurobi')/o/n/(o+'.json')
+                solve = json.loads((root/relative).read_text())[0]['solves'][0]
+                self.result(o,n,solve,'BigM-Gurobi',300,str(snapshot)+'#'+str(relative))
+
+    def cplex_tail(self, root):
+        from run_cplex_reference_tail import audit, source_material
+        report = audit(root,source_material())
+        if not report['complete']:
+            raise ValueError('incomplete CPLEX tail')
+        self.track(root/'manifest.json')
+        for row in report['cases']:
+            o,n = row['objective'],row['name']
+            raw = root/'cases'/o/n/'result.json'
+            self.track(raw)
+            self.result(o,n,json.loads(raw.read_text()),'BigM-CPLEX-Tight',300,str(raw))
 
     def offline_upper_witness(self,path):
         """A valid derived schedule is known UB evidence, never coverage/LB."""
@@ -391,6 +438,9 @@ def evaluate(args,candidate):
         pool.targeted_history(args.reference)
         pool.search_history(args.reference,args.diagnostics,json.loads((candidate/'manifest.json').read_text())['binary_sha256'])
         pool.cplex_rechecks()
+        pool.gurobi_tail()
+        if getattr(args,'cplex_tail',None) is not None:
+            pool.cplex_tail(args.cplex_tail)
         for path in sorted(RESEARCH.glob('offline_incumbent_polish_*/witness.json')):
             pool.offline_upper_witness(path)
         pool.check_reference_consistency()
@@ -446,6 +496,7 @@ if __name__=='__main__':
     p.add_argument('--gurobi-json',nargs=2,action='append',default=[],metavar=('OBJECTIVE','JSON'))
     p.add_argument('--sat600',type=Path,default=RESEARCH/'v17_extended600_20261107')
     p.add_argument('--cplex-archive',type=Path,default=RESEARCH/'cplex_full_120_20261108/raw_snapshot.tar.gz')
+    p.add_argument('--cplex-tail',type=Path)
     p.add_argument('--extended-archive',type=Path,action='append',default=[
         RESEARCH/'extended_300_20261106/progress_82/raw_snapshot.tar.gz',
         RESEARCH/'cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz'])

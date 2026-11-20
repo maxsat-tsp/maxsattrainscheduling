@@ -1,0 +1,770 @@
+{
+  "schema": "gurobi-reference-tail-audit-v1",
+  "audit_passed": true,
+  "complete": true,
+  "completed_runs": 6,
+  "expected_runs": 6,
+  "cases": [
+    {
+      "objective": "infsteps180",
+      "name": "trackA11",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.004540971,
+      "lb": 97,
+      "ub": 132,
+      "cost": null
+    },
+    {
+      "objective": "infsteps180",
+      "name": "trackA12",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.005196755,
+      "lb": 105,
+      "ub": 161,
+      "cost": null
+    },
+    {
+      "objective": "infsteps180",
+      "name": "stationA8",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.003373849,
+      "lb": 161,
+      "ub": 171,
+      "cost": null
+    },
+    {
+      "objective": "infsteps180",
+      "name": "stationA11",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.004131482,
+      "lb": 101,
+      "ub": 133,
+      "cost": null
+    },
+    {
+      "objective": "infsteps180",
+      "name": "stationA12",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.002787656,
+      "lb": 112,
+      "ub": 160,
+      "cost": null
+    },
+    {
+      "objective": "cont",
+      "name": "stationA12",
+      "status": "timeout",
+      "proven": false,
+      "seconds": 300.002912726,
+      "lb": 17869,
+      "ub": 24974,
+      "cost": null
+    }
+  ],
+  "inventory": {
+    "coverage": {
+      "finsteps123": 72,
+      "infsteps180": 67,
+      "cont": 68
+    },
+    "total": 207,
+    "complete": true,
+    "missing_at_cutoff": [],
+    "observed_no_proof_at_cutoff": [
+      [
+        "infsteps180",
+        "trackA11"
+      ],
+      [
+        "infsteps180",
+        "trackA12"
+      ],
+      [
+        "infsteps180",
+        "stationA8"
+      ],
+      [
+        "infsteps180",
+        "stationA11"
+      ],
+      [
+        "infsteps180",
+        "stationA12"
+      ],
+      [
+        "cont",
+        "trackA11"
+      ],
+      [
+        "cont",
+        "trackA12"
+      ],
+      [
+        "cont",
+        "stationA11"
+      ],
+      [
+        "cont",
+        "stationA12"
+      ]
+    ],
+    "proof_sources": {
+      "finsteps123/origA1": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA1"
+      ],
+      "finsteps123/origA2": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA2"
+      ],
+      "finsteps123/origA3": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA3"
+      ],
+      "finsteps123/origA4": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA4"
+      ],
+      "finsteps123/origA5": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA5"
+      ],
+      "finsteps123/origA6": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA6"
+      ],
+      "finsteps123/origA7": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA7"
+      ],
+      "finsteps123/origA8": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA8"
+      ],
+      "finsteps123/origA9": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA9"
+      ],
+      "finsteps123/origA10": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA10"
+      ],
+      "finsteps123/origA11": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA11"
+      ],
+      "finsteps123/origA12": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origA12"
+      ],
+      "finsteps123/origB1": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB1"
+      ],
+      "finsteps123/origB2": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB2"
+      ],
+      "finsteps123/origB3": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB3"
+      ],
+      "finsteps123/origB4": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB4"
+      ],
+      "finsteps123/origB5": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB5"
+      ],
+      "finsteps123/origB6": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB6"
+      ],
+      "finsteps123/origB7": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB7"
+      ],
+      "finsteps123/origB8": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB8"
+      ],
+      "finsteps123/origB9": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB9"
+      ],
+      "finsteps123/origB10": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB10"
+      ],
+      "finsteps123/origB11": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB11"
+      ],
+      "finsteps123/origB12": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#origB12"
+      ],
+      "finsteps123/trackA1": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA1"
+      ],
+      "finsteps123/trackA2": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA2"
+      ],
+      "finsteps123/trackA3": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA3"
+      ],
+      "finsteps123/trackA4": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA4"
+      ],
+      "finsteps123/trackA5": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA5"
+      ],
+      "finsteps123/trackA6": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA6"
+      ],
+      "finsteps123/trackA7": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA7"
+      ],
+      "finsteps123/trackA8": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA8"
+      ],
+      "finsteps123/trackA9": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA9"
+      ],
+      "finsteps123/trackA10": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA10"
+      ],
+      "finsteps123/trackA11": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA11"
+      ],
+      "finsteps123/trackA12": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackA12"
+      ],
+      "finsteps123/trackB1": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB1"
+      ],
+      "finsteps123/trackB2": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB2"
+      ],
+      "finsteps123/trackB3": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB3"
+      ],
+      "finsteps123/trackB4": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB4"
+      ],
+      "finsteps123/trackB5": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB5"
+      ],
+      "finsteps123/trackB6": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB6"
+      ],
+      "finsteps123/trackB7": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB7"
+      ],
+      "finsteps123/trackB8": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB8"
+      ],
+      "finsteps123/trackB9": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB9"
+      ],
+      "finsteps123/trackB10": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB10"
+      ],
+      "finsteps123/trackB11": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB11"
+      ],
+      "finsteps123/trackB12": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#trackB12"
+      ],
+      "finsteps123/stationA1": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA1"
+      ],
+      "finsteps123/stationA2": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA2"
+      ],
+      "finsteps123/stationA3": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA3"
+      ],
+      "finsteps123/stationA4": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA4"
+      ],
+      "finsteps123/stationA5": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA5"
+      ],
+      "finsteps123/stationA6": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA6"
+      ],
+      "finsteps123/stationA7": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA7"
+      ],
+      "finsteps123/stationA8": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA8"
+      ],
+      "finsteps123/stationA9": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA9"
+      ],
+      "finsteps123/stationA10": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA10"
+      ],
+      "finsteps123/stationA11": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA11"
+      ],
+      "finsteps123/stationA12": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationA12"
+      ],
+      "finsteps123/stationB1": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB1"
+      ],
+      "finsteps123/stationB2": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB2"
+      ],
+      "finsteps123/stationB3": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB3"
+      ],
+      "finsteps123/stationB4": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB4"
+      ],
+      "finsteps123/stationB5": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB5"
+      ],
+      "finsteps123/stationB6": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB6"
+      ],
+      "finsteps123/stationB7": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB7"
+      ],
+      "finsteps123/stationB8": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB8"
+      ],
+      "finsteps123/stationB9": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB9"
+      ],
+      "finsteps123/stationB10": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB10"
+      ],
+      "finsteps123/stationB11": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB11"
+      ],
+      "finsteps123/stationB12": [
+        "results/sat_research/baseline_inventory_20261110/gurobi_finsteps123_source.json#stationB12"
+      ],
+      "infsteps180/origA1": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA1"
+      ],
+      "infsteps180/origA2": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA2"
+      ],
+      "infsteps180/origA3": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA3"
+      ],
+      "infsteps180/origA4": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA4"
+      ],
+      "infsteps180/origA5": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA5"
+      ],
+      "infsteps180/origA6": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA6"
+      ],
+      "infsteps180/origA7": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA7"
+      ],
+      "infsteps180/origA8": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA8"
+      ],
+      "infsteps180/origA9": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA9"
+      ],
+      "infsteps180/origA10": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA10"
+      ],
+      "infsteps180/origA11": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA11"
+      ],
+      "infsteps180/origA12": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origA12"
+      ],
+      "infsteps180/origB1": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB1"
+      ],
+      "infsteps180/origB2": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB2"
+      ],
+      "infsteps180/origB3": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB3"
+      ],
+      "infsteps180/origB4": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB4"
+      ],
+      "infsteps180/origB5": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB5"
+      ],
+      "infsteps180/origB6": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB6"
+      ],
+      "infsteps180/origB7": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB7"
+      ],
+      "infsteps180/origB8": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB8"
+      ],
+      "infsteps180/origB9": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB9"
+      ],
+      "infsteps180/origB10": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB10"
+      ],
+      "infsteps180/origB11": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB11"
+      ],
+      "infsteps180/origB12": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#origB12"
+      ],
+      "infsteps180/trackA1": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA1"
+      ],
+      "infsteps180/trackA2": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA2"
+      ],
+      "infsteps180/trackA3": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA3"
+      ],
+      "infsteps180/trackA4": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA4"
+      ],
+      "infsteps180/trackA5": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA5"
+      ],
+      "infsteps180/trackA6": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA6"
+      ],
+      "infsteps180/trackA7": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA7"
+      ],
+      "infsteps180/trackA8": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA8"
+      ],
+      "infsteps180/trackA9": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA9"
+      ],
+      "infsteps180/trackA10": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackA10"
+      ],
+      "infsteps180/trackB1": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB1"
+      ],
+      "infsteps180/trackB2": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB2"
+      ],
+      "infsteps180/trackB3": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB3"
+      ],
+      "infsteps180/trackB4": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB4"
+      ],
+      "infsteps180/trackB5": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB5"
+      ],
+      "infsteps180/trackB6": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB6"
+      ],
+      "infsteps180/trackB7": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB7"
+      ],
+      "infsteps180/trackB8": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB8"
+      ],
+      "infsteps180/trackB9": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB9"
+      ],
+      "infsteps180/trackB10": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB10"
+      ],
+      "infsteps180/trackB11": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB11"
+      ],
+      "infsteps180/trackB12": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#trackB12"
+      ],
+      "infsteps180/stationA1": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA1"
+      ],
+      "infsteps180/stationA2": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA2"
+      ],
+      "infsteps180/stationA3": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA3"
+      ],
+      "infsteps180/stationA4": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA4"
+      ],
+      "infsteps180/stationA5": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA5"
+      ],
+      "infsteps180/stationA6": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA6"
+      ],
+      "infsteps180/stationA7": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA7"
+      ],
+      "infsteps180/stationA9": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA9"
+      ],
+      "infsteps180/stationA10": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationA10"
+      ],
+      "infsteps180/stationB1": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB1"
+      ],
+      "infsteps180/stationB2": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB2"
+      ],
+      "infsteps180/stationB3": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB3"
+      ],
+      "infsteps180/stationB4": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB4"
+      ],
+      "infsteps180/stationB5": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB5"
+      ],
+      "infsteps180/stationB6": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB6"
+      ],
+      "infsteps180/stationB7": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB7"
+      ],
+      "infsteps180/stationB8": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB8"
+      ],
+      "infsteps180/stationB9": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB9"
+      ],
+      "infsteps180/stationB10": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB10"
+      ],
+      "infsteps180/stationB11": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB11"
+      ],
+      "infsteps180/stationB12": [
+        "results/sat_research/v40_sat_bound_search_20261109/gurobi_infsteps180_source.json#stationB12"
+      ],
+      "cont/origA1": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA1"
+      ],
+      "cont/origA2": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA2"
+      ],
+      "cont/origA3": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA3"
+      ],
+      "cont/origA4": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA4"
+      ],
+      "cont/origA5": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA5"
+      ],
+      "cont/origA6": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA6"
+      ],
+      "cont/origA7": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA7"
+      ],
+      "cont/origA8": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA8",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/origA8/cont.json@8822b69c6065af137a969e5cb3bf6aa4baa02140af17d171a2c14dc37c0f274c",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/origA8/cont.json@8822b69c6065af137a969e5cb3bf6aa4baa02140af17d171a2c14dc37c0f274c"
+      ],
+      "cont/origA9": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA9"
+      ],
+      "cont/origA10": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA10"
+      ],
+      "cont/origA11": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA11",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/origA11/cont.json@874888d01e87d094c6fa842638b57558f642185731741d4910d04d1a87a7d17b"
+      ],
+      "cont/origA12": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origA12"
+      ],
+      "cont/origB1": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB1"
+      ],
+      "cont/origB2": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB2"
+      ],
+      "cont/origB3": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB3"
+      ],
+      "cont/origB4": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB4"
+      ],
+      "cont/origB5": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB5"
+      ],
+      "cont/origB6": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB6"
+      ],
+      "cont/origB7": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB7"
+      ],
+      "cont/origB8": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB8"
+      ],
+      "cont/origB9": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB9"
+      ],
+      "cont/origB10": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB10"
+      ],
+      "cont/origB11": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB11",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/origB11/cont.json@d6ac791ce820bd9a52453192fa27425aa2916479303bae4c7400977a2d555034",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/origB11/cont.json@d6ac791ce820bd9a52453192fa27425aa2916479303bae4c7400977a2d555034"
+      ],
+      "cont/origB12": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#origB12"
+      ],
+      "cont/trackA1": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA1"
+      ],
+      "cont/trackA2": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA2"
+      ],
+      "cont/trackA3": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA3"
+      ],
+      "cont/trackA4": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA4"
+      ],
+      "cont/trackA5": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA5"
+      ],
+      "cont/trackA6": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA6"
+      ],
+      "cont/trackA7": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA7"
+      ],
+      "cont/trackA8": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA8",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackA8/cont.json@8632056b998c55fd641d89d5b044961ed676bb3a70526c8b2f2fedd407fe1fb8",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackA8/cont.json@8632056b998c55fd641d89d5b044961ed676bb3a70526c8b2f2fedd407fe1fb8"
+      ],
+      "cont/trackA9": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA9"
+      ],
+      "cont/trackA10": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackA10"
+      ],
+      "cont/trackB1": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB1"
+      ],
+      "cont/trackB2": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB2"
+      ],
+      "cont/trackB3": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB3"
+      ],
+      "cont/trackB4": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB4"
+      ],
+      "cont/trackB5": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB5"
+      ],
+      "cont/trackB6": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB6"
+      ],
+      "cont/trackB7": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB7",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackB7/cont.json@798c8ff15a1d0f8b954c7a66d20047d2a8f666f8c149a5e7ed26aacd66c815ae",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackB7/cont.json@798c8ff15a1d0f8b954c7a66d20047d2a8f666f8c149a5e7ed26aacd66c815ae"
+      ],
+      "cont/trackB8": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB8"
+      ],
+      "cont/trackB9": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB9",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackB9/cont.json@5ef053a4198da94cb3d6d63b9b27f623447450412f73245b9e0c29e3d02d3237",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackB9/cont.json@5ef053a4198da94cb3d6d63b9b27f623447450412f73245b9e0c29e3d02d3237"
+      ],
+      "cont/trackB10": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB10"
+      ],
+      "cont/trackB11": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB11",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackB11/cont.json@91cd2a94a1d7d2976597a68c937bd59f6371b54662d97ca14c14d692ca88ccdb",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackB11/cont.json@91cd2a94a1d7d2976597a68c937bd59f6371b54662d97ca14c14d692ca88ccdb"
+      ],
+      "cont/trackB12": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#trackB12",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackB12/cont.json@788b4c18fbec0ec3db93288f9e1a733ef743e9ed8e307ef396fd89dea414f40d",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/trackB12/cont.json@788b4c18fbec0ec3db93288f9e1a733ef743e9ed8e307ef396fd89dea414f40d"
+      ],
+      "cont/stationA1": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA1"
+      ],
+      "cont/stationA2": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA2"
+      ],
+      "cont/stationA3": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA3"
+      ],
+      "cont/stationA4": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA4"
+      ],
+      "cont/stationA5": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA5"
+      ],
+      "cont/stationA6": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA6"
+      ],
+      "cont/stationA7": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA7"
+      ],
+      "cont/stationA8": [
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationA8/cont.json@ff1e38bb07ae89c26f387bb9beef2a9fbc42626ea7bf4a7edb752d9217b686bb"
+      ],
+      "cont/stationA9": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA9",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationA9/cont.json@f379de15b3e69f651bacc46e91e473ace28f42f2528d6a05ab006ba314e44c11",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationA9/cont.json@f379de15b3e69f651bacc46e91e473ace28f42f2528d6a05ab006ba314e44c11"
+      ],
+      "cont/stationA10": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationA10",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationA10/cont.json@85f8df950b11898f7cb22d68865afc2f5d23f067ed86ce4c0b267869d10fe1e5",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationA10/cont.json@85f8df950b11898f7cb22d68865afc2f5d23f067ed86ce4c0b267869d10fe1e5"
+      ],
+      "cont/stationB1": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB1",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationB1/cont.json@52e5280aa8ee8457b0f94f7d837e609a21cfad9ed33c0352a982048fbb88c4af",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationB1/cont.json@52e5280aa8ee8457b0f94f7d837e609a21cfad9ed33c0352a982048fbb88c4af"
+      ],
+      "cont/stationB2": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB2"
+      ],
+      "cont/stationB3": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB3"
+      ],
+      "cont/stationB4": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB4",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationB4/cont.json@c3e1bbcfabd512eb4d0d2f8371e1247a6f3e57871376f43ed5991ecc01a1c711",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationB4/cont.json@c3e1bbcfabd512eb4d0d2f8371e1247a6f3e57871376f43ed5991ecc01a1c711"
+      ],
+      "cont/stationB5": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB5"
+      ],
+      "cont/stationB6": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB6"
+      ],
+      "cont/stationB7": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB7",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationB7/cont.json@3327de85fc25e97c974575fdaec922841016f1faab3c110c482d4907261dab0c",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationB7/cont.json@3327de85fc25e97c974575fdaec922841016f1faab3c110c482d4907261dab0c"
+      ],
+      "cont/stationB8": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB8"
+      ],
+      "cont/stationB9": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB9"
+      ],
+      "cont/stationB10": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB10"
+      ],
+      "cont/stationB11": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB11",
+        "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationB11/cont.json@2cdf22c77d9813fdcd5146c95ab377f0cd338088aae49b94dd04b88b2ab0193b",
+        "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz#cases/BigM-Gurobi/cont/stationB11/cont.json@2cdf22c77d9813fdcd5146c95ab377f0cd338088aae49b94dd04b88b2ab0193b"
+      ],
+      "cont/stationB12": [
+        "results/sat_research/v39_bound_diagnostics_20261109/gurobi_cont_source.json#stationB12"
+      ]
+    }
+  },
+  "submission_passed": false,
+  "runtime_comparable": false,
+  "scope": "coverage from audited reused fast proofs plus the missing long-cutoff observations; versions/hardware assumptions remain explicit"
+}

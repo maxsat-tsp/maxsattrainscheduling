@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.31}
+\fancyhead[R]{\small Phiên bản 5.32}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.31, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.32, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -2207,6 +2207,14 @@ hoặc giữ mô hình. Cả hai chạy cùng 11 ca, với tối đa 60 giây RC
 và 300 giây tổng. Để xem giữ mô hình có ích ở đâu, đối chiếu số lần
 tạo mô hình, kết quả SAT đầu tiên và thời gian các truy vấn sau.
 Phần chạy và đọc kết quả nằm trong runbook.
+
+Ở 300 giây cả hai chế độ chưa chứng minh thêm ca nào. Chế độ giữ
+mô hình tìm được lịch chi phí $12884$ cho \code{cont/stationA1},
+bằng optimum Big-M. Câu hỏi ở ngưỡng $12883$ hết giờ, nên SAT chỉ
+xác nhận được cận trên $12884$. Lượt tiếp theo giữ đúng cấu hình
+\code{reuse} và cho mỗi ca 600 giây. Bốn đối chứng cũng được kiểm
+tra ở cùng mốc trên nhóm 11 ca. Khi đọc bảng, xem số ca chứng minh
+tối ưu trước, rồi mới xem LB, UB và thời gian.
 
 \section{Nội dung được phép đưa vào bài báo}
 

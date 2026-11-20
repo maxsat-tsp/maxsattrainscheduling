@@ -1,5 +1,29 @@
 # Tiến độ thử nghiệm trên VM, cập nhật 20-11-2026
 
+## V45 đã hoàn tất ở 300 giây, lượt 600 giây đã xếp hàng
+
+Đã kiểm toán đủ 22 lượt trên 11 ca khó. Cả hai chế độ đều có
+0 ca tối ưu mới và 0 cận tốt nhất mới khi đối chiếu với mọi nguồn.
+Chế độ giữ mô hình dựng 11 mô hình, so với 27 khi dựng lại.
+Khoảng cách cận trung bình trên 11 ca lần lượt là 39,04% và 39,87%.
+Cả hai chế độ đều hết giờ ngay ở câu hỏi SAT đầu tiên trên năm ca,
+nên giữ mô hình chỉ có thể giúp sau khi một câu hỏi đầu tiên thành công.
+Mốc SAT trên 216 ca vẫn là V42 với 205, so với Gurobi 207 ở 300 giây.
+
+Lượt CPLEX đầu dừng trước khi đo vì log kiểm toán cũ
+`tight_fix/cplex.log` bị Git bỏ qua. Bản sửa đưa đúng tệp đã khóa
+hash vào repo. Lượt chạy lại kiểm tra đủ 205 proof cũ từ checkout
+sạch rồi bắt đầu 11 ca còn thiếu. Ca đầu `cont/stationA11` có lịch
+hợp lệ chi phí 19.838 và hết giờ sau 300 giây.
+
+Service `maxsat-v45-long600-r2.service` đợi CPLEX 300 giây xong.
+Sau đó nó giữ nguyên MiniSAT, RC2 tối đa 60 giây và cơ chế giữ mô
+hình V45, chỉ tăng giới hạn tổng lên 600 giây. Lượt này thử đúng
+11 ca chưa giải. Gurobi, CPLEX, CSOnet và MaxSAT-Journal được đối
+chiếu trên cùng tập. Proof cũ hợp lệ trong thời hạn được dùng lại,
+các ca timeout ở mốc cũ được chạy ở giới hạn mới. Bảng 600 giây báo
+số ca tối ưu và chất lượng cận trong nhóm 11 ca.
+
 ## V45 giữ mô hình giữa các ngưỡng SAT
 
 V43 và V44 đã hoàn tất 11 ca khó mỗi lượt và đều chưa giải thêm ca tối

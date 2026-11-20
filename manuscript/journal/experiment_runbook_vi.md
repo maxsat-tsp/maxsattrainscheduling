@@ -1978,7 +1978,32 @@ systemctl status maxsat-bound-priority-report-v42.service
 journalctl -u maxsat-bound-priority-report-v42.service -n 20 --no-pager
 ```
 
-## V45 và CPLEX ở 300 giây
+## V45 ở 600 giây và các đối chứng cùng nhóm khó
+
+Lượt 300 giây của V45 đã qua kiểm toán đủ 22 ca và chưa có optimum
+mới. Lượt 600 giây giữ nguyên phương pháp `reuse`, cùng 11 ca, MiniSAT
+và RC2 60 giây. Sau khi chạy SAT, service chạy tuần tự phần còn thiếu
+của Gurobi, CPLEX, CSOnet và MaxSAT-Journal. Các proof có lịch hợp lệ,
+hai cận khớp và thời gian trong giới hạn gốc được dùng lại. Mỗi
+phương pháp có tối đa sáu giờ cho một giai đoạn và có manifest riêng.
+
+```bash
+journalctl -u maxsat-cplex-reference300-v45-retry.service -n 20 --no-pager
+journalctl -u maxsat-v45-long600-r2.service -n 20 --no-pager
+```
+
+Checkout CPLEX là `/home/tuyenkv/projects/cplex-tail-v45-retry` tại
+`9481aed`. Kết quả CPLEX nằm trong `results/aglr/cplex-reference300-v45-20261120`.
+Checkout 600 giây là `/home/tuyenkv/projects/sat-bound-search-v45-long-r2`
+tại `c90cb63`. Thư mục kết quả tương ứng là
+`results/aglr/sat-bound-search-v45-long600-20261120`.
+Đọc `hard/audit.json` cho SAT và `controls/<phương pháp>/audit.json`
+cho từng đối chứng. `matched600.json` được tạo sau khi đủ cả năm lượt.
+Có proof SAT mới thì service chạy ba lần xác nhận và hồi quy 205
+ca cũ. Khi đủ toàn bộ, báo cáo ghi riêng các mốc 120, 150, 300 và
+600 giây, với runtime ghép cặp chỉ cho hai lượt có cùng cutoff.
+
+## Nhật ký V45 và CPLEX ở 300 giây
 
 Trên VM dùng worktree `/home/tuyenkv/projects/sat-bound-search-v45`
 khóa tại `14b0df5`. Hai chế độ `reuse` và `restart-assumptions`

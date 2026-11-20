@@ -38,3 +38,25 @@ The final decision at 12883 returned UNKNOWN, so the solver timed out
 with its own interval [12504,12884]. The paired rebuild control and
 the other hard cases are still running. The snapshot and independent
 audit cover this one completed case.
+
+## Complete comparison at 300 seconds
+
+`matched_snapshot.tar.gz` preserves both finished modes, their native
+results and the shared frozen reference pool. `matched_audit.json`
+records the independent replay of the 22 cases.
+
+| Mode | Optima on 11 hard cases | First query timed out | SAT models created | Mean remaining gap |
+|---|---:|---:|---:|---:|
+| Reuse | 0 | 5 | 11 | 39.04% |
+| Rebuild with assumptions | 0 | 5 | 27 | 39.87% |
+
+Both configurations improved two SAT-only bounds. Neither improved the
+best bounds across all imported methods. On `cont/stationA1`, the final
+verified schedules cost 12884 with reuse and 12885 with rebuilding. The
+full-dataset SAT reference remains V42 at 205/216.
+
+The first 300-second CPLEX attempt exited in preflight because Git ignored
+a historical `cplex.log`. Commit `9481aed` tracks the original bytes
+matching the recorded hash. A separate clean worktree validated the
+205 reused proofs and started the 11 missing cases. The failed attempt
+and the original V45 worktree remain available for provenance.

@@ -26,6 +26,18 @@ VM `trp` đã nhận ổ 50 GiB. Phân vùng gốc còn trống 20 GiB sau khi m
 rộng. V45 chạy từ commit `14b0df5`. CPLEX đợi lượt SAT dừng rồi dùng
 lại các tệp LP đã kiểm tra để chạy 11 ca còn thiếu ở 300 giây.
 
+V45 đã qua 21 kiểm thử Rust và 193 kiểm thử Python trên VM. Phép thử
+chuyển pha cùng chứng minh optimum 5526 trên `cont/origA1` sau ba
+truy vấn. Chế độ giữ mô hình dùng một mô hình, chế độ dựng lại dùng
+ba. V45 bắt đầu chạy ca khó lúc 14:23 ngày 20-11 theo giờ Việt Nam.
+Bản kiểm toán và nguồn đối chứng đã lưu ở
+`results/sat_research/v45_sat_bound_search_20261120/`.
+
+CSOnet và MaxSAT-Journal chạy lại trên VM đều có 198 proof ở 120
+giây. Dữ liệu MiniSAT đã lưu bổ sung lên ít nhất 200 proof ở 300
+giây cho mỗi solver, với chín quan sát còn thiếu cho mỗi solver.
+Bảng theo cutoff giữ riêng mốc này và kết quả hội nghị gốc.
+
 ## Nhật ký lúc xếp hàng V44
 
 Kiểm tra ngoại tuyến trên các lịch của V42/V43 cho thấy một số lịch còn

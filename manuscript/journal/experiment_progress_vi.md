@@ -1,4 +1,30 @@
-# Tiến độ thử nghiệm trên VM, cập nhật 20-11-2026
+# Tiến độ thử nghiệm trên VM, cập nhật 21-11-2026
+
+## V45 giải thêm một ca SAT ở 600 giây
+
+Trên 11 ca khó, V45 chứng minh tối ưu cho `cont/stationA1` ở
+**322,42 giây**, với hai cận cùng bằng **12.884**. Solver tự tìm
+lịch chi phí 12.884 sau khoảng 246 giây rồi cần thêm khoảng 76
+giây để chứng minh không có lịch chi phí từ 12.883 trở xuống.
+Ở lượt 300 giây, câu hỏi cuối chỉ còn khoảng 55 giây và trả
+UNKNOWN. Ba lượt xác nhận và hồi quy 205 ca cũ dùng cùng binary.
+Lần xác nhận đầu đạt đúng optimum 12.884 trong 324,49 giây.
+Mốc SAT đã đo đủ toàn bộ vẫn là 205/216 của V42.
+
+Trên `stationA12/infsteps180`, cận trên V45 là **142**, tốt hơn
+UB 143 của CPLEX. LB riêng của V45 là 104. LB tốt nhất trong
+nguồn cũ vẫn là 115.
+
+CPLEX đã đủ ở 300 giây và đạt **208/216** (72, 68, 68).
+Gurobi đạt 207/216. Trên cùng nhóm 11 ca ở 600 giây, Gurobi
+và CPLEX đều có ba proof đã kiểm toán. CSOnet có tám kết quả
+gốc và một ca `trackA12/infsteps180` bị bộ bọc ngắt ở 620,016
+giây. Ca bị ngắt được ghi riêng là hết giờ ngoài, với ô cận
+để trống. Hai ca CSOnet còn thiếu và lượt MaxSAT-Journal chạy
+tuần tự sau khi SAT xác nhận và hồi quy.
+
+Snapshot và kiểm toán nằm trong `results/sat_research/v45_long600_20261121/`.
+Bảng đối chứng chưa đủ để kết luận vượt các phương pháp hiện có.
 
 ## V45 đã hoàn tất ở 300 giây, lượt 600 giây đã xếp hàng
 

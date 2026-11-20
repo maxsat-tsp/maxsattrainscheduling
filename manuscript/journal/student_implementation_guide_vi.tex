@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.32}
+\fancyhead[R]{\small Phiên bản 5.33}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.32, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.33, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -96,7 +96,8 @@ V43 và V44 đã thử đủ 11 ca khó. Hai lượt chưa thêm ca tối ưu, n
 hạ cận trên xuống $144$ cho \code{stationA12/infsteps180} và $107$
 cho \code{trackA11/infsteps180}. Gurobi đã có đủ kết quả ở 300 giây
 và giải $207/216$ ca. V45 thử giữ mô hình giữa các ngưỡng SAT, sau
-đó VM chạy 11 ca CPLEX còn thiếu để hoàn tất đối chứng.
+đó VM chạy 11 ca CPLEX còn thiếu. CPLEX đã hoàn tất đối chứng ở
+300 giây và giải $208/216$ ca.
 
 \textbf{Mốc mới nhất: V41 đã chạy đủ và được kiểm tra lại.} Coverage là
 $(72,67,65)$, tổng $204/216$, tăng một so với V17. Hai ca
@@ -2215,6 +2216,12 @@ xác nhận được cận trên $12884$. Lượt tiếp theo giữ đúng cấu
 \code{reuse} và cho mỗi ca 600 giây. Bốn đối chứng cũng được kiểm
 tra ở cùng mốc trên nhóm 11 ca. Khi đọc bảng, xem số ca chứng minh
 tối ưu trước, rồi mới xem LB, UB và thời gian.
+
+Lượt 600 giây đã chứng minh optimum $12884$ của
+\code{cont/stationA1} sau 322,42 giây. Sau khi tự tìm lịch có chi
+phí $12884$, solver cần khoảng 76 giây để chứng minh UNSAT ở
+ngưỡng $12883$. Kết quả này thêm một ca trong nhóm 11 ca khó.
+Tiếp theo chạy ba lần xác nhận và kiểm tra các ca V42 đã giải.
 
 \section{Nội dung được phép đưa vào bài báo}
 

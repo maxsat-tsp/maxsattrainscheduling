@@ -1978,7 +1978,28 @@ systemctl status maxsat-bound-priority-report-v42.service
 journalctl -u maxsat-bound-priority-report-v42.service -n 20 --no-pager
 ```
 
-## V45 ở 600 giây và các đối chứng cùng nhóm khó
+## Xác nhận ca stationA1 và tiếp tục đối chứng 600 giây
+
+V45 đã đo xong 11 ca ở 600 giây. Trên `cont/stationA1`, hai cận
+bằng 12.884 ở 322,42 giây. Service xác nhận dùng cùng binary và
+chạy ba lần mới trước khi hồi quy các ca V42 đã giải. Dữ liệu vẫn
+nằm trong lượt gốc `sat-bound-search-v45-long600-20261120`.
+
+```bash
+journalctl -u maxsat-v45-long600-followup.service -n 20 --no-pager
+journalctl -u maxsat-v45-long600-controls-recovery.service -n 20 --no-pager
+```
+
+Lượt gốc giữ marker `FAILED` của phần đối chứng CSOnet. Lượt phục
+hồi nằm trong checkout `sat-bound-search-v45-controls-recovery` ở
+`a964d69`, tại `results/aglr/sat-bound-search-v45-600-recovery-20261121`.
+Auditor tái kiểm tra tám kết quả CSOnet và ca bộ bọc ngắt ngoài. Chỉ
+ghi hết giờ ngoài khi có exit 124, đúng manifest, đủ thời gian đo
+và hai bản kết quả khớp. Ô LB, UB và chi phí của ca đó để trống.
+Panic, sai cấu hình, dừng sớm hoặc sai lịch vẫn làm audit thất bại.
+Đọc `matched600.json` khi đủ năm phương pháp.
+
+## Lượt V45 ở 600 giây ban đầu
 
 Lượt 300 giây của V45 đã qua kiểm toán đủ 22 ca và chưa có optimum
 mới. Lượt 600 giây giữ nguyên phương pháp `reuse`, cùng 11 ca, MiniSAT

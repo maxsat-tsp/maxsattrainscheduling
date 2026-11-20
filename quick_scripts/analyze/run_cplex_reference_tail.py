@@ -32,10 +32,12 @@ TIGHT_TRACK = ('infsteps180', 'trackA8')
 def recover_track_proof(archive, prefix):
     folder = DATA/'tight_fix'
     receipts = json.loads((DATA/'archive_hashes.json').read_text())
-    for file in folder.iterdir():
+    lp_name = 'InstanceA8_bigm_infsteps180.lp'
+    for name in (lp_name, 'cplex.log', 'schedule.sol'):
+        file = folder/name
         if ex.focus.sha(file) != receipts[str(file.relative_to(DATA))]:
             raise ValueError('changed trackA8 correction')
-    lp, = folder.glob('*.lp')
+    lp = folder/lp_name
     if hashlib.sha256(archive.extractfile(prefix+lp.name).read()).hexdigest() != ex.focus.sha(lp):
         raise ValueError('trackA8 correction changed the LP')
     solve = ex.cplex_result(folder/'schedule.sol',folder/'cplex.log','trackA8','infsteps180',120,120)

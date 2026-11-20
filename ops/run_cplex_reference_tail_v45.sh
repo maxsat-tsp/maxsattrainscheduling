@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 : "${REPO:?}" "${RUN_ID:?}" "${REFERENCE:?}" "${DIAGNOSTIC_ROOT:?}" "${MIP_ROOT:?}" "${CPLEX_BIN:?}"
 cd "$REPO"
-sat="$REPO/results/aglr/$RUN_ID"
-root="$REPO/results/aglr/cplex-reference300-v45-20261120"
+sat="${SAT_ROOT:-$REPO/results/aglr/$RUN_ID}"
+root="${CPLEX_RESULT_ROOT:-$REPO/results/aglr/cplex-reference300-v45-20261120}"
 mkdir -p "$root"
 exec 9>"$root/campaign.lock"
 flock -n 9

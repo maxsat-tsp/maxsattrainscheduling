@@ -35,7 +35,7 @@ def baseline_rows(snapshot):
             if len(rows) != 216 or any(r['errors'] for r in rows):
                 raise ValueError('bad full baseline observations')
             observations[tag] += [dict(objective=r['objective'],name=r['name'],proven=r['proven'],
-                upper_witness_verified=r['proven'],seconds=r['time'],
+                upper_witness_verified=r['proven'],seconds=r['time'],cost=r['solve'].get('cost'),
                 timeout_seconds=120,source=str(snapshot)) for r in rows]
     for relative in SAT_SOURCES:
         path = RESEARCH/relative
@@ -64,7 +64,7 @@ def baseline_rows(snapshot):
                         or ex.common.independently_verify_solution(name,objective,solve)):
                     raise ValueError('historical proof has an invalid schedule or bound')
                 observations[tag].append(dict(objective=objective,name=name,proven=row['proven'],
-                    upper_witness_verified=row['proven'],seconds=solve['total_time'],
+                    upper_witness_verified=row['proven'],seconds=solve['total_time'],cost=solve.get('cost'),
                     timeout_seconds=solve['timeout_seconds'],source=f'{relative}#{member}'))
     return observations
 

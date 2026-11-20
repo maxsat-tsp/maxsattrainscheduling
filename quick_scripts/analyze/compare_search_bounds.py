@@ -244,6 +244,7 @@ class Pool:
         """Earlier autonomous searches are now part of the known-bound pool."""
         archives = list(RESEARCH.glob('v*_sat_bound_search_*/complete_snapshot.tar.gz'))
         archives += list(RESEARCH.glob('v*_*/hard_snapshot.tar.gz'))
+        archives += list(RESEARCH.glob('v*_sat_bound_search_*/matched_snapshot.tar.gz'))
         for path in sorted(archives):
             with tempfile.TemporaryDirectory(prefix='previous-sat-search-') as folder:
                 root=Path(folder)
@@ -253,24 +254,33 @@ class Pool:
                         if root.resolve() not in dest.parents or member.issym() or member.islnk():
                             raise ValueError('unsafe previous search archive')
                     archive.extractall(root)
-                manifest=json.loads((root/'hard/manifest.json').read_text())
-                if manifest['binary_sha256']==exclude_binary:continue
-                hard=search.audit(root/'hard',reference,diagnostics)
-                if not hard['complete'] or not (root/'COMPLETED').exists():
-                    raise ValueError('archived search is incomplete')
-                if path.name == 'complete_snapshot.tar.gz':
-                    followup=search.audit(root/'followup',reference,diagnostics)
-                    baseline,_=search.baseline_for_manifest(manifest,reference,diagnostics)
-                    search.same_method(manifest,json.loads((root/'followup/manifest.json').read_text()))
-                    records,_=combine_full(hard,followup,baseline)
-                else:
-                    records=hard['records']
-                self.track(path)
-                for r in records:
-                    record=self.add(r['objective'],r['name'],r['lb'],r['ub'],'SAT-search-'+manifest['commit'][:7],
-                        manifest['timeout_seconds'],str(path)+'#'+r['objective']+'/'+r['name'],
-                        'query ledger replayed; every incumbent independently checked')
-                    if record is not None:record['upper_witness_verified']=True
+                phases = [root]
+                if path.name == 'matched_snapshot.tar.gz':
+                    phases = [root/'reuse',root/'restart-assumptions']
+                for phase in phases:
+                    manifest=json.loads((phase/'hard/manifest.json').read_text())
+                    if manifest['binary_sha256']==exclude_binary:continue
+                    hard=search.audit(phase/'hard',reference,diagnostics)
+                    if not hard['complete'] or not (root/'COMPLETED').exists():
+                        raise ValueError('archived search is incomplete')
+                    if path.name == 'complete_snapshot.tar.gz':
+                        followup=search.audit(phase/'followup',reference,diagnostics)
+                        baseline,_=search.baseline_for_manifest(manifest,reference,diagnostics)
+                        search.same_method(manifest,json.loads((phase/'followup/manifest.json').read_text()))
+                        records,_=combine_full(hard,followup,baseline)
+                    else:
+                        records=hard['records']
+                    self.track(path)
+                    for r in records:
+                        label = 'SAT-search-'+manifest['commit'][:7]
+                        middle = ''
+                        if len(phases) > 1:
+                            label += '-'+phase.name
+                            middle = phase.name+'/'
+                        record=self.add(r['objective'],r['name'],r['lb'],r['ub'],label,
+                            manifest['timeout_seconds'],str(path)+'#'+middle+r['objective']+'/'+r['name'],
+                            'query ledger replayed; every incumbent independently checked')
+                        if record is not None:record['upper_witness_verified']=True
 
     def cplex_rechecks(self):
         original=RESEARCH/'cplex_full_120_20261108/raw_snapshot.tar.gz'
@@ -400,7 +410,7 @@ def full_comparison(records,baseline,cutoff,confirmations,baseline_label='V17 fu
             paired_instances=len(paired),paired_candidate_seconds=sum(r['seconds'] for r in paired),
             paired_baseline_seconds=sum(previous[o,r['name']]['seconds'] for r in paired)))
     proof_cutoffs = {}
-    for limit in (120, 150, 300):
+    for limit in sorted({120, 150, 300, cutoff}):
         if limit > cutoff:
             continue
         proof_cutoffs[str(limit)] = {

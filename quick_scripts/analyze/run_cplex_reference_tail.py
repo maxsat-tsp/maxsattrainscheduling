@@ -87,7 +87,8 @@ def source_material():
             if proof and solve.get('solution') is None:
                 raise ValueError('reused proof lacks a feasible schedule')
             records.append(dict(objective=objective,name=name,status=status,seconds=time_used,
-                timeout_seconds=120,proven=proof,upper_witness_verified=proof,source=raw_name))
+                timeout_seconds=120,proven=proof,upper_witness_verified=proof,source=raw_name,
+                cost=solve.get('cost')))
             if not proof:
                 lp, = [m for m in members if m.isfile() and m.name.startswith(prefix) and m.name.endswith('.lp')]
                 build = solve['build_time']
@@ -126,6 +127,19 @@ def replay_case(case, task, reference):
     return dict(objective=objective,name=name,status=solve['status'],seconds=seconds,
         timeout_seconds=CUTOFF,proven=proven,upper_witness_verified=proven,
         source=f"tail/{objective}/{name}",lb=solve.get('lb'),ub=solve.get('ub'),cost=solve.get('cost'))
+
+
+def execute_saved_lp(cplex, case, task, lp, cutoff, ram_kb=RAM_KB):
+    if hashlib.sha256(lp).hexdigest() != task['lp_sha256']:
+        raise ValueError('CPLEX input differs from the audited LP')
+    (case/'model.lp').write_bytes(lp)
+    solve_seconds = cutoff - task['export_seconds']
+    command = [str(cplex),'-c','read model.lp',*SETTINGS,
+               f'set timelimit {solve_seconds:.6f}','optimize',
+               'display solution bestbound','write schedule.sol','quit']
+    elapsed = ex.execute(command,case,case/'cplex.log',solve_seconds+30,os.environ,ram_kb)
+    return ex.cplex_result(case/'schedule.sol',case/'cplex.log',task['name'],task['objective'],cutoff,
+                           task['export_seconds'] + elapsed)
 
 
 def audit(root, material):
@@ -172,16 +186,9 @@ def run(root, cplex, round_seconds):
             if case.exists():
                 raise ValueError('interrupted CPLEX case needs review')
             case.mkdir(parents=True)
-            (case/'model.lp').write_bytes(archive.extractfile(task['lp_member']).read())
             objective,name = task['objective'],task['name']
             print(f'CPLEX 300 s {objective}/{name}',flush=True)
-            solve_seconds = CUTOFF - task['export_seconds']
-            command = [str(cplex),'-c','read model.lp',*SETTINGS,
-                       f'set timelimit {solve_seconds:.6f}','optimize',
-                       'display solution bestbound','write schedule.sol','quit']
-            elapsed = ex.execute(command,case,case/'cplex.log',solve_seconds+30,os.environ,RAM_KB)
-            solve = ex.cplex_result(case/'schedule.sol',case/'cplex.log',name,objective,CUTOFF,
-                                    task['export_seconds'] + elapsed)
+            solve = execute_saved_lp(cplex,case,task,archive.extractfile(task['lp_member']).read(),CUTOFF)
             ex.save(case/'result.json',solve)
             files = ['model.lp','cplex.log','result.json']
             if (case/'schedule.sol').exists():

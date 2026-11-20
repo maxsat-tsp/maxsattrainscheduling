@@ -366,6 +366,7 @@ def run_case(binary,cutoff,ram_kb,commit,case,objective,name,repeat,policy=None,
 def run(args):
     session = getattr(args, 'threshold_session', None)
     source,_,_=trial.load_reference(args.reference)
+    cutoff = getattr(args, 'timeout', None) or source['timeout_seconds']
     selection={}
     if args.selection_archive is not None:
         path=args.selection_archive.resolve()
@@ -392,7 +393,7 @@ def run(args):
     manifest=dict(schema='sat-bound-search-campaign-v1',commit=commit,binary_sha256=ex.focus.sha(args.binary),
         build_manifest_sha256=ex.focus.sha(args.build_manifest),dataset_sha256=ex.focus.dataset_hash(),
         reference_manifest_sha256=ex.focus.sha(args.reference/'manifest.json'),tasks=tasks,
-        timeout_seconds=source['timeout_seconds'],ram_kb=source['ram_kb'],cpu_affinity=sorted(os.sched_getaffinity(0)),
+        timeout_seconds=cutoff,ram_kb=source['ram_kb'],cpu_affinity=sorted(os.sched_getaffinity(0)),
         source_script_sha256=ex.focus.sha(Path(__file__)),followup=str(args.followup) if args.followup else None,
         uses_optimum_oracle=False,threshold_policy=args.threshold_policy,extra_instances=args.extra_instance,rc2_warmup_seconds=args.rc2_warmup_seconds,incumbent_polish_checks=args.incumbent_polish_checks,**selection)
     if session is not None:manifest['threshold_session']=session
@@ -402,9 +403,9 @@ def run(args):
     deadline=time.monotonic()+args.round_seconds
     for task in tasks:
         o,n,i=task['objective'],task['name'],task['repeat'];case=root/'cases'/o/n/str(i)
-        if not (case/'result.json').exists() and deadline-time.monotonic()<source['timeout_seconds']+60:break
+        if not (case/'result.json').exists() and deadline-time.monotonic()<cutoff+60:break
         print(f'SAT search ({args.threshold_policy}, {session or "restart"}) {o}/{n} repeat={i}',flush=True)
-        run_case(args.binary,source['timeout_seconds'],source['ram_kb'],commit,case,o,n,i,args.threshold_policy,args.rc2_warmup_seconds,args.incumbent_polish_checks,session)
+        run_case(args.binary,cutoff,source['ram_kb'],commit,case,o,n,i,args.threshold_policy,args.rc2_warmup_seconds,args.incumbent_polish_checks,session)
         report=audit(root,args.reference,args.diagnostic_root);ex.save(root/'audit.json',report)
         if args.followup is not None and i>0 and not report['records'][-1]['proven']:
             ex.save(root/'followup_stopped.json',dict(reason='a newly solved pair did not repeat',objective=o,name=n,repeat=i))
@@ -422,6 +423,7 @@ def main():
     p.add_argument('--rc2-warmup-seconds',type=float,default=0)
     p.add_argument('--incumbent-polish-checks',type=int,default=0)
     p.add_argument('--threshold-session',choices=SESSIONS)
+    p.add_argument('--timeout', type=int, choices=(300,600), help='override the measured cutoff; selection still comes from the audited reference')
     p.add_argument('--selection-archive',type=Path,help='audited previous full search; test only its unresolved pairs')
     p.add_argument('--round-seconds',type=int,default=18000);a=p.parse_args()
     if a.action=='audit':print(json.dumps(audit(a.results,a.reference,a.diagnostic_root),indent=2));return

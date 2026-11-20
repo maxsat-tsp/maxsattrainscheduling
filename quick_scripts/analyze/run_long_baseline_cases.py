@@ -83,7 +83,7 @@ def case_record(case, method, row, known):
         source=str(case),lb=solve.get('lb'),ub=solve.get('ub'),cost=solve.get('cost'),reused=False)
 
 
-def measured_case(args, case, o, n, cplex_tasks, known):
+def measured_case(args, case, o, n, cplex_tasks):
     if args.method == 'BigM-CPLEX':
         with tarfile.open(cp.ORIGINAL) as archive:
             task = cplex_tasks[o,n]
@@ -92,8 +92,58 @@ def measured_case(args, case, o, n, cplex_tasks, known):
         ex.save(case/(o+'.json'),[dict(name=n,solves=[solve])])
     else:
         ex.run_case(args.method,o,n,SimpleNamespace(timeout=CUTOFF,ram_kb=cp.RAM_KB,binary=args.binary),case)
-    row = ex.assess_case(case,args.method,o,n,CUTOFF)
-    return case_record(case,args.method,row,known)
+def launch_fields(case, method, objective, name, lock):
+    path = case/'logs/manifest.txt'
+    fields = dict(line.split('=',1) for line in path.read_text().splitlines() if '=' in line)
+    expected = dict(binary_sha256=lock['binary_sha256'],git_commit=lock['runner_commit'],
+        solver=ex.METHODS[method]['solver'],objective=objective,selected_instances=name,
+        instance_timeout_seconds=str(CUTOFF),ram_limit_kb=str(cp.RAM_KB))
+    if any(fields.get(k) != v for k,v in expected.items()):
+        raise ValueError('baseline run does not match its manifest')
+    return fields
+
+
+def checked_case(case, method, objective, name, lock, known):
+    """Keep watchdog censoring distinct from a native timeout or a crash."""
+    rows = ex.common.load_rows(case/(objective+'.json'))
+    if len(rows) != 1 or rows[0][0] != name:
+        raise ValueError('baseline case has the wrong identity')
+    raw = rows[0][1]
+    if raw.get('status') != 'external_timeout':
+        record = case_record(case,method,ex.assess_case(case,method,objective,name,CUTOFF),known)
+        if method == 'BigM-CPLEX':
+            native = ex.cplex_result(case/'schedule.sol',case/'cplex.log',name,objective,CUTOFF,raw['total_time'])
+            if native != raw:
+                raise ValueError('saved result differs from the native CPLEX evidence')
+        return record
+    if method not in ('CSOnet','MaxSAT-Journal'):
+        raise ValueError('unexpected external SAT timeout')
+    fields = launch_fields(case,method,objective,name,lock)
+    configuration = ex.METHODS[method]
+    required = {f'maxsatddd_{key}':str(configuration[key]) for key in
+        ('assumptions','backend','sparse_costs','resource_orders','order_transitivity',
+         'objective_bound','residual_hardening') if key in configuration}
+    if any(fields.get(k) != v for k,v in required.items()) or fields.get('selected_instance_count') != '1':
+        raise ValueError('external timeout has a different SAT configuration')
+    keys = {'solver_name','status','external_status','process_exit_code',
+            'total_time','timeout_seconds','process_wall_time_seconds'}
+    elapsed = raw.get('process_wall_time_seconds')
+    external = int(fields['external_timeout_seconds'])
+    wrapper = Path(fields['timeout_binary']).name
+    per_case = case/'logs/instances'/(name+'.json')
+    diagnostics = (case/'logs'/(name+'.stderr.log')).read_bytes() + (case/'logs'/(name+'.stdout.log')).read_bytes()
+    if (set(raw) != keys or raw['process_exit_code'] != 124 or raw['external_status'] != 'external_timeout'
+            or raw['solver_name'] != configuration['solver'] or raw['timeout_seconds'] != CUTOFF
+            or wrapper not in ('timeout','gtimeout') or not fields.get('timeout_binary_sha256')
+            or external != CUTOFF + int(fields['external_timeout_grace_seconds'])
+            or external < CUTOFF or not isinstance(elapsed,(int,float)) or not math.isfinite(elapsed)
+            or elapsed < external - 0.5 or raw['total_time'] != elapsed
+            or ex.common.load_rows(per_case) != rows or per_case.with_suffix('.raw.json').exists()
+            or b'panicked at' in diagnostics):
+        raise ValueError('external timeout lacks clean process and launch evidence')
+    return dict(objective=objective,name=name,status='external_timeout',seconds=elapsed,
+        timeout_seconds=CUTOFF,proven=False,upper_witness_verified=False,source=str(case),
+        lb=None,ub=None,cost=None,reused=False,censored_by_watchdog=True)
 
 
 def case_evidence(case, method, objective, name, lock):
@@ -103,15 +153,26 @@ def case_evidence(case, method, objective, name, lock):
         if (case/'schedule.sol').exists():
             files.append('schedule.sol')
     else:
-        path = 'logs/manifest.txt'
-        fields = dict(line.split('=',1) for line in (case/path).read_text().splitlines() if '=' in line)
-        expected = dict(binary_sha256=lock['binary_sha256'],git_commit=lock['runner_commit'],
-            solver=ex.METHODS[method]['solver'],objective=objective,selected_instances=name,
-            instance_timeout_seconds=str(CUTOFF),ram_limit_kb=str(cp.RAM_KB))
-        if any(fields.get(k) != v for k,v in expected.items()):
-            raise ValueError('baseline run does not match its manifest')
-        files.append(path)
+        launch_fields(case,method,objective,name,lock)
+        files.append('logs/manifest.txt')
+        if ex.common.load_rows(case/(objective+'.json'))[0][1].get('status') == 'external_timeout':
+            files += [f'logs/instances/{name}.json', f'logs/{name}.stdout.log', f'logs/{name}.stderr.log']
     return {file:ex.focus.sha(case/file) for file in files}
+
+
+def resume_old_case(args, previous, previous_lock, objective, name, known):
+    case = previous/'cases'/objective/name
+    if not (case/(objective+'.json')).exists():
+        return None
+    evidence = case_evidence(case,args.method,objective,name,previous_lock)
+    receipt = case/'completion.json'
+    if receipt.is_file():
+        if json.loads(receipt.read_text())['files'] != evidence:
+            raise ValueError('prior baseline files changed')
+    elif ex.common.load_rows(case/(objective+'.json'))[0][1].get('status') != 'external_timeout':
+        raise ValueError('prior observation is missing its completion receipt')
+    record = checked_case(case,args.method,objective,name,previous_lock,known)
+    return dict(record, replayed=True, prior_input_sha256=evidence)
 
 
 def run(args):
@@ -135,6 +196,19 @@ def run(args):
         cpu_affinity=sorted(os.sched_getaffinity(0)),dataset_sha256=candidate['dataset_sha256'],
         sources=sources, tasks=[dict(objective=o,name=n,reused_proof=proofs.get((o,n))) for o,n in pairs])
     manifest = root/'manifest.json'
+    previous = args.prior_results
+    previous_lock = None
+    if previous is not None:
+        prior_manifest = previous/'manifest.json'
+        previous_lock = json.loads(prior_manifest.read_text())
+        keys = ('method','timeout_seconds','ram_kb','threads_milp','candidate_manifest_sha256',
+                'binary_sha256','cpu_affinity','dataset_sha256','tasks')
+        if any(previous_lock.get(k) != lock[k] for k in keys):
+            raise ValueError('prior baseline changes configuration or selected cases')
+        lock['prior_manifest_sha256'] = ex.focus.sha(prior_manifest)
+        lock['binary_source_commit'] = previous_lock['runner_commit']
+    elif args.binary_source_commit is not None:
+        lock['binary_source_commit'] = args.binary_source_commit
     if manifest.exists() and json.loads(manifest.read_text()) != lock:
         raise ValueError('unsafe baseline resume')
     ex.save(manifest,lock)
@@ -145,13 +219,17 @@ def run(args):
             record = proofs[o,n]
             checked_bounds(dict(proven=True,solve=record),known[o,n])
         else:
+            record = resume_old_case(args,previous,previous_lock,o,n,known[o,n]) if previous is not None else None
             case = root/'cases'/o/n
             receipt = case/'completion.json'
-            if receipt.is_file():
+            if record is not None:
+                if case.exists():
+                    raise ValueError('mixed replayed and measured evidence for one case')
+            elif receipt.is_file():
                 saved = json.loads(receipt.read_text())
                 if saved['files'] != case_evidence(case,args.method,o,n,lock):
                     raise ValueError('completed baseline result changed')
-                record = case_record(case,args.method,ex.assess_case(case,args.method,o,n,CUTOFF),known[o,n])
+                record = checked_case(case,args.method,o,n,lock,known[o,n])
             else:
                 if time.monotonic() > deadline - CUTOFF - 90:
                     break
@@ -159,14 +237,18 @@ def run(args):
                     raise ValueError(f'interrupted baseline requires review: {case}')
                 case.mkdir(parents=True)
                 print(f'{args.method} at {CUTOFF}s: {o}/{n}',flush=True)
-                record = measured_case(args,case,o,n,cplex_tasks,known[o,n])
+                measured_case(args,case,o,n,cplex_tasks)
+                record = checked_case(case,args.method,o,n,lock,known[o,n])
                 ex.save(receipt,dict(files=case_evidence(case,args.method,o,n,lock)))
         interval(record.get('lb'),record.get('ub'))
         records.append(record)
         ex.save(root/'audit.json',dict(audit_passed=True,method=args.method,timeout_seconds=CUTOFF,
             complete=len(records)==len(pairs),expected_runs=len(pairs),completed_runs=len(records),
             proven=sum(r['proven'] for r in records),reused=sum(r['reused'] for r in records),
-            runtime_comparable=all(not r['reused'] for r in records),cases=records))
+            external_timeouts=sum(r['status']=='external_timeout' for r in records),
+            replayed=sum(r.get('replayed',False) for r in records),
+            runtime_comparable=all(not r['reused'] and r['status']!='external_timeout' for r in records),
+            cases=records))
 
 
 if __name__=='__main__':
@@ -175,6 +257,8 @@ if __name__=='__main__':
     for name in ('candidate-manifest','results','binary','cplex'):
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--cplex-reference',type=Path)
+    parser.add_argument('--prior-results',type=Path)
+    parser.add_argument('--binary-source-commit')
     parser.add_argument('--round-seconds',type=int,default=21000)
     args=parser.parse_args()
     if not CUTOFF + 90 < args.round_seconds <= 21600:

@@ -1,17 +1,22 @@
 """Compare the five methods on the same eleven objective/instance pairs."""
+import argparse
 import json
 from pathlib import Path
-import sys
 
 from bound_quality import compare, envelope
 from extended_timeout_experiments import save
 from run_long_baseline_cases import CUTOFF, METHODS
 
 
-def summarize(root):
-    hard = json.loads((root/'hard/audit.json').read_text())
-    reference = json.loads((root/'hard-evaluation.json').read_text())
-    rows = {method:json.loads((root/'controls'/method/'audit.json').read_text()) for method in METHODS}
+def summarize(root, original=None):
+    original = root if original is None else original
+    hard = json.loads((original/'hard/audit.json').read_text())
+    reference = json.loads((original/'hard-evaluation.json').read_text())
+    rows = {
+        method:json.loads(((original if method.startswith('BigM-') else root)
+                           /'controls'/method/'audit.json').read_text())
+        for method in METHODS
+    }
     if not hard['complete'] or not hard['audit_passed'] or not reference['complete']:
         raise ValueError('incomplete candidate')
     candidate = {(r['objective'],r['name']):r for r in hard['records']}
@@ -33,9 +38,16 @@ def summarize(root):
     return dict(scope='matched hard set of 11 pairs; no full-dataset coverage or runtime comparison',
         timeout_seconds=CUTOFF,candidate_proven=sum(r['proven'] for r in candidate.values()),
         baseline_proven={method:r['proven'] for method,r in rows.items()},
-        baseline_reused={method:r['reused'] for method,r in rows.items()},cases=cases)
+        baseline_reused={method:r['reused'] for method,r in rows.items()},
+        baseline_external_timeouts={method:r.get('external_timeouts',0) for method,r in rows.items()},
+        candidate_new_best_bound_cases=sum(row['comparison']['new_bound']
+                                          for row in cases if not row['candidate']['proven']),
+        cases=cases)
 
 
 if __name__ == '__main__':
-    directory = Path(sys.argv[1])
-    save(directory/'matched600.json',summarize(directory))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('directory',type=Path)
+    parser.add_argument('--original',type=Path)
+    args = parser.parse_args()
+    save(args.directory/'matched600.json',summarize(args.directory,args.original))

@@ -399,8 +399,20 @@ def full_comparison(records,baseline,cutoff,confirmations,baseline_label='V17 fu
             median_solved_seconds=statistics.median(times) if times else None,
             paired_instances=len(paired),paired_candidate_seconds=sum(r['seconds'] for r in paired),
             paired_baseline_seconds=sum(previous[o,r['name']]['seconds'] for r in paired)))
+    proof_cutoffs = {}
+    for limit in (120, 150, 300):
+        if limit > cutoff:
+            continue
+        proof_cutoffs[str(limit)] = {
+            label: {objective: sum(row['proven'] and row['seconds'] <= limit
+                                   for row in cohort if row['objective'] == objective)
+                    for objective in ex.audit.OBJECTIVES}
+            for label, cohort in (('candidate', records), ('reference', baseline))
+        }
     return dict(summary=summary,gained=gains,lost=losses,confirmations=confirmations,
         complete=True,cutoff_seconds=cutoff,baseline=baseline_label,
+        proof_cutoffs_seconds=proof_cutoffs,
+        proof_cutoffs_scope='proofs recorded by the indicated time in the longer run',
         coverage_total_delta=sum(r['coverage_delta'] for r in summary),
         coverage_nonregression=all(r['coverage_delta']>=0 for r in summary),
         scope='one frozen method on every pair; no mixing with baseline solutions')

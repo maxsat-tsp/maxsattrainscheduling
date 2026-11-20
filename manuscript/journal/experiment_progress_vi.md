@@ -1,6 +1,32 @@
-# Tiến độ thử nghiệm trên VM, cập nhật 10-11-2026
+# Tiến độ thử nghiệm trên VM, cập nhật 20-11-2026
 
-## V44 đã xếp hàng tự động: cải thiện chính lịch SAT vừa tìm được
+## V45 giữ mô hình giữa các ngưỡng SAT
+
+V43 và V44 đã hoàn tất 11 ca khó mỗi lượt và đều chưa giải thêm ca tối
+ưu. V43 hạ cận trên của `stationA12/infsteps180` từ 146 xuống 144.
+V44 hạ cận trên của `trackA11/infsteps180` từ 109 xuống 107. Cận
+dưới riêng của hai lượt là 103 và 92. Hai cận trên mới đã được đưa
+vào dữ liệu tham chiếu, cùng cận trên ngoại tuyến 114 của
+`trackA12/infsteps180`.
+
+Mốc SAT đã chạy đủ 216 ca vẫn là V42, với **205/216** ở 300 giây.
+Trong các proof của lượt đó, **204/216** hoàn thành trong 120 giây và
+cũng **204/216** trong 150 giây. Đây là các mốc đọc từ cùng một lượt
+chạy. Sáu ca Gurobi bổ sung đều timeout. Bảng Gurobi đủ dữ liệu ở
+300 giây và đạt **207/216**, gồm 72, 67 và 68 ca theo ba objective.
+
+V45 so sánh hai chế độ dùng cùng giả định SAT để đặt ngân sách. Một
+chế độ dựng lại mô hình ở mỗi ngưỡng. Chế độ kia giữ mô hình MiniSAT
+và các ràng buộc đã thêm. Cả hai hỏi ở ngưỡng \(U-1\) sau tối đa
+60 giây RC2 và cùng dùng 300 giây cho mỗi ca. Chạy một lần trên 11
+ca khó. Nếu có proof mới, cấu hình đứng đầu chạy ba lần xác nhận
+rồi hồi quy các ca V42 đã giải.
+
+VM `trp` đã nhận ổ 50 GiB. Phân vùng gốc còn trống 20 GiB sau khi mở
+rộng. V45 chạy từ commit `14b0df5`. CPLEX đợi lượt SAT dừng rồi dùng
+lại các tệp LP đã kiểm tra để chạy 11 ca còn thiếu ở 300 giây.
+
+## Nhật ký lúc xếp hàng V44
 
 Kiểm tra ngoại tuyến trên các lịch của V42/V43 cho thấy một số lịch còn
 có thể đi sớm hơn hoặc đổi thứ tự hai lượt liền nhau. Với chính lịch

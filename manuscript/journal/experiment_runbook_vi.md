@@ -1978,6 +1978,31 @@ systemctl status maxsat-bound-priority-report-v42.service
 journalctl -u maxsat-bound-priority-report-v42.service -n 20 --no-pager
 ```
 
+## V45 và CPLEX ở 300 giây
+
+Trên VM dùng worktree `/home/tuyenkv/projects/sat-bound-search-v45`
+khóa tại `14b0df5`. Hai chế độ `reuse` và `restart-assumptions`
+cùng dùng MiniSAT, `--threshold-policy upper`, `--rc2-warmup-seconds 60`
+và 300 giây tổng. Mỗi chế độ chạy một lần trên cùng 11 cặp. Service
+kiểm tra Rust, Python, lịch nhỏ, timeout và chuyển pha trước khi đo.
+
+```bash
+journalctl -u maxsat-sat-bound-search-v45.service -n 30 --no-pager
+journalctl -u maxsat-cplex-reference-tail-v45.service -n 30 --no-pager
+```
+
+Trong `results/aglr/sat-bound-search-v45-20261120/` đọc
+`<chế độ>/hard/audit.json` sau mỗi ca và `matched-comparison.json`
+sau khi cả hai chế độ hoàn tất. Lượt đầy đủ, nếu có, nằm trong
+`<chế độ>/full-evaluation.json`.
+
+CPLEX đợi SAT dừng rồi chạy tuần tự 11 ca từng timeout ở 120 giây.
+Mỗi ca lấy đúng tệp LP gốc và bốn luồng. Ngân sách 300 giây tính
+cả thời gian xuất LP ghi ở lượt trước. Hai ca CPLEX đã sửa do dung
+sai đều có lịch được kiểm tra lại khi lập bảng. Đọc `audit.json`
+tại `results/aglr/cplex-reference300-v45-20261120/` để xem mốc đủ
+dữ liệu và các báo cáo SAT đã đối chiếu lại với cận CPLEX.
+
 ## V44: cải thiện lịch trong cùng timeout, chạy sau V43/Gurobi
 
 Đối chứng V42 bằng đúng một thay đổi: sau mỗi lịch SAT hợp lệ, tính lại

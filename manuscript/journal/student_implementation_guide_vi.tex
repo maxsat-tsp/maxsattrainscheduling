@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.30}
+\fancyhead[R]{\small Phiên bản 5.31}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.30, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.31, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -92,11 +92,11 @@ chứng minh tối ưu. Trên \code{infsteps180/trackA11}, V42 tìm lịch hợp
 chi phí $109$, tốt hơn UB $127$ trong các nguồn cũ đã nhập. LB riêng là
 $92$, thấp hơn LB $101$ đã biết; phải ghi cả hai mặt này.
 
-V43 sẽ giữ RC2 60 giây và tổng 300 giây, nhưng luôn hỏi SAT ở $U-1$.
-Gurobi đã có ít nhất 207 ca ở cutoff 300 giây; còn sáu ca thiếu quan sát
-ở cutoff đó. Các ca này được chạy bổ sung sau lượt SAT. Vì vậy chưa được
-kết luận vượt SOTA từ mốc 205. Các đoạn nhật ký sau ghi lại từng mốc cũ;
-kết quả ở đây và runbook mới nhất được dùng để chọn lượt chạy tiếp.
+V43 và V44 đã thử đủ 11 ca khó. Hai lượt chưa thêm ca tối ưu, nhưng
+hạ cận trên xuống $144$ cho \code{stationA12/infsteps180} và $107$
+cho \code{trackA11/infsteps180}. Gurobi đã có đủ kết quả ở 300 giây
+và giải $207/216$ ca. V45 thử giữ mô hình giữa các ngưỡng SAT, sau
+đó VM chạy 11 ca CPLEX còn thiếu để hoàn tất đối chứng.
 
 \textbf{Mốc mới nhất: V41 đã chạy đủ và được kiểm tra lại.} Coverage là
 $(72,67,65)$, tổng $204/216$, tăng một so với V17. Hai ca
@@ -2182,6 +2182,31 @@ của bước mới và 191 kiểm thử Python đã qua trên máy local; kiể
 toàn bộ binary trên VM phải qua trước khi bắt đầu đo. UB $114$ ngoại
 tuyến đã được lưu làm cận đã biết, nên tìm lại $114$ không được đếm
 thành tiến bộ mới. Không đưa lịch hoặc cận từ file này vào solver.
+
+\section{V45: giữ các ràng buộc đã học khi thử lịch rẻ hơn}
+
+Giả sử lịch tốt nhất hiện có chi phí $U=100$. Ta hỏi SAT xem có lịch
+chi phí không quá $99$ hay không. Nếu SAT tìm được lịch $94$, câu
+hỏi tiếp theo có ngưỡng $93$. Các ràng buộc về đường ray và thời gian
+di chuyển vẫn đúng ở cả hai ngưỡng. V45 giữ mô hình và các ràng buộc
+đó khi chuyển từ $99$ sang $93$.
+
+Mô hình dùng các bit $b_j$ để biểu diễn ngân sách $B$. Với
+$x_i$ là biến báo phát sinh một khoản chi phí $w_i$, ta mã hóa
+\[
+  \sum_i w_i x_i\le B,\qquad B=\sum_j 2^j b_j.
+\]
+Ở mỗi câu hỏi, gán các bit $b_j$ theo số $T=U-1$ bằng giả định
+SAT. Giả định chỉ có hiệu lực trong lần gọi đó. Nếu SAT trả lịch hợp
+lệ, hạ $U$ bằng chi phí của lịch. Nếu UNSAT, mọi lịch tốt hơn đã bị
+loại và hai cận khớp. Nếu hết giờ, giữ lịch và các cận đã xác nhận.
+
+Hai chế độ \code{restart-assumptions} và \code{reuse} dùng cùng
+cách đặt ngưỡng. Cờ \code{--threshold-session} chọn cách dựng lại
+hoặc giữ mô hình. Cả hai chạy cùng 11 ca, với tối đa 60 giây RC2
+và 300 giây tổng. Để xem giữ mô hình có ích ở đâu, đối chiếu số lần
+tạo mô hình, kết quả SAT đầu tiên và thời gian các truy vấn sau.
+Phần chạy và đọc kết quả nằm trong runbook.
 
 \section{Nội dung được phép đưa vào bài báo}
 

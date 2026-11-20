@@ -78,7 +78,7 @@ def report(snapshot, candidate):
         raise ValueError('compare cutoffs only for a complete audited candidate')
     observations = baseline_rows(snapshot)
     by_cutoff = {}
-    for limit in (120,150,300):
+    for limit in sorted({120,150,300,comparison['candidate_cutoff_seconds']}):
         if limit > comparison['candidate_cutoff_seconds']:
             continue
         baseline = {tag:summarize(records,limit) for tag,records in observations.items()}

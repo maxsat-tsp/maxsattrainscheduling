@@ -389,7 +389,9 @@ def comparison_report(records,pool,expected):
 combine_full=quality.combine_full
 
 
-def full_comparison(records,baseline,cutoff,confirmations,baseline_label='V17 full300'):
+def full_comparison(records,baseline,cutoff,confirmations,baseline_label='V17 full300',baseline_cutoff=None):
+    baseline_cutoff = cutoff if baseline_cutoff is None else baseline_cutoff
+    equal_cutoff = cutoff == baseline_cutoff
     previous={(r['objective'],r['name']):r for r in baseline};summary=[];gains=[];losses=[]
     for r in records:
         old=previous[r['objective'],r['name']]
@@ -405,22 +407,27 @@ def full_comparison(records,baseline,cutoff,confirmations,baseline_label='V17 fu
             baseline_optimal=sum(r['proven'] for r in old),
             coverage_delta=len(times)-sum(r['proven'] for r in old),
             par2_seconds=sum(r['seconds'] if r['proven'] else 2*cutoff for r in rows)/len(rows),
-            baseline_par2_seconds=sum(r['seconds'] if r['proven'] else 2*cutoff for r in old)/len(old),
+            baseline_par2_seconds=(sum(r['seconds'] if r['proven'] else 2*baseline_cutoff for r in old)/len(old)
+                                   if equal_cutoff else None),
             median_solved_seconds=statistics.median(times) if times else None,
-            paired_instances=len(paired),paired_candidate_seconds=sum(r['seconds'] for r in paired),
-            paired_baseline_seconds=sum(previous[o,r['name']]['seconds'] for r in paired)))
+            paired_instances=len(paired),
+            paired_candidate_seconds=sum(r['seconds'] for r in paired) if equal_cutoff else None,
+            paired_baseline_seconds=(sum(previous[o,r['name']]['seconds'] for r in paired)
+                                     if equal_cutoff else None)))
     proof_cutoffs = {}
     for limit in sorted({120, 150, 300, cutoff}):
         if limit > cutoff:
             continue
         proof_cutoffs[str(limit)] = {
-            label: {objective: sum(row['proven'] and row['seconds'] <= limit
+            label: ({objective: sum(row['proven'] and row['seconds'] <= limit
                                    for row in cohort if row['objective'] == objective)
-                    for objective in ex.audit.OBJECTIVES}
+                     for objective in ex.audit.OBJECTIVES}
+                    if label == 'candidate' or limit <= baseline_cutoff else None)
             for label, cohort in (('candidate', records), ('reference', baseline))
         }
     return dict(summary=summary,gained=gains,lost=losses,confirmations=confirmations,
         complete=True,cutoff_seconds=cutoff,baseline=baseline_label,
+        baseline_cutoff_seconds=baseline_cutoff,runtime_comparable=equal_cutoff,
         proof_cutoffs_seconds=proof_cutoffs,
         proof_cutoffs_scope='proofs recorded by the indicated time in the longer run',
         coverage_total_delta=sum(r['coverage_delta'] for r in summary),
@@ -439,7 +446,8 @@ def evaluate(args,candidate):
         fa=search.audit(followup,args.reference,args.diagnostics)
         baseline,label=search.baseline_for_manifest(hm,args.reference,args.diagnostics)
         records,confirmations=combine_full(audited,fa,baseline);expected=len(baseline)
-        full=full_comparison(records,baseline,hm['timeout_seconds'],confirmations,label)
+        baseline_cutoff = int(re.search(r'full(\d+)$',label)[1])
+        full=full_comparison(records,baseline,hm['timeout_seconds'],confirmations,label,baseline_cutoff)
     selection=([(o,n) for o in ex.audit.OBJECTIVES for n in ex.common.EXPECTED_NAMES] if full else
         [(t['objective'],t['name']) for t in json.loads((candidate/'manifest.json').read_text())['tasks'] if not t['repeat']])
     pool=Pool(selection)

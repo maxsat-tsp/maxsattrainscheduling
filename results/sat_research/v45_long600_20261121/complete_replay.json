@@ -1,0 +1,236 @@
+{
+  "audit_passed": true,
+  "source_commit": "c90cb63f2b0736e9b0eb2993235f2fc98e41bdd0",
+  "binary_sha256": "b0c6f5a32754790a209c9bf2350df7ac4832d9783f30030a104e8786e2f97821",
+  "dataset_sha256": "170814355a5ff1293d279666b0ee5d6885d6413af6c58efd40114e870c6d5d7d",
+  "cutoff_seconds": 600,
+  "hard_completed": 11,
+  "followup_completed": 208,
+  "full_comparison": {
+    "summary": [
+      {
+        "objective": "finsteps123",
+        "instances": 72,
+        "proven_optimal": 72,
+        "baseline_optimal": 72,
+        "coverage_delta": 0,
+        "par2_seconds": 0.06043096059722223,
+        "baseline_par2_seconds": null,
+        "median_solved_seconds": 0.023878813999999998,
+        "paired_instances": 72,
+        "paired_candidate_seconds": null,
+        "paired_baseline_seconds": null
+      },
+      {
+        "objective": "infsteps180",
+        "instances": 72,
+        "proven_optimal": 68,
+        "baseline_optimal": 68,
+        "coverage_delta": 0,
+        "par2_seconds": 67.36340737347228,
+        "baseline_par2_seconds": null,
+        "median_solved_seconds": 0.026699811,
+        "paired_instances": 68,
+        "paired_candidate_seconds": null,
+        "paired_baseline_seconds": null
+      },
+      {
+        "objective": "cont",
+        "instances": 72,
+        "proven_optimal": 66,
+        "baseline_optimal": 65,
+        "coverage_delta": 1,
+        "par2_seconds": 112.60184883269449,
+        "baseline_par2_seconds": null,
+        "median_solved_seconds": 0.0311859885,
+        "paired_instances": 65,
+        "paired_candidate_seconds": null,
+        "paired_baseline_seconds": null
+      }
+    ],
+    "gained": [
+      {
+        "objective": "cont",
+        "name": "stationA1",
+        "cost": 12884
+      }
+    ],
+    "lost": [],
+    "confirmations": [
+      {
+        "objective": "cont",
+        "name": "stationA1",
+        "status": "ok",
+        "proven": true,
+        "seconds": 324.486875108,
+        "lb": 12884,
+        "ub": 12884,
+        "cost": 12884,
+        "queries": 6,
+        "sat_calls": 5394,
+        "threshold_policy": "upper",
+        "rc2_warmup_seconds": 60.0,
+        "incumbent_polish_checks": 0,
+        "threshold_session": "reuse",
+        "sat_model_builds": 1,
+        "first_query_outcome": "sat",
+        "first_query_seconds": 31.498777555,
+        "later_query_seconds": 232.958586424,
+        "repeat": 1
+      },
+      {
+        "objective": "cont",
+        "name": "stationA1",
+        "status": "ok",
+        "proven": true,
+        "seconds": 322.672570572,
+        "lb": 12884,
+        "ub": 12884,
+        "cost": 12884,
+        "queries": 6,
+        "sat_calls": 5410,
+        "threshold_policy": "upper",
+        "rc2_warmup_seconds": 60.0,
+        "incumbent_polish_checks": 0,
+        "threshold_session": "reuse",
+        "sat_model_builds": 1,
+        "first_query_outcome": "sat",
+        "first_query_seconds": 31.363724897,
+        "later_query_seconds": 231.27884523799997,
+        "repeat": 2
+      },
+      {
+        "objective": "cont",
+        "name": "stationA1",
+        "status": "ok",
+        "proven": true,
+        "seconds": 322.811565097,
+        "lb": 12884,
+        "ub": 12884,
+        "cost": 12884,
+        "queries": 6,
+        "sat_calls": 5410,
+        "threshold_policy": "upper",
+        "rc2_warmup_seconds": 60.0,
+        "incumbent_polish_checks": 0,
+        "threshold_session": "reuse",
+        "sat_model_builds": 1,
+        "first_query_outcome": "sat",
+        "first_query_seconds": 31.413212202,
+        "later_query_seconds": 231.369733849,
+        "repeat": 3
+      }
+    ],
+    "complete": true,
+    "cutoff_seconds": 600,
+    "baseline": "SAT search c53cd29 full300",
+    "baseline_cutoff_seconds": 300,
+    "runtime_comparable": false,
+    "proof_cutoffs_seconds": {
+      "120": {
+        "candidate": {
+          "finsteps123": 72,
+          "infsteps180": 68,
+          "cont": 64
+        },
+        "reference": {
+          "finsteps123": 72,
+          "infsteps180": 68,
+          "cont": 64
+        }
+      },
+      "150": {
+        "candidate": {
+          "finsteps123": 72,
+          "infsteps180": 68,
+          "cont": 64
+        },
+        "reference": {
+          "finsteps123": 72,
+          "infsteps180": 68,
+          "cont": 64
+        }
+      },
+      "300": {
+        "candidate": {
+          "finsteps123": 72,
+          "infsteps180": 68,
+          "cont": 65
+        },
+        "reference": {
+          "finsteps123": 72,
+          "infsteps180": 68,
+          "cont": 65
+        }
+      },
+      "600": {
+        "candidate": {
+          "finsteps123": 72,
+          "infsteps180": 68,
+          "cont": 66
+        },
+        "reference": null
+      }
+    },
+    "proof_cutoffs_scope": "proofs recorded by the indicated time in the longer run",
+    "coverage_total_delta": 1,
+    "coverage_nonregression": true,
+    "scope": "one frozen method on every pair; no mixing with baseline solutions"
+  },
+  "matched600": {
+    "scope": "matched hard set of 11 pairs; no full-dataset coverage or runtime comparison",
+    "timeout_seconds": 600,
+    "candidate_proven": 1,
+    "baseline_proven": {
+      "BigM-Gurobi": 3,
+      "BigM-CPLEX": 3,
+      "CSOnet": 0,
+      "MaxSAT-Journal": 0
+    },
+    "baseline_reused": {
+      "BigM-Gurobi": 3,
+      "BigM-CPLEX": 3,
+      "CSOnet": 0,
+      "MaxSAT-Journal": 0
+    },
+    "baseline_external_timeouts": {
+      "BigM-Gurobi": 0,
+      "BigM-CPLEX": 0,
+      "CSOnet": 2,
+      "MaxSAT-Journal": 1
+    },
+    "candidate_new_best_bound_cases": 1
+  },
+  "milp_coverage_inventory": {
+    "BigM-Gurobi": {
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 67,
+        "cont": 68
+      },
+      "total": 207,
+      "complete": false,
+      "missing_at_cutoff": [
+        [
+          "infsteps180",
+          "stationA8"
+        ]
+      ],
+      "reused_proofs_at_300": 207,
+      "observed_at_600": 8
+    },
+    "BigM-CPLEX": {
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 68,
+        "cont": 68
+      },
+      "total": 208,
+      "complete": true,
+      "missing_at_cutoff": [],
+      "reused_proofs_at_300": 208,
+      "observed_at_600": 8
+    }
+  },
+  "runtime_comparable_to_milp": false
+}

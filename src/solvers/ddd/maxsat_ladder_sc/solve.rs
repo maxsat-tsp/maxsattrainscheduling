@@ -1151,7 +1151,8 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         _ => None,
     };
     if diagnostic.is_some() || threshold_session.is_some() {
-        if settings.order_master || settings.extract_initial_cost || settings.residual_hardening {
+        if settings.order_master || settings.residual_hardening
+            || (diagnostic.is_some() && settings.extract_initial_cost) {
             return Err(SolverError::InvalidSolution(
                 "bound diagnostics require ordinary DDD, no initial cost offset or residual hardening".into()));
         }
@@ -1333,6 +1334,16 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         .ok_or_else(||SolverError::InvalidSolution("initial objective cost overflow".into()))?)
         .map_err(|_|SolverError::InvalidSolution("initial objective cost exceeds i32".into()))?;
     output_stats("maxsat_initial_cost_offset".to_string(),initial_cost_offset.into());
+    if let Some(session) = threshold_session.as_ref() {
+        if session.target < initial_cost_offset {
+            return Err(SolverError::InvalidSolution(
+                "threshold session started below its input-only cost bound".into()));
+        }
+        if settings.extract_initial_cost {
+            output_stats("threshold_residual_target".into(),
+                (session.target - initial_cost_offset).into());
+        }
+    }
     let mut total_cost = initial_cost_offset;
     let mut soft_constraints = HashMap::new();
     let mut debug_actions = Vec::new();
@@ -2022,11 +2033,15 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
                     output_stats("diagnostic_outcome".into(), "sat".into());
                     if let Some(session) = threshold_session.as_mut() {
                         if let Some(next) = (session.after_sat)(target, cost, &trains)? {
-                            if next < 0 || next >= target || next >= cost {
+                            if next < initial_cost_offset || next >= target || next >= cost {
                                 return Err(SolverError::InvalidSolution("threshold failed to tighten".into()));
                             }
                             fixed_target = Some(next);
                             output_stats("diagnostic_target".into(), next.into());
+                            if settings.extract_initial_cost {
+                                output_stats("threshold_residual_target".into(),
+                                    (next - initial_cost_offset).into());
+                            }
                             is_sat = false;
                             iteration += 1;
                             continue;
@@ -2205,7 +2220,7 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         if fixed_target.is_some() { assumptions.clear(); }
         let budget_assumptions: Vec<_> = if threshold_session.is_some() {
             binary_objective.as_ref().unwrap()
-                .budget_bits(fixed_target.unwrap() as usize).collect()
+                .budget_bits((fixed_target.unwrap() - initial_cost_offset) as usize).collect()
         } else {
             Vec::new()
         };

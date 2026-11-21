@@ -243,6 +243,7 @@ class Pool:
     def search_history(self,reference,diagnostics,exclude_binary):
         """Earlier autonomous searches are now part of the known-bound pool."""
         archives = list(RESEARCH.glob('v*_sat_bound_search_*/complete_snapshot.tar.gz'))
+        archives += list(RESEARCH.glob('v*_long600_*/complete_snapshot.tar.gz'))
         archives += list(RESEARCH.glob('v*_*/hard_snapshot.tar.gz'))
         archives += list(RESEARCH.glob('v*_sat_bound_search_*/matched_snapshot.tar.gz'))
         for path in sorted(archives):
@@ -281,6 +282,19 @@ class Pool:
                             manifest['timeout_seconds'],str(path)+'#'+middle+r['objective']+'/'+r['name'],
                             'query ledger replayed; every incumbent independently checked')
                         if record is not None:record['upper_witness_verified']=True
+                    recovery = phase/'control-recovery'
+                    if path.name == 'complete_snapshot.tar.gz' and recovery.is_dir():
+                        from run_long_baseline_cases import audit_archived_controls
+                        known = {(r['objective'],r['name']):r for r in records}
+                        for method, row in audit_archived_controls(phase,recovery,known):
+                            if row['status'] == 'external_timeout':
+                                continue
+                            o,n = row['objective'],row['name']
+                            record = self.add(o,n,row['lb'],row['ub'],method,row['timeout_seconds'],
+                                str(path)+'#controls/'+method+'/'+o+'/'+n,
+                                'native control and receipt replayed against independently checked schedules')
+                            if record is not None:
+                                record['upper_witness_verified'] = row['upper_witness_verified']
 
     def cplex_rechecks(self):
         original=RESEARCH/'cplex_full_120_20261108/raw_snapshot.tar.gz'

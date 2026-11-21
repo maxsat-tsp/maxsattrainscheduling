@@ -297,11 +297,16 @@ mod tests {
             let optimum = (0..=5).flat_map(|a| (0..=5).map(move |b| (a,b)))
                 .filter_map(|(a,b)| problem.verify_solution(&[vec![a,a+2],vec![b,b+1]],objective))
                 .min().unwrap();
-            for session in [ThresholdSession::Restart, ThresholdSession::RestartAssumptions, ThresholdSession::Reuse] {
+            for session in [ThresholdSession::Restart, ThresholdSession::RestartAssumptions,
+                ThresholdSession::Reuse, ThresholdSession::ReuseOffset] {
                 let result = solve_with_session(&problem, objective, 5.0, ThresholdPolicy::Upper,
                     0.0, 0, session, |_,_,_| {}).unwrap();
                 assert_eq!((result.status, result.lb, result.ub), ("ok", optimum, optimum));
-                let builds = if session == ThresholdSession::Reuse { 1 } else { result.queries.len() };
+                let builds = if matches!(session, ThresholdSession::Reuse | ThresholdSession::ReuseOffset) {
+                    1
+                } else {
+                    result.queries.len()
+                };
                 assert_eq!(result.sat_model_builds, builds);
                 assert_eq!(result.queries.last().unwrap().target, optimum - 1);
                 assert_eq!(result.queries.last().unwrap().outcome, "unsat");
@@ -310,6 +315,38 @@ mod tests {
                     assert_eq!(result.queries.last().unwrap().target, 0);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn reused_offset_threshold_matches_exhaustive_optima_with_unavoidable_cost() {
+        let problem = Problem {
+            name: "threshold-offset".into(),
+            conflicts: vec![(1, 1)],
+            trains: [180, 181].into_iter().map(|travel_time| Train {
+                visits: vec![
+                    Visit { resource_id: 0, earliest: 179, aimed: None, travel_time: 1 },
+                    Visit { resource_id: 1, earliest: 0, aimed: Some(0), travel_time },
+                ],
+            }).collect(),
+        };
+        for objective in [DelayCostType::Continuous, DelayCostType::FiniteSteps123, DelayCostType::InfiniteSteps180] {
+            let optimum = (180..=361).flat_map(|a| (180..=361).map(move |b| (a,b)))
+                .filter_map(|(a,b)| problem.verify_solution(&[vec![179,a,a+180],vec![179,b,b+181]],objective))
+                .min().unwrap();
+            let result = solve_with_session(&problem, objective, 5.0, ThresholdPolicy::Upper,
+                0.0, 0, ThresholdSession::ReuseOffset, |_,_,_| {}).unwrap();
+            assert_eq!((result.status, result.lb, result.ub), ("ok", optimum, optimum));
+            let offset = result.initial_lb;
+            assert!(offset > 0);
+            assert_eq!(result.sat_model_builds, 1);
+            for query in &result.queries {
+                assert_eq!(query.threshold_evidence["maxsat_initial_cost_offset"], offset);
+                assert_eq!(query.threshold_evidence["threshold_residual_target"], query.target - offset);
+            }
+            let closing = result.queries.last().unwrap();
+            assert_eq!(closing.outcome, "unsat");
+            assert_eq!(closing.target, optimum - 1);
         }
     }
 

@@ -32,6 +32,29 @@ class SearchAuditTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 search.check_result(changed,'origA1','cont',300,5526)
 
+    def test_reused_offset_requires_the_chain_bound_and_residual_for_each_query(self):
+        data = self.fixture('upper')
+        data.update(solver_name='SAT-Upper-ReuseOffset', threshold_session='reuse-offset', sat_model_builds=1)
+        offset = data['initial_lb']
+        self.assertGreater(offset, 0)
+        for query in data['queries']:
+            query['model_generation'] = 1
+            query['threshold_evidence'].update(
+                threshold_budget_assumptions=True, threshold_budget_capacity=data['initial_ub']-1,
+                maxsat_extract_initial_cost=True, maxsat_initial_cost_offset=offset,
+                threshold_residual_target=query['target']-offset)
+        self.assertTrue(search.check_result(data,'origA1','cont',300,5526)[0]['proven'])
+        for update in (dict(maxsat_initial_cost_offset=offset+1),
+                       dict(threshold_residual_target=data['queries'][-1]['target']),
+                       dict(maxsat_extract_initial_cost=False)):
+            changed = copy.deepcopy(data)
+            changed['queries'][-1]['threshold_evidence'].update(update)
+            with self.assertRaisesRegex(ValueError, 'objective offset'):
+                search.check_result(changed,'origA1','cont',300,5526)
+        data.update(solver_name='SAT-Upper-Reuse', threshold_session='reuse')
+        with self.assertRaisesRegex(ValueError, 'unrequested threshold cost offset'):
+            search.check_result(data,'origA1','cont',300,5526)
+
     def test_confirmation_cannot_switch_threshold_session(self):
         manifest = {k: 0 for k in ('commit','binary_sha256','build_manifest_sha256',
                                    'dataset_sha256','timeout_seconds','ram_kb','cpu_affinity')}

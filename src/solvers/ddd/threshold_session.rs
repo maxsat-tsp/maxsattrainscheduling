@@ -19,6 +19,7 @@ pub enum ThresholdSession {
     Restart,
     RestartAssumptions,
     Reuse,
+    ReuseOffset,
 }
 
 impl ThresholdSession {
@@ -27,6 +28,7 @@ impl ThresholdSession {
             "restart" => Ok(Self::Restart),
             "restart-assumptions" => Ok(Self::RestartAssumptions),
             "reuse" => Ok(Self::Reuse),
+            "reuse-offset" => Ok(Self::ReuseOffset),
             _ => Err("unsupported threshold session".into()),
         }
     }
@@ -39,6 +41,8 @@ impl ThresholdSession {
             (Self::RestartAssumptions, true) => "RC2-Warm-SAT-Upper-RestartAssumptions",
             (Self::Reuse, false) => "SAT-Upper-Reuse",
             (Self::Reuse, true) => "RC2-Warm-SAT-Upper-Reuse",
+            (Self::ReuseOffset, false) => "SAT-Upper-ReuseOffset",
+            (Self::ReuseOffset, true) => "RC2-Warm-SAT-Upper-ReuseOffset",
         }
     }
 }
@@ -120,6 +124,7 @@ pub(super) fn search(
         core_minimize_checks: 4,
         core_minimize_conflicts: 100,
         core_exhaust_checks: 4,
+        extract_initial_cost: session == ThresholdSession::ReuseOffset,
         ..Default::default()
     };
     let mut models = 0;
@@ -174,7 +179,7 @@ pub(super) fn search(
                         ),
                         *interval,
                     );
-                    if session == ThresholdSession::Reuse {
+                    if matches!(session, ThresholdSession::Reuse | ThresholdSession::ReuseOffset) {
                         if let Some(next) = interval.target_for(policy) {
                             let decision = Decision::start(next, deadline);
                             if decision.remaining_seconds > 0.0 {

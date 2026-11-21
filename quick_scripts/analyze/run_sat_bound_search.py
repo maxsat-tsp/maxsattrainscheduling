@@ -18,7 +18,8 @@ import extended_timeout_experiments as ex
 import targeted_order_cycles as trial
 import bound_quality
 
-SESSIONS = ('restart', 'restart-assumptions', 'reuse')
+REUSE_SESSIONS = ('reuse', 'reuse-offset')
+SESSIONS = ('restart', 'restart-assumptions', *REUSE_SESSIONS)
 
 
 def initial_lower(name,objective):
@@ -107,7 +108,8 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     if session not in SESSIONS or (session != 'restart' and (policy != 'upper' or polish_checks)):
         raise ValueError('invalid SAT threshold session')
     if session != 'restart':
-        solver = {'reuse': 'SAT-Upper-Reuse', 'restart-assumptions': 'SAT-Upper-RestartAssumptions'}[session]
+        solver = {'reuse': 'SAT-Upper-Reuse', 'reuse-offset': 'SAT-Upper-ReuseOffset',
+                  'restart-assumptions': 'SAT-Upper-RestartAssumptions'}[session]
     requested=result.get('rc2_warmup_seconds',0)
     if isinstance(requested,bool) or not isinstance(requested,(int,float)) or not math.isfinite(requested) or requested<0:raise ValueError('invalid RC2 warmup allocation')
     if requested>0 and solver is not None:solver='RC2-Warm-'+solver
@@ -120,15 +122,16 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     seconds=result.get('total_time')
     if not isinstance(seconds,(float,int)) or not math.isfinite(seconds) or seconds<0:
         raise ValueError('invalid elapsed time')
-    lower=initial_lower(name,objective);upper=result.get('initial_ub')
-    if result.get('initial_lb')!=lower:raise ValueError('initial LB is not the input-only chain bound')
+    chain_bound=initial_lower(name,objective);lower=chain_bound;upper=result.get('initial_ub')
+    if result.get('initial_lb')!=chain_bound:raise ValueError('initial LB is not the input-only chain bound')
     validate_schedule(name,objective,result.get('initial_solution'),upper)
     if lower>upper:raise ValueError('initial bounds cross')
     lower,upper,spent,warm_calls=replay_warmup(result,name,objective,cutoff,lower,upper)
     if known_optimum is not None and not lower<=known_optimum<=upper:raise ValueError('RC2 warmup contradicts a known optimum')
     queries=result.get('queries');unknown=False;last_remaining=float('inf');trace=[]
     if not isinstance(queries,list):raise ValueError('missing query ledger')
-    expected_builds = min(1, len(queries)) if session == 'reuse' else len(queries)
+    reuse = session in REUSE_SESSIONS
+    expected_builds = min(1, len(queries)) if reuse else len(queries)
     if (session != 'restart' or 'sat_model_builds' in result) and (
             type(result.get('sat_model_builds')) is not int or result['sat_model_builds'] != expected_builds):
         raise ValueError('wrong SAT model build count')
@@ -153,16 +156,27 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
             maxsat_resource_orders=True,maxsat_order_transitivity=True,maxsat_sparse_costs=False)
         if any(evidence.get(k)!=v for k,v in required.items()):raise ValueError('wrong fixed-bound query definition')
         if session != 'restart':
-            generation = 1 if session == 'reuse' else index
+            generation = 1 if reuse else index
             if (q.get('model_generation') != generation or
                     evidence.get('threshold_budget_assumptions') is not True or
                     evidence.get('threshold_budget_capacity') != capacity):
                 raise ValueError('wrong assumption budget or SAT model generation')
             size = (q.get('variables'), q.get('clauses'))
             if any(type(n) is not int or n < 0 for n in size) or (
-                    session == 'reuse' and any(n < old for n, old in zip(size, model_size))):
+                    reuse and any(n < old for n, old in zip(size, model_size))):
                 raise ValueError('SAT model size decreased within a reused session')
             model_size = size
+        if session == 'reuse-offset':
+            offset = evidence.get('maxsat_initial_cost_offset')
+            residual = evidence.get('threshold_residual_target')
+            if (evidence.get('maxsat_extract_initial_cost') is not True
+                    or type(offset) is not int or offset != chain_bound
+                    or type(residual) is not int or residual != target-offset or residual < 0):
+                raise ValueError('incorrect input-only objective offset or residual target')
+        elif (evidence.get('maxsat_extract_initial_cost', False) is not False
+              or evidence.get('maxsat_initial_cost_offset', 0) != 0
+              or 'threshold_residual_target' in evidence):
+            raise ValueError('unrequested threshold cost offset')
         if any(k.startswith('diagnostic_') for k in evidence):raise ValueError('diagnostic oracle metadata leaked into optimizer')
         answer=q.get('outcome')
         polish=q.get('polish')

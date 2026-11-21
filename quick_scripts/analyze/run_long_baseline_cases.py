@@ -175,6 +175,46 @@ def resume_old_case(args, previous, previous_lock, objective, name, known):
     return dict(record, replayed=True, prior_input_sha256=evidence)
 
 
+def audit_archived_controls(original, recovery, known):
+    """Replay measured 600-second controls, including the interrupted SAT phase."""
+    candidate = original/'hard/manifest.json'
+    dataset = ex.focus.dataset_hash()
+    for method in METHODS:
+        stage = (original if method.startswith('BigM-') else recovery)/'controls'/method
+        manifest = json.loads((stage/'manifest.json').read_text())
+        pairs = [(t['objective'],t['name']) for t in manifest['tasks']]
+        if (manifest['candidate_manifest_sha256'] != ex.focus.sha(candidate)
+                or manifest['dataset_sha256'] != dataset or manifest['method'] != method
+                or manifest['timeout_seconds'] != CUTOFF or len(pairs) != len(set(pairs))):
+            raise ValueError('archived controls mismatch the candidate, dataset or method')
+        report = json.loads((stage/'audit.json').read_text())
+        if (not report['complete'] or not report['audit_passed']
+                or [(r['objective'],r['name']) for r in report['cases']] != pairs):
+            raise ValueError('archived control membership changed')
+        for task, saved in zip(manifest['tasks'], report['cases']):
+            o,n = task['objective'],task['name']
+            if task['reused_proof'] is not None:
+                if task['reused_proof'] != saved:
+                    raise ValueError('archived reusable control proof changed')
+                continue
+            if saved.get('replayed'):
+                prior = original/'controls'/method
+                prior_manifest = prior/'manifest.json'
+                if ex.focus.sha(prior_manifest) != manifest['prior_manifest_sha256']:
+                    raise ValueError('archived prior control manifest changed')
+                previous = json.loads(prior_manifest.read_text())
+                row = resume_old_case(SimpleNamespace(method=method),prior,previous,o,n,known[o,n])
+            else:
+                case = stage/'cases'/o/n
+                receipt = json.loads((case/'completion.json').read_text())
+                if receipt['files'] != case_evidence(case,method,o,n,manifest):
+                    raise ValueError('archived control evidence changed')
+                row = checked_case(case,method,o,n,manifest,known[o,n])
+            if row is None or any(row.get(k) != v for k,v in saved.items() if k != 'source'):
+                raise ValueError('archived control does not replay')
+            yield method, row
+
+
 def run(args):
     candidate = json.loads(args.candidate_manifest.read_text())
     pairs = [(r['objective'],r['name']) for r in candidate['tasks']]

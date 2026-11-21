@@ -1,0 +1,172 @@
+{
+  "audit_passed": true,
+  "timeout_seconds": 600,
+  "dataset_sha256": "170814355a5ff1293d279666b0ee5d6885d6413af6c58efd40114e870c6d5d7d",
+  "scope": "observed proof coverage and ceiling if every unmeasured pair were solved; no mixed runtime comparison",
+  "source_sha256": {
+    "results/sat_research/v45_sat_bound_search_20261120/sat_baselines120_snapshot.tar.gz": "26a6857228d564a5f0ac314e9519095925d0be9c01c66cbee2b437db392e8bc9",
+    "results/sat_research/v45_long600_20261121/complete_snapshot.tar.gz": "1272270fb9552c71a9f3630fb72cdcd06ced4ea4430eef383d6797abab83180b",
+    "results/sat_research/extended_300_20261106/progress_82/raw_snapshot.tar.gz": "a2fbe12138b72600ae3f1ff30a194f97e5ed636f10871c543eeb5caf64660f98",
+    "results/sat_research/cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz": "a66e7ab69f5b9afe387b33d570aee77e33cffb5b7160edb37ad8976c0eac6098"
+  },
+  "solvers": {
+    "CSOnet": {
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 68,
+        "cont": 60
+      },
+      "total": 200,
+      "complete": false,
+      "missing_at_cutoff": [
+        [
+          "cont",
+          "origA8"
+        ],
+        [
+          "cont",
+          "trackB12"
+        ],
+        [
+          "cont",
+          "stationA2"
+        ],
+        [
+          "cont",
+          "stationA3"
+        ],
+        [
+          "cont",
+          "stationB12"
+        ]
+      ],
+      "observed_no_proof_at_cutoff": [
+        [
+          "infsteps180",
+          "trackA11"
+        ],
+        [
+          "infsteps180",
+          "trackA12"
+        ],
+        [
+          "infsteps180",
+          "stationA11"
+        ],
+        [
+          "infsteps180",
+          "stationA12"
+        ],
+        [
+          "cont",
+          "trackA8"
+        ],
+        [
+          "cont",
+          "trackA11"
+        ],
+        [
+          "cont",
+          "trackA12"
+        ],
+        [
+          "cont",
+          "stationA1"
+        ],
+        [
+          "cont",
+          "stationA8"
+        ],
+        [
+          "cont",
+          "stationA11"
+        ],
+        [
+          "cont",
+          "stationA12"
+        ]
+      ],
+      "not_measured_at_cutoff": 5,
+      "coverage_ceiling": 205
+    },
+    "MaxSAT-Journal": {
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 68,
+        "cont": 60
+      },
+      "total": 200,
+      "complete": false,
+      "missing_at_cutoff": [
+        [
+          "cont",
+          "origA8"
+        ],
+        [
+          "cont",
+          "trackB12"
+        ],
+        [
+          "cont",
+          "stationA2"
+        ],
+        [
+          "cont",
+          "stationA3"
+        ],
+        [
+          "cont",
+          "stationB12"
+        ]
+      ],
+      "observed_no_proof_at_cutoff": [
+        [
+          "infsteps180",
+          "trackA11"
+        ],
+        [
+          "infsteps180",
+          "trackA12"
+        ],
+        [
+          "infsteps180",
+          "stationA11"
+        ],
+        [
+          "infsteps180",
+          "stationA12"
+        ],
+        [
+          "cont",
+          "trackA8"
+        ],
+        [
+          "cont",
+          "trackA11"
+        ],
+        [
+          "cont",
+          "trackA12"
+        ],
+        [
+          "cont",
+          "stationA1"
+        ],
+        [
+          "cont",
+          "stationA8"
+        ],
+        [
+          "cont",
+          "stationA11"
+        ],
+        [
+          "cont",
+          "stationA12"
+        ]
+      ],
+      "not_measured_at_cutoff": 5,
+      "coverage_ceiling": 205
+    }
+  }
+}

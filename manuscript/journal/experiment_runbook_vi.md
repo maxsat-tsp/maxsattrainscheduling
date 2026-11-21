@@ -2007,6 +2007,12 @@ Gurobi chứng minh ca cuối `infsteps180/stationA8` sau 563,83 giây,
 với chi phí 161 và hai cận bằng nhau. Các lượt MILP ghép giúp xác
 định số ca tối ưu. Bảng thời gian cần các lượt đo nhất quán.
 
+CSOnet và MaxSAT-Journal đều có 200 chứng minh đã kiểm tra.
+Mỗi phương pháp còn thiếu phép đo 600 giây cho năm ca. Ngay cả
+khi giải được cả năm ca, mỗi phương pháp sẽ đạt tối đa 205 ca
+trong bảng hiện tại. Danh sách năm ca nằm trong
+`sat600_coverage_inventory.json`.
+
 Dữ liệu gốc, kiểm toán và danh sách lượt xác nhận nằm trong
 `results/sat_research/v45_long600_20261121/`. Lượt V46 dùng
 `complete_snapshot.tar.gz` ở đó để chọn ca và đối chiếu cận.
@@ -2026,6 +2032,9 @@ journalctl -u maxsat-sat-bound-search-v46-offset.service -n 25 --no-pager
 Checkout VM là `~/projects/sat-bound-search-v46-offset`. Trong
 `results/aglr/sat-bound-search-v46-offset600-20261121/`, đọc
 `preflight.json` để xem kiểm thử và phiên bản binary.
+VM đã qua 22 kiểm thử Rust, 198 kiểm thử Python, ba ca chạy thử
+và hai phép kiểm tra chuyển sang SAT và hết giờ. Bản lưu đã kiểm
+tra lại nằm trong `results/sat_research/v46_sat_bound_search_20261121/`.
 `hard/audit.json` ghi số ca đã chạy. Khi xong 10 ca,
 `hard-evaluation.json` cho biết ca mới và cận nào được cải thiện.
 Nếu có chứng minh mới, VM tự xác nhận ba lần và chạy hồi quy 206

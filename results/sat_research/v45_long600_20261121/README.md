@@ -29,6 +29,11 @@ proved optimum 161 in 563.83 seconds. Its native files and
 independently rebuilt inventory are in `gurobi600_tail_snapshot.tar.gz`
 and `gurobi600_audit.json`. The inventories record coverage only.
 
+`sat600_coverage_inventory.json` counts 200 checked proofs for
+each SAT baseline. Each has five pairs with a missing 600-second
+observation. Even if all five were solved by each baseline, its
+coverage in this inventory would be at most 205/216.
+
 `complete_snapshot.tar.gz` contains both completed SAT phases,
 all matched controls and their original receipts. Its top-level
 `COMPLETED` copies the SAT marker `FOLLOWUP_COMPLETED` so the

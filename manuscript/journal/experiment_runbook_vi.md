@@ -2001,11 +2001,11 @@ và hai bản kết quả khớp. Ô LB, UB và chi phí của ca đó để tr�
 Panic, sai cấu hình, dừng sớm hoặc sai lịch vẫn làm audit thất bại.
 Trong `matched600.json`, số ca tối ưu trên cùng nhóm 11 ca lần lượt
 là V45 1, Gurobi 3, CPLEX 3, CSOnet 0 và MaxSAT-Journal 0. Mỗi
-solver MILP dùng lại ba chứng minh hợp lệ đã có. CPLEX đã đủ mốc
-600 giây cho toàn bộ 216 ca và có 208 chứng minh. Gurobi còn thiếu
-`infsteps180/stationA8` ở mốc này, chạy trong service
-`maxsat-gurobi-ref600-v45-tail.service`. Các lượt MILP ghép giúp
-xác định số ca tối ưu. Bảng thời gian cần các lượt đo nhất quán.
+solver MILP dùng lại ba chứng minh hợp lệ đã có. Trên toàn bộ 216
+ca, Gurobi và CPLEX cùng có 208 chứng minh ở mốc 600 giây.
+Gurobi chứng minh ca cuối `infsteps180/stationA8` sau 563,83 giây,
+với chi phí 161 và hai cận bằng nhau. Các lượt MILP ghép giúp xác
+định số ca tối ưu. Bảng thời gian cần các lượt đo nhất quán.
 
 Dữ liệu gốc, kiểm toán và danh sách lượt xác nhận nằm trong
 `results/sat_research/v45_long600_20261121/`. Lượt V46 dùng

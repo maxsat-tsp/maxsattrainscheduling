@@ -20,12 +20,14 @@ the best known UB from 143 to 142. Its own LB is 104 and the
 strongest imported LB is 115. None of the other unresolved
 pairs improved the best bounds in the matched comparison.
 
-At 600 seconds, CPLEX has **208/216**. The inventory combines
-208 audited proofs by 300 seconds with the eight remaining
-observations at 600 seconds. The Gurobi inventory has 207
-verified proofs and one outstanding observation at 600 seconds,
-`infsteps180/stationA8`. Runtime comparisons across these
-reused MILP runs are unavailable.
+At 600 seconds, both MILP controls have **208/216** with
+coverage `(72, 68, 68)`. CPLEX reuses 208 audited proofs by
+300 seconds and measures the remaining eight pairs at 600 seconds.
+Gurobi reuses 207 such proofs and measures nine pairs at 600
+seconds. On its final pair, `infsteps180/stationA8`, Gurobi
+proved optimum 161 in 563.83 seconds. Its native files and
+independently rebuilt inventory are in `gurobi600_tail_snapshot.tar.gz`
+and `gurobi600_audit.json`. The inventories record coverage only.
 
 `complete_snapshot.tar.gz` contains both completed SAT phases,
 all matched controls and their original receipts. Its top-level
@@ -34,7 +36,7 @@ archive can select V46's cases. The native `FAILED` marker for
 the original CSOnet interruption and the separate recovery
 results under `control-recovery/` are preserved. The recovered
 controls ran with runner `a964d69`. `complete_replay.json`
-records the independent replay and the MILP coverage inventory.
+records the independent replay before the final Gurobi observation.
 
 The initial data and checks remain in `native_initial_snapshot.tar.gz`,
 `hard600_replay.json`, and `cplex300_audit.json`. The first confirmation

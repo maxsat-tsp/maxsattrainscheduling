@@ -87,8 +87,8 @@ Mỗi báo cáo phải ghi rõ giả định này.
 
 \textbf{Cập nhật 21-11-2026.} Ở 600 giây, V45 chứng minh tối ưu
 $(72,68,66)$ ca theo ba hàm mục tiêu, tổng $206/216$. Ca mới
-\code{cont/stationA1} đã xác nhận thành công cả ba lần. CPLEX
-chứng minh $208/216$ ca ở cùng mốc. V46 thử trên 10 ca SAT chưa giải
+\code{cont/stationA1} đã xác nhận thành công cả ba lần. CPLEX và
+Gurobi cùng chứng minh $208/216$ ca ở mốc này. V46 thử trên 10 ca SAT chưa giải
 được. Xem số ca chứng minh tối ưu trước, mức cải thiện cận sau đó,
 rồi mới so sánh thời gian.
 
@@ -2224,12 +2224,13 @@ ngưỡng $12883$. Ba lần xác nhận độc lập đều trả hai cận bằ
 $12884$ trong khoảng 323 đến 324,5 giây. V45 giữ được cả 205 ca
 V42 đã giải và đạt $206/216$ ở 600 giây.
 
-\section{V46: trừ trước phần chi phí bắt buộc}
+\section{V46 trừ trước phần chi phí bắt buộc}
 
-Từ giờ đến sớm nhất của lượt $v$ và thời gian di chuyển, tính
-$e_v$, thời điểm sớm nhất tàu có thể bắt đầu lượt đó. Mọi lịch hợp
-lệ đều bắt đầu lượt $v$ tại $t_v\ge e_v$. Gọi $c_v(t)$ là chi phí
-của lượt nếu bắt đầu tại $t$. Chi phí bắt buộc là
+Với mỗi tàu, gọi $a_v$ là giờ bắt đầu sớm nhất ghi trong dữ liệu
+cho lượt $v$ và $p_v$ là thời gian di chuyển của lượt đó. Tính
+$e_1=a_1$ rồi lần lượt lấy $e_{v+1}=\max(a_{v+1},e_v+p_v)$.
+Mọi lịch hợp lệ đều bắt đầu lượt $v$ tại $t_v\ge e_v$.
+Gọi $c_v(t)$ là chi phí của lượt nếu bắt đầu tại $t$. Chi phí bắt buộc là
 $C_0=\sum_v c_v(e_v)$. Với ngưỡng tổng chi phí $T$, SAT kiểm tra
 \[
   \sum_v \bigl[c_v(t_v)-c_v(e_v)\bigr]\le T-C_0.

@@ -1978,12 +1978,14 @@ systemctl status maxsat-bound-priority-report-v42.service
 journalctl -u maxsat-bound-priority-report-v42.service -n 20 --no-pager
 ```
 
-## Xác nhận ca stationA1 và tiếp tục đối chứng 600 giây
+## Kết quả V45 và đối chứng ở 600 giây
 
-V45 đã đo xong 11 ca ở 600 giây. Trên `cont/stationA1`, hai cận
-bằng 12.884 ở 322,42 giây. Service xác nhận dùng cùng binary và
-chạy ba lần mới trước khi hồi quy các ca V42 đã giải. Dữ liệu vẫn
-nằm trong lượt gốc `sat-bound-search-v45-long600-20261120`.
+V45 đã hoàn tất 216 ca ở 600 giây và chứng minh tối ưu 206 ca,
+gồm 72, 68 và 66 ca theo ba hàm mục tiêu. Trên `cont/stationA1`,
+hai cận bằng 12.884 ở 322,42 giây. Cùng binary xác nhận lại ba
+lần ở 324,49, 322,67 và 322,81 giây. Cả 205 ca V42 đã giải vẫn
+được V45 chứng minh tối ưu. Ở mốc 300 giây, V45 và V42 cùng có
+205 chứng minh.
 
 ```bash
 journalctl -u maxsat-v45-long600-followup.service -n 20 --no-pager
@@ -1997,7 +1999,39 @@ Auditor tái kiểm tra tám kết quả CSOnet và ca bộ bọc ngắt ngoài.
 ghi hết giờ ngoài khi có exit 124, đúng manifest, đủ thời gian đo
 và hai bản kết quả khớp. Ô LB, UB và chi phí của ca đó để trống.
 Panic, sai cấu hình, dừng sớm hoặc sai lịch vẫn làm audit thất bại.
-Đọc `matched600.json` khi đủ năm phương pháp.
+Trong `matched600.json`, số ca tối ưu trên cùng nhóm 11 ca lần lượt
+là V45 1, Gurobi 3, CPLEX 3, CSOnet 0 và MaxSAT-Journal 0. Mỗi
+solver MILP dùng lại ba chứng minh hợp lệ đã có. CPLEX đã đủ mốc
+600 giây cho toàn bộ 216 ca và có 208 chứng minh. Gurobi còn thiếu
+`infsteps180/stationA8` ở mốc này, chạy trong service
+`maxsat-gurobi-ref600-v45-tail.service`. Các lượt MILP ghép giúp
+xác định số ca tối ưu. Bảng thời gian cần các lượt đo nhất quán.
+
+Dữ liệu gốc, kiểm toán và danh sách lượt xác nhận nằm trong
+`results/sat_research/v45_long600_20261121/`. Lượt V46 dùng
+`complete_snapshot.tar.gz` ở đó để chọn ca và đối chiếu cận.
+
+## V46 chạy tự động trên 10 ca SAT chưa chứng minh được
+
+V46 trừ phần chi phí chắc chắn phát sinh khỏi ngân sách SAT.
+Giữ MiniSAT, cách đặt ngưỡng và 60 giây RC2 của V45. Mỗi ca có
+600 giây tổng. Trình chạy đợi lượt Gurobi còn thiếu kết thúc
+để hai lượt đo không tranh CPU.
+
+```bash
+systemctl status maxsat-sat-bound-search-v46-offset.service --no-pager
+journalctl -u maxsat-sat-bound-search-v46-offset.service -n 25 --no-pager
+```
+
+Checkout VM là `~/projects/sat-bound-search-v46-offset`. Trong
+`results/aglr/sat-bound-search-v46-offset600-20261121/`, đọc
+`preflight.json` để xem kiểm thử và phiên bản binary.
+`hard/audit.json` ghi số ca đã chạy. Khi xong 10 ca,
+`hard-evaluation.json` cho biết ca mới và cận nào được cải thiện.
+Nếu có chứng minh mới, VM tự xác nhận ba lần và chạy hồi quy 206
+ca V45 đã giải. Kiểm tra `full-evaluation.json` sau khi hồi quy xong.
+Chỉ so sánh với CPLEX sau khi kiểm toán đủ 216 ca. V46 cần ít nhất
+209 chứng minh để vượt mốc 208 hiện có.
 
 ## Lượt V45 ở 600 giây ban đầu
 

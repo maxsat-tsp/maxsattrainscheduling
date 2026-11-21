@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.33}
+\fancyhead[R]{\small Phiên bản 5.34}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.33, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.34, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -85,21 +85,21 @@ Mỗi báo cáo phải ghi rõ giả định này.
 
 \subsection{Thứ tự ưu tiên hiện tại: giải thêm, cải thiện cận, rồi thời gian}
 
-\textbf{Cập nhật 10-11-2026: V42 đã kiểm tra đủ 216 ca.} Coverage là
-$(72,68,65)$, tổng $205/216$, không mất ca nào so với V41. Ca khôi phục
-\code{infsteps180/stationA8} xác nhận thành công 3/3 lần. Còn 11 ca chưa
-chứng minh tối ưu. Trên \code{infsteps180/trackA11}, V42 tìm lịch hợp lệ
-chi phí $109$, tốt hơn UB $127$ trong các nguồn cũ đã nhập. LB riêng là
-$92$, thấp hơn LB $101$ đã biết; phải ghi cả hai mặt này.
+\textbf{Cập nhật 21-11-2026.} Ở 600 giây, V45 chứng minh tối ưu
+$(72,68,66)$ ca theo ba hàm mục tiêu, tổng $206/216$. Ca mới
+\code{cont/stationA1} đã xác nhận thành công cả ba lần. CPLEX
+chứng minh $208/216$ ca ở cùng mốc. V46 thử trên 10 ca SAT chưa giải
+được. Xem số ca chứng minh tối ưu trước, mức cải thiện cận sau đó,
+rồi mới so sánh thời gian.
 
-V43 và V44 đã thử đủ 11 ca khó. Hai lượt chưa thêm ca tối ưu, nhưng
-hạ cận trên xuống $144$ cho \code{stationA12/infsteps180} và $107$
-cho \code{trackA11/infsteps180}. Gurobi đã có đủ kết quả ở 300 giây
-và giải $207/216$ ca. V45 thử giữ mô hình giữa các ngưỡng SAT, sau
-đó VM chạy 11 ca CPLEX còn thiếu. CPLEX đã hoàn tất đối chứng ở
-300 giây và giải $208/216$ ca.
+V42 chứng minh $205/216$ ca ở 300 giây. Ca
+\code{infsteps180/stationA8} xác nhận thành công cả ba lần.
+V43 và V44 thử 11 ca khó ở 300 giây. Hai lượt chưa thêm optimum.
+Cận trên đã giảm xuống $144$ ở \code{infsteps180/stationA12} và
+$107$ ở \code{infsteps180/trackA11}. V45 tiếp tục hạ cận trên ca
+\code{infsteps180/stationA12} xuống $142$ ở 600 giây.
 
-\textbf{Mốc mới nhất: V41 đã chạy đủ và được kiểm tra lại.} Coverage là
+V41 đã chạy đủ và được kiểm tra lại. Coverage là
 $(72,67,65)$, tổng $204/216$, tăng một so với V17. Hai ca
 \code{cont/origA8} và \code{cont/stationA2} tự chứng minh tối ưu và đều
 xác nhận thành công 3/3 lần. Vẫn mất \code{infsteps180/stationA8}, nên
@@ -2220,8 +2220,30 @@ tối ưu trước, rồi mới xem LB, UB và thời gian.
 Lượt 600 giây đã chứng minh optimum $12884$ của
 \code{cont/stationA1} sau 322,42 giây. Sau khi tự tìm lịch có chi
 phí $12884$, solver cần khoảng 76 giây để chứng minh UNSAT ở
-ngưỡng $12883$. Kết quả này thêm một ca trong nhóm 11 ca khó.
-Tiếp theo chạy ba lần xác nhận và kiểm tra các ca V42 đã giải.
+ngưỡng $12883$. Ba lần xác nhận độc lập đều trả hai cận bằng
+$12884$ trong khoảng 323 đến 324,5 giây. V45 giữ được cả 205 ca
+V42 đã giải và đạt $206/216$ ở 600 giây.
+
+\section{V46: trừ trước phần chi phí bắt buộc}
+
+Từ giờ đến sớm nhất của lượt $v$ và thời gian di chuyển, tính
+$e_v$, thời điểm sớm nhất tàu có thể bắt đầu lượt đó. Mọi lịch hợp
+lệ đều bắt đầu lượt $v$ tại $t_v\ge e_v$. Gọi $c_v(t)$ là chi phí
+của lượt nếu bắt đầu tại $t$. Chi phí bắt buộc là
+$C_0=\sum_v c_v(e_v)$. Với ngưỡng tổng chi phí $T$, SAT kiểm tra
+\[
+  \sum_v \bigl[c_v(t_v)-c_v(e_v)\bigr]\le T-C_0.
+\]
+Ví dụ, nếu $C_0=40$ và cần tìm lịch chi phí không quá $99$,
+SAT chỉ cần mã hóa phần chi phí tăng thêm với ngân sách $59$.
+Khi báo kết quả, vẫn kiểm tra chi phí thật của cả lịch theo ngưỡng $99$.
+
+Chọn \code{--threshold-session reuse-offset} khi chạy V46. Lượt
+thử dùng MiniSAT, tối đa 60 giây RC2 và 600 giây tổng cho mỗi ca.
+VM tự chọn 10 ca từ kết quả V45 đã kiểm tra. Nếu có ca mới, VM
+chạy lại ba lần và kiểm tra 206 ca cũ. Nếu chưa có ca mới, đọc cận
+dưới và cận trên của 10 ca để chọn bước thử tiếp theo. Các lệnh xem
+tiến độ và đường dẫn báo cáo nằm trong runbook.
 
 \section{Nội dung được phép đưa vào bài báo}
 

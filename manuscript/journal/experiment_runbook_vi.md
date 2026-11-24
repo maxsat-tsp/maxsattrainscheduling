@@ -2042,6 +2042,46 @@ ca V45 đã giải. Kiểm tra `full-evaluation.json` sau khi hồi quy xong.
 Chỉ so sánh với CPLEX sau khi kiểm toán đủ 216 ca. V46 cần ít nhất
 209 chứng minh để vượt mốc 208 hiện có.
 
+Kiểm toán cuối xác nhận V46 hết giờ cả 10 ca. Ba ca có cận trên
+tốt hơn các lượt SAT trước. Trong số đó, lịch `cont/trackA8` có
+chi phí 24.441, bằng optimum Big-M. Lượt hỏi ở ngưỡng 24.440
+hết giờ. Kết quả gốc và biên bản kiểm toán nằm ở
+`results/sat_research/v46_sat_bound_search_20261121/`.
+
+## V47 và đối chứng ở 1.200 giây
+
+V47 dùng MiniSAT với `reuse-offset-tree`, RC2 tối đa 60 giây và
+600 giây tổng mỗi ca. Lượt thử dùng đúng 10 ca V46 đã đo. Nếu có ca
+tối ưu mới, VM tự xác nhận ba lần và hồi quy 206 ca V45 đã giải.
+
+```bash
+systemctl status maxsat-sat-bound-search-v47-tree.service --no-pager
+journalctl -u maxsat-sat-bound-search-v47-tree.service -n 25 --no-pager
+systemctl status maxsat-sat-cutoff-extension-v47.service --no-pager
+journalctl -u maxsat-sat-cutoff-extension-v47.service -n 25 --no-pager
+```
+
+Đọc `hard/audit.json` trong thư mục
+`~/projects/sat-bound-search-v47-tree/results/aglr/sat-bound-search-v47-tree600-20261124/`
+để xem tiến độ V47. `hard-evaluation.json` đối chiếu các cận đã
+kiểm tra. Nếu có `full-evaluation.json`, xem thêm các lần xác nhận
+và số ca giữ được khi hồi quy.
+
+Service đối chứng đợi V47 kết thúc rồi đọc biên bản kiểm toán. Nếu
+V47 giữ 206 ca cũ và có thêm ca tái lập được, service dùng V47.
+Nếu chưa có kết quả như vậy, service chọn lại binary V45. Khi tổng
+còn dưới 209, service đo ở 1.200 giây. Với V45, số ca cần đo thêm
+là 10 cho SAT, 8 cho mỗi Big-M và 16 cho mỗi baseline SAT cũ.
+Nếu V47 đã đạt 209 ở 600 giây, service hoàn thành năm ca còn thiếu
+của mỗi baseline SAT cũ tại mốc 600 giây.
+
+Đọc `audit.json` trong
+`~/projects/sat-cutoff-extension-v47/results/aglr/sat-cutoff-extension-v47-20261124/`.
+Thư mục này ghi phiên bản đã chọn, số ca đo và số chứng minh được
+dùng lại. Mỗi lượt service tối đa sáu giờ. Lượt kế tiếp tiếp tục từ
+các ca có biên nhận hợp lệ. `FAILED` ghi lỗi cần xem lại. Dùng số
+ca tối ưu để so sánh các solver trong bảng tổng hợp này.
+
 ## Lượt V45 ở 600 giây ban đầu
 
 Lượt 300 giây của V45 đã qua kiểm toán đủ 22 ca và chưa có optimum

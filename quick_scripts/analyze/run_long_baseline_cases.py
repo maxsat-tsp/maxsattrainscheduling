@@ -69,35 +69,36 @@ def plan_material(method, pairs, cplex_reference):
     return first_checked_proofs(proof_rows,pairs), cplex_tasks, {str(p):ex.focus.sha(p) for p in sources}
 
 
-def case_record(case, method, row, known):
+def case_record(case, method, row, known, cutoff=CUTOFF):
     solve = row['solve']
     if row['errors'] or row['status'] not in ('ok','timeout'):
         raise ValueError(f'{method} failed audit at {case}: {row["errors"]}')
     seconds = row['time']
-    if not math.isfinite(seconds) or (row['status']=='timeout' and seconds < CUTOFF - 0.5):
+    if not math.isfinite(seconds) or (row['status']=='timeout' and seconds < cutoff - 0.5):
         raise ValueError('baseline stopped before the measured cutoff')
-    proven = row['status']=='ok' and row['proven'] and ex.audit.bounds_prove_optimal(solve) and seconds <= CUTOFF
+    proven = row['status']=='ok' and row['proven'] and ex.audit.bounds_prove_optimal(solve) and seconds <= cutoff
     checked_bounds(dict(proven=proven,solve=solve),known)
     return dict(objective=row['objective'],name=row['name'],status=row['status'],seconds=seconds,
-        timeout_seconds=CUTOFF,proven=proven,upper_witness_verified=solve.get('solution') is not None,
+        timeout_seconds=cutoff,proven=proven,upper_witness_verified=solve.get('solution') is not None,
         source=str(case),lb=solve.get('lb'),ub=solve.get('ub'),cost=solve.get('cost'),reused=False)
 
 
 def measured_case(args, case, o, n, cplex_tasks):
+    cutoff = getattr(args,'timeout',CUTOFF)
     if args.method == 'BigM-CPLEX':
         with tarfile.open(cp.ORIGINAL) as archive:
             task = cplex_tasks[o,n]
             lp = archive.extractfile(task['lp_member']).read()
-        solve = cp.execute_saved_lp(args.cplex,case,task,lp,CUTOFF)
+        solve = cp.execute_saved_lp(args.cplex,case,task,lp,cutoff)
         ex.save(case/(o+'.json'),[dict(name=n,solves=[solve])])
     else:
-        ex.run_case(args.method,o,n,SimpleNamespace(timeout=CUTOFF,ram_kb=cp.RAM_KB,binary=args.binary),case)
+        ex.run_case(args.method,o,n,SimpleNamespace(timeout=cutoff,ram_kb=cp.RAM_KB,binary=args.binary),case)
 def launch_fields(case, method, objective, name, lock):
     path = case/'logs/manifest.txt'
     fields = dict(line.split('=',1) for line in path.read_text().splitlines() if '=' in line)
     expected = dict(binary_sha256=lock['binary_sha256'],git_commit=lock['runner_commit'],
         solver=ex.METHODS[method]['solver'],objective=objective,selected_instances=name,
-        instance_timeout_seconds=str(CUTOFF),ram_limit_kb=str(cp.RAM_KB))
+        instance_timeout_seconds=str(lock.get('timeout_seconds',CUTOFF)),ram_limit_kb=str(cp.RAM_KB))
     if any(fields.get(k) != v for k,v in expected.items()):
         raise ValueError('baseline run does not match its manifest')
     return fields
@@ -105,14 +106,15 @@ def launch_fields(case, method, objective, name, lock):
 
 def checked_case(case, method, objective, name, lock, known):
     """Keep watchdog censoring distinct from a native timeout or a crash."""
+    cutoff = lock.get('timeout_seconds',CUTOFF)
     rows = ex.common.load_rows(case/(objective+'.json'))
     if len(rows) != 1 or rows[0][0] != name:
         raise ValueError('baseline case has the wrong identity')
     raw = rows[0][1]
     if raw.get('status') != 'external_timeout':
-        record = case_record(case,method,ex.assess_case(case,method,objective,name,CUTOFF),known)
+        record = case_record(case,method,ex.assess_case(case,method,objective,name,cutoff),known,cutoff)
         if method == 'BigM-CPLEX':
-            native = ex.cplex_result(case/'schedule.sol',case/'cplex.log',name,objective,CUTOFF,raw['total_time'])
+            native = ex.cplex_result(case/'schedule.sol',case/'cplex.log',name,objective,cutoff,raw['total_time'])
             if native != raw:
                 raise ValueError('saved result differs from the native CPLEX evidence')
         return record
@@ -133,16 +135,16 @@ def checked_case(case, method, objective, name, lock, known):
     per_case = case/'logs/instances'/(name+'.json')
     diagnostics = (case/'logs'/(name+'.stderr.log')).read_bytes() + (case/'logs'/(name+'.stdout.log')).read_bytes()
     if (set(raw) != keys or raw['process_exit_code'] != 124 or raw['external_status'] != 'external_timeout'
-            or raw['solver_name'] != configuration['solver'] or raw['timeout_seconds'] != CUTOFF
+            or raw['solver_name'] != configuration['solver'] or raw['timeout_seconds'] != cutoff
             or wrapper not in ('timeout','gtimeout') or not fields.get('timeout_binary_sha256')
-            or external != CUTOFF + int(fields['external_timeout_grace_seconds'])
-            or external < CUTOFF or not isinstance(elapsed,(int,float)) or not math.isfinite(elapsed)
+            or external != cutoff + int(fields['external_timeout_grace_seconds'])
+            or external < cutoff or not isinstance(elapsed,(int,float)) or not math.isfinite(elapsed)
             or elapsed < external - 0.5 or raw['total_time'] != elapsed
             or ex.common.load_rows(per_case) != rows or per_case.with_suffix('.raw.json').exists()
             or b'panicked at' in diagnostics):
         raise ValueError('external timeout lacks clean process and launch evidence')
     return dict(objective=objective,name=name,status='external_timeout',seconds=elapsed,
-        timeout_seconds=CUTOFF,proven=False,upper_witness_verified=False,source=str(case),
+        timeout_seconds=cutoff,proven=False,upper_witness_verified=False,source=str(case),
         lb=None,ub=None,cost=None,reused=False,censored_by_watchdog=True)
 
 

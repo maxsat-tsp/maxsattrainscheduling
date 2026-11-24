@@ -313,6 +313,31 @@ def baseline_for_manifest(manifest,reference,diagnostic_root):
         (ex.focus.sha(reference/'manifest.json'),ex.focus.sha(reference/'full_audit.json'),ex.focus.dataset_hash()))
 
 
+def audit_case(case,manifest,objective,name,repeat,known_optimum):
+    result=case/'result.json'
+    launch=json.load(open(case/'launch.json'))
+    expected=dict(binary_sha256=manifest['binary_sha256'],commit=manifest['commit'],
+        objective=objective,name=name,repeat=repeat,timeout=manifest['timeout_seconds'],
+        ram_kb=manifest['ram_kb'],instance_sha256=ex.focus.sha(ex.common.instance_path(name)))
+    if 'threshold_policy' in manifest:expected['threshold_policy']=manifest['threshold_policy']
+    if 'rc2_warmup_seconds' in manifest:expected['rc2_warmup_seconds']=manifest['rc2_warmup_seconds']
+    if 'incumbent_polish_checks' in manifest:expected['incumbent_polish_checks']=manifest['incumbent_polish_checks']
+    if 'threshold_session' in manifest:expected['threshold_session']=manifest['threshold_session']
+    if launch!=expected:raise ValueError('launch provenance changed')
+    done=json.load(open(case/'completion.json'))
+    if done.get('returncode')!=0 or done.get('result_sha256')!=ex.focus.sha(result):
+        raise ValueError('failed process or changed result')
+    if done.get('trace_sha256')!=ex.focus.sha(case/'result.trace.jsonl'):raise ValueError('trace changed')
+    row,trace=check_result(json.load(open(result)),name,objective,manifest['timeout_seconds'],known_optimum)
+    if row['threshold_policy']!=manifest.get('threshold_policy','bisect'):raise ValueError('query policy differs from campaign')
+    if row['rc2_warmup_seconds']!=manifest.get('rc2_warmup_seconds',0):raise ValueError('warmup allocation differs from campaign')
+    if row['incumbent_polish_checks']!=manifest.get('incumbent_polish_checks',0):raise ValueError('polish check limit differs from campaign')
+    if row['threshold_session']!=manifest.get('threshold_session','restart'):raise ValueError('SAT session differs from campaign')
+    if trace!=[json.loads(line) for line in (case/'result.trace.jsonl').read_text().splitlines()]:
+        raise ValueError('progress trace does not match replayed results')
+    return dict(row,repeat=repeat)
+
+
 def audit(root,reference,diagnostic_root=None):
     manifest=json.load(open(root/'manifest.json'))
     if manifest.get('schema')!='sat-bound-search-campaign-v1' or manifest.get('uses_optimum_oracle') is not False:
@@ -337,27 +362,7 @@ def audit(root,reference,diagnostic_root=None):
         objective,name,repeat=task['objective'],task['name'],task['repeat']
         case=root/'cases'/objective/name/str(repeat);result=case/'result.json'
         if not result.exists():continue
-        launch=json.load(open(case/'launch.json'))
-        expected=dict(binary_sha256=manifest['binary_sha256'],commit=manifest['commit'],
-            objective=objective,name=name,repeat=repeat,timeout=manifest['timeout_seconds'],
-            ram_kb=manifest['ram_kb'],instance_sha256=ex.focus.sha(ex.common.instance_path(name)))
-        if 'threshold_policy' in manifest:expected['threshold_policy']=manifest['threshold_policy']
-        if 'rc2_warmup_seconds' in manifest:expected['rc2_warmup_seconds']=manifest['rc2_warmup_seconds']
-        if 'incumbent_polish_checks' in manifest:expected['incumbent_polish_checks']=manifest['incumbent_polish_checks']
-        if 'threshold_session' in manifest:expected['threshold_session']=manifest['threshold_session']
-        if launch!=expected:raise ValueError('launch provenance changed')
-        done=json.load(open(case/'completion.json'))
-        if done.get('returncode')!=0 or done.get('result_sha256')!=ex.focus.sha(result):
-            raise ValueError('failed process or changed result')
-        if done.get('trace_sha256')!=ex.focus.sha(case/'result.trace.jsonl'):raise ValueError('trace changed')
-        row,trace=check_result(json.load(open(result)),name,objective,manifest['timeout_seconds'],known.get((objective,name)))
-        if row['threshold_policy']!=manifest.get('threshold_policy','bisect'):raise ValueError('query policy differs from campaign')
-        if row['rc2_warmup_seconds']!=manifest.get('rc2_warmup_seconds',0):raise ValueError('warmup allocation differs from campaign')
-        if row['incumbent_polish_checks']!=manifest.get('incumbent_polish_checks',0):raise ValueError('polish check limit differs from campaign')
-        if row['threshold_session']!=manifest.get('threshold_session','restart'):raise ValueError('SAT session differs from campaign')
-        if trace!=[json.loads(line) for line in (case/'result.trace.jsonl').read_text().splitlines()]:
-            raise ValueError('progress trace does not match replayed results')
-        records.append(dict(row,repeat=repeat))
+        records.append(audit_case(case,manifest,objective,name,repeat,known.get((objective,name))))
     hard={(r['objective'],r['name']) for r in baseline if not r['proven']}
     quality=bound_quality.summarize([dict(r,bounds_verified=True) for r in records if r['repeat']==0])
     return dict(schema='sat-bound-search-audit-v1',audit_passed=True,complete=len(records)==len(manifest['tasks']),

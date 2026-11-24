@@ -298,11 +298,11 @@ mod tests {
                 .filter_map(|(a,b)| problem.verify_solution(&[vec![a,a+2],vec![b,b+1]],objective))
                 .min().unwrap();
             for session in [ThresholdSession::Restart, ThresholdSession::RestartAssumptions,
-                ThresholdSession::Reuse, ThresholdSession::ReuseOffset] {
+                ThresholdSession::Reuse, ThresholdSession::ReuseOffset, ThresholdSession::ReuseOffsetTree] {
                 let result = solve_with_session(&problem, objective, 5.0, ThresholdPolicy::Upper,
                     0.0, 0, session, |_,_,_| {}).unwrap();
                 assert_eq!((result.status, result.lb, result.ub), ("ok", optimum, optimum));
-                let builds = if matches!(session, ThresholdSession::Reuse | ThresholdSession::ReuseOffset) {
+                let builds = if matches!(session, ThresholdSession::Reuse | ThresholdSession::ReuseOffset | ThresholdSession::ReuseOffsetTree) {
                     1
                 } else {
                     result.queries.len()
@@ -334,19 +334,21 @@ mod tests {
             let optimum = (180..=361).flat_map(|a| (180..=361).map(move |b| (a,b)))
                 .filter_map(|(a,b)| problem.verify_solution(&[vec![179,a,a+180],vec![179,b,b+181]],objective))
                 .min().unwrap();
-            let result = solve_with_session(&problem, objective, 5.0, ThresholdPolicy::Upper,
-                0.0, 0, ThresholdSession::ReuseOffset, |_,_,_| {}).unwrap();
-            assert_eq!((result.status, result.lb, result.ub), ("ok", optimum, optimum));
-            let offset = result.initial_lb;
-            assert!(offset > 0);
-            assert_eq!(result.sat_model_builds, 1);
-            for query in &result.queries {
-                assert_eq!(query.threshold_evidence["maxsat_initial_cost_offset"], offset);
-                assert_eq!(query.threshold_evidence["threshold_residual_target"], query.target - offset);
+            for session in [ThresholdSession::ReuseOffset, ThresholdSession::ReuseOffsetTree] {
+                let result = solve_with_session(&problem, objective, 5.0, ThresholdPolicy::Upper,
+                    0.0, 0, session, |_,_,_| {}).unwrap();
+                assert_eq!((result.status, result.lb, result.ub), ("ok", optimum, optimum));
+                let offset = result.initial_lb;
+                assert!(offset > 0);
+                assert_eq!(result.sat_model_builds, 1);
+                for query in &result.queries {
+                    assert_eq!(query.threshold_evidence["maxsat_initial_cost_offset"], offset);
+                    assert_eq!(query.threshold_evidence["threshold_residual_target"], query.target - offset);
+                }
+                let closing = result.queries.last().unwrap();
+                assert_eq!(closing.outcome, "unsat");
+                assert_eq!(closing.target, optimum - 1);
             }
-            let closing = result.queries.last().unwrap();
-            assert_eq!(closing.outcome, "unsat");
-            assert_eq!(closing.target, optimum - 1);
         }
     }
 

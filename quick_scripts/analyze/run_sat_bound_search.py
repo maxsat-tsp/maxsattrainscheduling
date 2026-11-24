@@ -18,7 +18,8 @@ import extended_timeout_experiments as ex
 import targeted_order_cycles as trial
 import bound_quality
 
-REUSE_SESSIONS = ('reuse', 'reuse-offset')
+OFFSET_SESSIONS = ('reuse-offset', 'reuse-offset-tree')
+REUSE_SESSIONS = ('reuse', *OFFSET_SESSIONS)
 SESSIONS = ('restart', 'restart-assumptions', *REUSE_SESSIONS)
 
 
@@ -109,6 +110,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
         raise ValueError('invalid SAT threshold session')
     if session != 'restart':
         solver = {'reuse': 'SAT-Upper-Reuse', 'reuse-offset': 'SAT-Upper-ReuseOffset',
+                  'reuse-offset-tree': 'SAT-Upper-ReuseOffsetTree',
                   'restart-assumptions': 'SAT-Upper-RestartAssumptions'}[session]
     requested=result.get('rc2_warmup_seconds',0)
     if isinstance(requested,bool) or not isinstance(requested,(int,float)) or not math.isfinite(requested) or requested<0:raise ValueError('invalid RC2 warmup allocation')
@@ -137,6 +139,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
         raise ValueError('wrong SAT model build count')
     capacity = upper - 1
     model_size = (0, 0)
+    encoding_seconds = 0.0
     for index, q in enumerate(queries, 1):
         if unknown:raise ValueError('continued after UNKNOWN')
         if lower>=upper:raise ValueError('queried after the gap closed')
@@ -166,7 +169,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
                     reuse and any(n < old for n, old in zip(size, model_size))):
                 raise ValueError('SAT model size decreased within a reused session')
             model_size = size
-        if session == 'reuse-offset':
+        if session in OFFSET_SESSIONS:
             offset = evidence.get('maxsat_initial_cost_offset')
             residual = evidence.get('threshold_residual_target')
             if (evidence.get('maxsat_extract_initial_cost') is not True
@@ -177,6 +180,15 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
               or evidence.get('maxsat_initial_cost_offset', 0) != 0
               or 'threshold_residual_target' in evidence):
             raise ValueError('unrequested threshold cost offset')
+        if session == 'reuse-offset-tree':
+            t = evidence.get('threshold_objective_encoding_seconds')
+            if (evidence.get('threshold_objective_encoding') != 'balanced-tree'
+                    or type(t) not in (float,int) or not math.isfinite(t)
+                    or not 0 <= t - encoding_seconds <= elapsed + 0.05):
+                raise ValueError('invalid balanced objective encoding evidence')
+            encoding_seconds = t
+        elif 'threshold_objective_encoding' in evidence or 'threshold_objective_encoding_seconds' in evidence:
+            raise ValueError('unrequested balanced objective encoding')
         if any(k.startswith('diagnostic_') for k in evidence):raise ValueError('diagnostic oracle metadata leaked into optimizer')
         answer=q.get('outcome')
         polish=q.get('polish')
@@ -224,13 +236,17 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     elif status=='timeout':
         if seconds<cutoff-0.5:raise ValueError('premature timeout')
     else:raise ValueError('fatal optimizer status: '+str(status))
-    return dict(objective=objective,name=name,status=status,proven=status=='ok',seconds=seconds,
+    record = dict(objective=objective,name=name,status=status,proven=status=='ok',seconds=seconds,
         lb=lower,ub=upper,cost=upper,queries=len(queries),sat_calls=warm_calls+sum(q['native_sat_calls'] for q in queries),
         threshold_policy=policy,rc2_warmup_seconds=result.get('rc2_warmup_seconds',0),incumbent_polish_checks=polish_checks,
         threshold_session=session,sat_model_builds=expected_builds,
         first_query_outcome=queries[0]['outcome'] if queries else None,
         first_query_seconds=queries[0]['seconds'] if queries else None,
-        later_query_seconds=sum(q['seconds'] for q in queries[1:])),trace
+        later_query_seconds=sum(q['seconds'] for q in queries[1:]))
+    if session == 'reuse-offset-tree':
+        record.update(objective_encoding_seconds=encoding_seconds,
+            threshold_sat_seconds=sum(q['native_sat_seconds'] for q in queries))
+    return record,trace
 
 
 def reference_costs(reference,diagnostic_root):

@@ -378,9 +378,40 @@ fn assert_binary_le<L: satcoder::Lit + Copy + 'static>(
     solver.add_clause(vec![le]);
 }
 
+enum BudgetEncoding<L: satcoder::Lit> {
+    Subtract(Binary<L>),
+    Tree(Vec<Option<Binary<L>>>),
+}
+
+// Each occupied level sums a disjoint block of 2^level cost terms.
+// All feasible partial sums fit in the original budget register.
+fn add_budget_words<L: satcoder::Lit + Copy + 'static>(
+    solver: &mut impl SatInstance<L>,
+    a: Binary<L>,
+    b: Binary<L>,
+    width: usize,
+) -> Binary<L> {
+    let mut a_bits = a.into_list().into_iter();
+    let mut b_bits = b.into_list().into_iter();
+    let mut carry = false.into();
+    let mut bits = Vec::with_capacity(width);
+    for _ in 0..width {
+        let a = a_bits.next().unwrap_or(false.into());
+        let b = b_bits.next().unwrap_or(false.into());
+        let either = solver.xor_literal([a, b]);
+        bits.push(solver.xor_literal([either, carry]));
+        let both = solver.and_literal([a, b]);
+        let carried = solver.and_literal([either, carry]);
+        carry = solver.or_literal([both, carried]);
+    }
+    debug_assert!(a_bits.next().is_none() && b_bits.next().is_none());
+    solver.add_clause([!carry]);
+    Binary::from_list(bits)
+}
+
 struct BinaryObjective<L: satcoder::Lit> {
     reg_bits: Vec<Bool<L>>,
-    remaining: Binary<L>,
+    encoding: BudgetEncoding<L>,
     upper_bound: usize,
 }
 
@@ -388,13 +419,20 @@ impl<L: satcoder::Lit + Copy + 'static> BinaryObjective<L> {
     /// Reserve an unsigned budget B <= UB. Every original weighted cost term
     /// is subtracted exactly once, with underflow forbidden. No new soft
     /// objective is introduced: RC2 keeps minimizing the original costs.
+    #[cfg(test)]
     fn new(solver: &mut impl SatInstance<L>, upper_bound: usize) -> Self {
+        Self::with_encoding(solver, upper_bound, false)
+    }
+
+    fn with_encoding(solver: &mut impl SatInstance<L>, upper_bound: usize, tree: bool) -> Self {
         let reg_bits = (0..bits_needed(upper_bound)).map(|_| solver.new_var()).collect::<Vec<_>>();
         let remaining = build_binary_register(&reg_bits);
         assert_binary_le(solver, &remaining, &Binary::constant(upper_bound));
+        let encoding = if tree { BudgetEncoding::Tree(Vec::new()) }
+            else { BudgetEncoding::Subtract(remaining) };
         Self {
             reg_bits,
-            remaining,
+            encoding,
             upper_bound,
         }
     }
@@ -404,10 +442,40 @@ impl<L: satcoder::Lit + Copy + 'static> BinaryObjective<L> {
             return;
         }
 
-        let term = build_weighted_binary_term(lit, weight);
-        let (next_remaining, underflow) = subtract_binary(solver, &self.remaining, &term);
-        solver.add_clause(vec![!underflow]);
-        self.remaining = next_remaining;
+        match &mut self.encoding {
+            BudgetEncoding::Subtract(remaining) => {
+                let term = build_weighted_binary_term(lit, weight);
+                let (next_remaining, underflow) = subtract_binary(solver, remaining, &term);
+                solver.add_clause(vec![!underflow]);
+                *remaining = next_remaining;
+            }
+            BudgetEncoding::Tree(levels) => {
+                if weight > self.upper_bound {
+                    solver.add_clause([!lit]);
+                    return;
+                }
+                let mut sum = build_weighted_binary_term(lit, weight);
+                for slot in levels.iter_mut() {
+                    match slot.take() {
+                        Some(left) => sum = add_budget_words(solver, left, sum, self.reg_bits.len()),
+                        None => { *slot = Some(sum); return; }
+                    }
+                }
+                levels.push(Some(sum));
+            }
+        }
+    }
+
+    fn compare_tree_sum(&self, solver: &mut impl SatInstance<L>) {
+        if let BudgetEncoding::Tree(levels) = &self.encoding {
+            if let Some(sum) = levels.iter().flatten().cloned().reduce(|right, left| {
+                add_budget_words(solver, left, right, self.reg_bits.len())
+            }) {
+                // Old comparisons only bound subsets of the new nonnegative
+                // sum and use the same budget bits. They remain valid.
+                assert_binary_le(solver, &sum, &build_binary_register(&self.reg_bits));
+            }
+        }
     }
 
     /// A diagnostic asks about one fixed threshold. Pin the initial budget
@@ -1080,6 +1148,7 @@ type AfterSat<'a> = dyn FnMut(i32, i32, &[Vec<i32>]) -> Result<Option<i32>, Solv
 struct BudgetSession<'a> {
     capacity: i32,
     target: i32,
+    tree: bool,
     after_sat: &'a mut AfterSat<'a>,
 }
 
@@ -1093,6 +1162,7 @@ pub(crate) fn solve_threshold_session<L: satcoder::Lit + Copy + std::fmt::Debug 
     settings: MaxSatDddLadderScSettings,
     capacity: i32,
     target: i32,
+    tree: bool,
     mut after_sat: impl FnMut(i32, i32, &[Vec<i32>]) -> Result<Option<i32>, SolverError>,
     mut output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(), SolverError> {
@@ -1101,7 +1171,7 @@ pub(crate) fn solve_threshold_session<L: satcoder::Lit + Copy + std::fmt::Debug 
     }
     solve_inner(|| panic!("a threshold decision never starts a MIP heuristic"),
         solver, problem, timeout, objective, settings, None, None,
-        Some(BudgetSession { capacity, target, after_sat: &mut after_sat }),
+        Some(BudgetSession { capacity, target, tree, after_sat: &mut after_sat }),
         |_| {}, threshold_stats(&mut output_stats)).map(|_| ())
 }
 
@@ -1163,6 +1233,10 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
     if let Some(session) = threshold_session.as_ref() {
         output_stats("threshold_budget_capacity".into(), session.capacity.into());
         output_stats("threshold_budget_assumptions".into(), true.into());
+        if session.tree {
+            output_stats("threshold_objective_encoding".into(), "balanced-tree".into());
+            output_stats("threshold_objective_encoding_seconds".into(), 0.0.into());
+        }
     }
 
     assert!(
@@ -1526,9 +1600,9 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         ))?.0 };
         let residual_upper=upper.checked_sub(initial_cost_offset).filter(|v|*v>=0)
             .ok_or_else(||SolverError::InvalidSolution("verified upper bound is below initial cost".into()))?;
-        let objective = BinaryObjective::new(&mut solver, residual_upper.try_into().map_err(|_| {
+        let objective = BinaryObjective::with_encoding(&mut solver, residual_upper.try_into().map_err(|_| {
             SolverError::InvalidSolution("negative objective upper bound".to_string())
-        })?);
+        })?, threshold_session.as_ref().is_some_and(|session| session.tree));
         if fixed_target.is_some() && threshold_session.is_none() { objective.fix_budget(&mut solver); }
         Some(objective)
     } else {
@@ -2180,6 +2254,7 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
 
         if let Some(objective) = binary_objective.as_mut() {
             let encoding_start = Instant::now();
+            let grew = !new_objective_terms.is_empty();
             if let Some((upper, _)) = best_heur.as_ref().filter(|_| fixed_target.is_none()) {
                 let residual_upper=upper.checked_sub(initial_cost_offset).filter(|v|*v>=0)
                     .ok_or_else(||SolverError::InvalidSolution("verified upper bound is below initial cost".into()))?;
@@ -2191,7 +2266,14 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
                 objective.add_term(&mut solver, literal, weight);
                 aglr_telemetry.objective_bound_terms += 1;
             }
+            if grew {
+                objective.compare_tree_sum(&mut solver);
+            }
             aglr_telemetry.objective_bound_time += encoding_start.elapsed();
+            if threshold_session.as_ref().is_some_and(|session| session.tree) {
+                output_stats("threshold_objective_encoding_seconds".into(),
+                    aglr_telemetry.objective_bound_time.as_secs_f64().into());
+            }
         }
 
         if settings.residual_hardening {
@@ -3152,6 +3234,32 @@ fn inject_solution_timepoints_maxsat<L: satcoder::Lit>(
 mod binary_objective_tests {
     use super::*;
     use satcoder::{SatResult, SatSolver};
+
+    #[test]
+    fn balanced_budget_matches_every_assignment_after_each_growth_batch() {
+        for capacity in [0, 1, 3, 7, 10, 16, 31] {
+            let mut solver = satcoder::solvers::minisat::Solver::new();
+            let literals: Vec<_> = (0..3).map(|_| solver.new_var()).collect();
+            let terms = [(0, 0), (0, 1), (1, 3), (0, 5), (2, 17)];
+            let mut objective = BinaryObjective::with_encoding(&mut solver, capacity, true);
+            for (i, &(variable, weight)) in terms.iter().enumerate() {
+                objective.add_term(&mut solver, literals[variable], weight);
+                objective.compare_tree_sum(&mut solver);
+                for target in (0..=capacity).rev() {
+                    for mask in 0..8 {
+                        let cost = terms[..=i].iter()
+                            .filter(|(index, _)| mask & (1 << index) != 0)
+                            .map(|(_, weight)| weight).sum::<usize>();
+                        let assignment = literals.iter().enumerate().map(|(index, &lit)| {
+                            if mask & (1 << index) != 0 { lit } else { !lit }
+                        });
+                        let result = solver.solve_with_assumptions(assignment.chain(objective.budget_bits(target)));
+                        assert_eq!(matches!(result, satcoder::SatResultWithCore::Sat(_)), cost <= target);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn fixed_diagnostic_budget_matches_weighted_truth_table() {

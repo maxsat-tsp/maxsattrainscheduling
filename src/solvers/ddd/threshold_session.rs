@@ -20,6 +20,7 @@ pub enum ThresholdSession {
     RestartAssumptions,
     Reuse,
     ReuseOffset,
+    ReuseOffsetTree,
 }
 
 impl ThresholdSession {
@@ -29,6 +30,7 @@ impl ThresholdSession {
             "restart-assumptions" => Ok(Self::RestartAssumptions),
             "reuse" => Ok(Self::Reuse),
             "reuse-offset" => Ok(Self::ReuseOffset),
+            "reuse-offset-tree" => Ok(Self::ReuseOffsetTree),
             _ => Err("unsupported threshold session".into()),
         }
     }
@@ -43,6 +45,8 @@ impl ThresholdSession {
             (Self::Reuse, true) => "RC2-Warm-SAT-Upper-Reuse",
             (Self::ReuseOffset, false) => "SAT-Upper-ReuseOffset",
             (Self::ReuseOffset, true) => "RC2-Warm-SAT-Upper-ReuseOffset",
+            (Self::ReuseOffsetTree, false) => "SAT-Upper-ReuseOffsetTree",
+            (Self::ReuseOffsetTree, true) => "RC2-Warm-SAT-Upper-ReuseOffsetTree",
         }
     }
 }
@@ -124,7 +128,7 @@ pub(super) fn search(
         core_minimize_checks: 4,
         core_minimize_conflicts: 100,
         core_exhaust_checks: 4,
-        extract_initial_cost: session == ThresholdSession::ReuseOffset,
+        extract_initial_cost: matches!(session, ThresholdSession::ReuseOffset | ThresholdSession::ReuseOffsetTree),
         ..Default::default()
     };
     let mut models = 0;
@@ -157,6 +161,7 @@ pub(super) fn search(
                 settings,
                 capacity,
                 target,
+                session == ThresholdSession::ReuseOffsetTree,
                 |solved_target, cost, schedule| {
                     let decision = pending.take().expect("active threshold");
                     if decision.target != solved_target {
@@ -179,7 +184,7 @@ pub(super) fn search(
                         ),
                         *interval,
                     );
-                    if matches!(session, ThresholdSession::Reuse | ThresholdSession::ReuseOffset) {
+                    if matches!(session, ThresholdSession::Reuse | ThresholdSession::ReuseOffset | ThresholdSession::ReuseOffsetTree) {
                         if let Some(next) = interval.target_for(policy) {
                             let decision = Decision::start(next, deadline);
                             if decision.remaining_seconds > 0.0 {

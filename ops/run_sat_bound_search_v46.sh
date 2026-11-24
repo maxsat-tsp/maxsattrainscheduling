@@ -11,9 +11,14 @@ trap 'printf "exit=%s line=%s\n" "$?" "$LINENO" > "$root/FAILED"; exit 78' ERR
 rm -f "$root/INCOMPLETE"
 deadline=$(( $(date +%s) + 21600 ))
 remaining() { printf '%s\n' "$(( deadline - $(date +%s) - 90 ))"; }
+incomplete() {
+    touch "$root/INCOMPLETE"
+    if [[ "${RESUME_PHASES:-0}" == 1 ]]; then exit 75; fi
+    exit 0
+}
 if [[ -n "${AFTER_UNIT:-}" ]]; then
     while systemctl is-active --quiet "$AFTER_UNIT"; do
-        if (( $(remaining) < 700 )); then touch "$root/INCOMPLETE"; exit 0; fi
+        if (( $(remaining) < 700 )); then incomplete; fi
         sleep 15
     done
 fi
@@ -26,7 +31,7 @@ export LD_LIBRARY_PATH="$GUROBI_HOME/lib"
 export GRB_LICENSE_FILE=/home/tuyenkv/gurobi.lic
 export CARGO_TARGET_DIR=/home/tuyenkv/projects/maxsattrainscheduling/target
 
-session=reuse-offset
+session="${THRESHOLD_SESSION:-reuse-offset}"
 binary="$root/solver/sat_bound_search"
 if [[ ! -f "$root/preflight.json" ]]; then
     python3 -m unittest discover -s quick_scripts/analyze -p 'test_*.py' > "$root/python-tests.log" 2>&1
@@ -46,7 +51,7 @@ run_phase() {
     local phase="$1" seconds
     shift
     seconds="$(remaining)"
-    if (( seconds < 700 )); then touch "$root/INCOMPLETE"; exit 0; fi
+    if (( seconds < 700 )); then incomplete; fi
     taskset -c 0,1,4,5 python3 quick_scripts/analyze/run_sat_bound_search.py run \
         --reference "$REFERENCE" --diagnostic-root "$DIAGNOSTIC_ROOT" --binary "$binary" \
         --results "$phase" --build-manifest "$root/build_manifest.json" --selection-archive "$selection" \
@@ -54,8 +59,7 @@ run_phase() {
         --timeout 600 --round-seconds "$seconds" "$@"
     if [[ -f "$phase/followup_stopped.json" ]]; then return; fi
     if ! python3 -c 'import json,sys; sys.exit(not json.load(open(sys.argv[1]))["complete"])' "$phase/audit.json"; then
-        touch "$root/INCOMPLETE"
-        exit 0
+        incomplete
     fi
 }
 compare() {

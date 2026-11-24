@@ -17,6 +17,7 @@ def validate(root,reference,policy='bisect',warmup=0,polish_checks=0,session=Non
     counts={}
     checks=[('rust-search-tests',11 if policy=='upper' else 10 if warmup>0 else 6 if policy=='close-upper' else 5),('rust-objective-tests',5)]
     if session is not None:checks[0]=('rust-search-tests',14)
+    if session == 'reuse-offset-tree':checks[1]=('rust-objective-tests',6)
     if polish_checks>0:checks.append(('rust-polish-tests',8))
     if warmup>0:checks.extend([('rust-rc2-tests',1),('rust-legacy-tests',1)])
     for name,minimum in checks:

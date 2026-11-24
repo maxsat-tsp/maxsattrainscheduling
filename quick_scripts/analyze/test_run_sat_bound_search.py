@@ -10,6 +10,30 @@ import run_sat_bound_search as search
 
 
 class SearchAuditTests(unittest.TestCase):
+    def test_tree_session_records_valid_encoding_time_at_each_threshold(self):
+        data = self.fixture('upper')
+        data.update(solver_name='SAT-Upper-ReuseOffsetTree',
+                    threshold_session='reuse-offset-tree', sat_model_builds=1)
+        offset = data['initial_lb']
+        for index, query in enumerate(data['queries'], 1):
+            query['model_generation'] = 1
+            query['threshold_evidence'].update(
+                threshold_budget_assumptions=True, threshold_budget_capacity=data['initial_ub']-1,
+                maxsat_extract_initial_cost=True, maxsat_initial_cost_offset=offset,
+                threshold_residual_target=query['target']-offset,
+                threshold_objective_encoding='balanced-tree',
+                threshold_objective_encoding_seconds=index * 0.01)
+        row, _ = search.check_result(data,'origA1','cont',300,5526)
+        self.assertTrue(row['proven'])
+        self.assertEqual(row['objective_encoding_seconds'],len(data['queries']) * 0.01)
+        for fields in (dict(threshold_objective_encoding='sequential'),
+                       dict(threshold_objective_encoding_seconds=4),
+                       dict(threshold_objective_encoding_seconds=0)):
+            changed = copy.deepcopy(data)
+            changed['queries'][-1]['threshold_evidence'].update(fields)
+            with self.assertRaisesRegex(ValueError,'balanced objective'):
+                search.check_result(changed,'origA1','cont',300,5526)
+
     def test_reused_threshold_session_requires_one_model_and_the_same_initial_capacity(self):
         data = self.fixture('upper')
         data.update(solver_name='SAT-Upper-Reuse', threshold_session='reuse', sat_model_builds=1)

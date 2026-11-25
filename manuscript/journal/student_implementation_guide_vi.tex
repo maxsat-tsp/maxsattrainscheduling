@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.35}
+\fancyhead[R]{\small Phiên bản 5.36}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.35, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.36, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -85,14 +85,15 @@ Mỗi báo cáo phải ghi rõ giả định này.
 
 \subsection{Thứ tự ưu tiên hiện tại: giải thêm, cải thiện cận, rồi thời gian}
 
-\textbf{Cập nhật 24-11-2026.} Ở 600 giây, V45 chứng minh tối ưu
+\textbf{Cập nhật 25-11-2026.} Ở 600 giây, V45 chứng minh tối ưu
 $(72,68,66)$ ca theo ba hàm mục tiêu, tổng $206/216$. Ca mới
 \code{cont/stationA1} đã xác nhận thành công cả ba lần. CPLEX và
 Gurobi cùng chứng minh $208/216$ ca ở mốc này. V46 đã thử đủ 10 ca
 chưa giải và tìm được lịch rẻ hơn các lượt SAT trước ở ba ca.
-Số chứng minh tối ưu chưa tăng. V47 thử cách mã hóa tổng chi phí
-trên cùng 10 ca. Xem số ca chứng minh tối ưu trước, mức cải thiện
-cận sau đó, rồi mới so sánh thời gian.
+V47 thử cách mã hóa tổng chi phí trên cùng 10 ca. Cả hai lượt
+chưa chứng minh thêm ca nào. Ở 1.200 giây, V45 vẫn đạt $206/216$.
+VM đang khôi phục lượt đối chứng bị gián đoạn. Xem số ca chứng
+minh tối ưu trước, mức cải thiện cận sau đó, rồi mới so sánh thời gian.
 
 V42 chứng minh $205/216$ ca ở 300 giây. Ca
 \code{infsteps180/stationA8} xác nhận thành công cả ba lần.
@@ -2270,6 +2271,14 @@ VM thử mười ca ở 600 giây. Có ca mới thì VM xác nhận ba lần và
 chạy lại 206 ca V45 đã chứng minh. Nếu tổng vẫn dưới 209, VM
 chuyển sang 1.200 giây cho SAT và các baseline. Ở mốc dài hơn,
 mỗi solver chỉ chạy lại những ca chưa có chứng minh đã kiểm toán.
+
+V47 đã hoàn thành 10 ca và chưa thêm chứng minh tối ưu. Lượt
+1.200 giây dùng lại V45. Khi Gurobi báo lỗi ở
+\code{infsteps180/stationA11}, VM dừng để kiểm tra kết quả.
+Lượt khôi phục dùng lại 14 ca đã kiểm toán và chỉ đo các ca
+còn thiếu. Khi đọc báo cáo, phân biệt ca hết giờ với ca phần
+mềm báo lỗi. Một ca báo lỗi vẫn cần kết quả hợp lệ để hoàn
+thành bảng.
 
 \section{Nội dung được phép đưa vào bài báo}
 

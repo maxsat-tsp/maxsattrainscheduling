@@ -2082,6 +2082,40 @@ dùng lại. Mỗi lượt service tối đa sáu giờ. Lượt kế tiếp ti�
 các ca có biên nhận hợp lệ. `FAILED` ghi lỗi cần xem lại. Dùng số
 ca tối ưu để so sánh các solver trong bảng tổng hợp này.
 
+### Chạy tiếp lượt 1.200 giây sau lỗi Gurobi
+
+V47 dựa trên cây cộng đã đo đủ 10 ca ở mốc 600 giây và chưa
+chứng minh thêm ca nào. V45 cũng đã chạy đủ 10 ca còn mở tại
+1.200 giây và vẫn có 206/216 chứng minh. Gurobi có ít nhất
+208/216 chứng minh. Lượt đối chứng dừng khi Gurobi báo lỗi API
+ở `infsteps180/stationA11` sau 1.124,7 giây.
+
+Lượt khôi phục dùng `--prior-results` để kiểm toán lại 10 ca
+SAT và bốn ca Gurobi từ thư mục gốc. Chương trình kiểm tra dữ
+liệu, binary, cấu hình và biên nhận của từng ca. Còn 44 ca cần
+đo gồm bốn Gurobi, tám CPLEX, 16 CSOnet và 16 MaxSAT-Journal.
+VM chạy lại ca Gurobi bị lỗi một lần với cùng cấu hình.
+
+```bash
+systemctl status maxsat-sat-cutoff-recovery-v47.service --no-pager
+journalctl -u maxsat-sat-cutoff-recovery-v47.service -n 25 --no-pager
+```
+
+Trong `~/projects/sat-cutoff-recovery-v47/results/aglr/sat-cutoff-recovery-v47-20261125/`,
+đọc `audit.json` để xem các ca đã kiểm toán, ca dùng lại và
+ca báo lỗi. Nếu Gurobi tiếp tục báo lỗi API, VM lưu lần thử
+trong `failed_cases` và chạy các ca khác. Sau đó, bản chẩn
+đoán dùng riêng một binary có trường `gurobi_error_code`.
+Dữ liệu chẩn đoán nằm trong `diagnostics/`. `BLOCKED`
+cho biết đã xử lý các ca còn lại nhưng bảng vẫn thiếu quan
+sát hợp lệ. Chỉ `COMPLETED` kèm `complete=true` xác nhận
+bảng đối chứng đã đủ.
+
+Dữ liệu V47 ở 600 giây nằm trong
+`results/sat_research/v47_sat_bound_search_20261124/`.
+Bản lưu lượt 1.200 giây bị gián đoạn nằm trong
+`results/sat_research/v47_cutoff1200_recovery_20261125/`.
+
 ## Lượt V45 ở 600 giây ban đầu
 
 Lượt 300 giây của V45 đã qua kiểm toán đủ 22 ca và chưa có optimum

@@ -2116,6 +2116,48 @@ Dữ liệu V47 ở 600 giây nằm trong
 Bản lưu lượt 1.200 giây bị gián đoạn nằm trong
 `results/sat_research/v47_cutoff1200_recovery_20261125/`.
 
+### Kết quả đối chứng 1.200 giây
+
+Lượt khôi phục đã hoàn thành. Gurobi chạy lại
+`infsteps180/stationA11` và kết thúc đúng giới hạn thời gian.
+Kiểm toán độc lập phát lại đủ 58 ca cần đo, gồm 14 ca được
+dùng lại từ lượt đầu.
+
+| Phương pháp | finsteps123 | infsteps180 | cont | Tổng tối ưu |
+|---|---:|---:|---:|---:|
+| CSOnet | 72 | 68 | 61 | 201 |
+| MaxSAT-Journal | 72 | 68 | 63 | 203 |
+| V45 | 72 | 68 | 66 | 206 |
+| Big-M Gurobi | 72 | 68 | 68 | 208 |
+| Big-M CPLEX | 72 | 68 | 68 | 208 |
+
+CSOnet có bốn ca và MaxSAT-Journal có hai ca bị ngắt bởi bộ
+giới hạn ngoài sau mốc 1.200 giây. Các ca này được ghi riêng
+và không tính là chứng minh tối ưu. `complete_replay.json`
+ghi kết quả từng ca. Bảng sử dụng lại các chứng minh hợp lệ
+ở mốc ngắn hơn nên chỉ so sánh số ca tối ưu tại 1.200 giây.
+
+### V48 dùng các mốc từ lịch tìm được trong lần chạy
+
+V48 giữ cấu hình V45 và chỉ đổi cách khởi tạo các mốc thời gian
+trước câu hỏi SAT đầu tiên. Cờ `reuse-seed` lấy mốc từ lịch do
+chính lần chạy tìm được. SAT vẫn có thể chọn lịch khác. Mỗi ca
+có 1.200 giây, gồm tối đa 60 giây RC2, và dùng MiniSAT.
+
+```bash
+systemctl status maxsat-sat-bound-search-v48-seed.service --no-pager
+journalctl -u maxsat-sat-bound-search-v48-seed.service -n 25 --no-pager
+```
+
+Kết quả ở
+`~/projects/sat-bound-search-v48-seed/results/aglr/sat-bound-search-v48-seed1200-20261126/`.
+`hard/audit.json` cho biết số ca đã đo trong 10 ca chưa giải.
+`hard-evaluation.json` đối chiếu cả cận ở 1.200 giây.
+Nếu có chứng minh mới, VM xác nhận ba lần rồi chạy lại 206 ca
+V45 đã giải. Trường `matched_cutoff_coverage` ghi so sánh
+coverage ở cùng mốc sau khi hoàn tất. Để vượt mốc 208, V48 cần
+giữ đủ 206 ca cũ và chứng minh tối ưu ít nhất 209 ca.
+
 ## Lượt V45 ở 600 giây ban đầu
 
 Lượt 300 giây của V45 đã qua kiểm toán đủ 22 ca và chưa có optimum

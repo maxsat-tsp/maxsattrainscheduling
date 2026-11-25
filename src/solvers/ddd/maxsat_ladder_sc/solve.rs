@@ -1149,6 +1149,7 @@ struct BudgetSession<'a> {
     capacity: i32,
     target: i32,
     tree: bool,
+    seed: Option<&'a [Vec<i32>]>,
     after_sat: &'a mut AfterSat<'a>,
 }
 
@@ -1163,6 +1164,7 @@ pub(crate) fn solve_threshold_session<L: satcoder::Lit + Copy + std::fmt::Debug 
     capacity: i32,
     target: i32,
     tree: bool,
+    seed: Option<&[Vec<i32>]>,
     mut after_sat: impl FnMut(i32, i32, &[Vec<i32>]) -> Result<Option<i32>, SolverError>,
     mut output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(), SolverError> {
@@ -1171,7 +1173,7 @@ pub(crate) fn solve_threshold_session<L: satcoder::Lit + Copy + std::fmt::Debug 
     }
     solve_inner(|| panic!("a threshold decision never starts a MIP heuristic"),
         solver, problem, timeout, objective, settings, None, None,
-        Some(BudgetSession { capacity, target, tree, after_sat: &mut after_sat }),
+        Some(BudgetSession { capacity, target, tree, seed, after_sat: &mut after_sat }),
         |_| {}, threshold_stats(&mut output_stats)).map(|_| ())
 }
 
@@ -1528,6 +1530,18 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
                 );
             }
         }
+    }
+
+    if let Some(seed) = threshold_session.as_ref().and_then(|session| session.seed) {
+        // Reuse the solver's own feasible schedule only to place ladder points.
+        // Each new point can still be false under the current cost threshold.
+        let cost = problem.verify_solution(seed, delay_cost_type)
+            .ok_or_else(|| SolverError::InvalidSolution("invalid threshold seed schedule".into()))?;
+        let before = new_time_points.len();
+        inject_solution_timepoints_maxsat(&mut solver, problem, &visits, &mut occupations,
+            &mut new_time_points, &mut fixed_prec_rows, settings.use_eager_chain_expansion, seed);
+        output_stats("threshold_seed_cost".into(), cost.into());
+        output_stats("threshold_seeded_points".into(), (new_time_points.len() - before).into());
     }
 
     // Async heuristic: instead of blocking on initial heuristic computation

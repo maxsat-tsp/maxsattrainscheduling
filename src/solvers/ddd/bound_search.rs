@@ -298,11 +298,12 @@ mod tests {
                 .filter_map(|(a,b)| problem.verify_solution(&[vec![a,a+2],vec![b,b+1]],objective))
                 .min().unwrap();
             for session in [ThresholdSession::Restart, ThresholdSession::RestartAssumptions,
-                ThresholdSession::Reuse, ThresholdSession::ReuseOffset, ThresholdSession::ReuseOffsetTree] {
+                ThresholdSession::Reuse, ThresholdSession::ReuseOffset, ThresholdSession::ReuseOffsetTree,
+                ThresholdSession::ReuseSeed] {
                 let result = solve_with_session(&problem, objective, 5.0, ThresholdPolicy::Upper,
                     0.0, 0, session, |_,_,_| {}).unwrap();
                 assert_eq!((result.status, result.lb, result.ub), ("ok", optimum, optimum));
-                let builds = if matches!(session, ThresholdSession::Reuse | ThresholdSession::ReuseOffset | ThresholdSession::ReuseOffsetTree) {
+                let builds = if session.reuses_model() {
                     1
                 } else {
                     result.queries.len()
@@ -311,8 +312,16 @@ mod tests {
                 assert_eq!(result.queries.last().unwrap().target, optimum - 1);
                 assert_eq!(result.queries.last().unwrap().outcome, "unsat");
                 if matches!(objective, DelayCostType::Continuous) {
-                    assert!(result.queries.len() >= 2);
+                    if session != ThresholdSession::ReuseSeed {
+                        assert!(result.queries.len() >= 2);
+                    }
                     assert_eq!(result.queries.last().unwrap().target, 0);
+                }
+                if session == ThresholdSession::ReuseSeed {
+                    for query in &result.queries {
+                        assert_eq!(query.threshold_evidence["threshold_seed_cost"], result.initial_ub);
+                        assert!(query.threshold_evidence["threshold_seeded_points"].as_u64().unwrap() > 0);
+                    }
                 }
             }
         }

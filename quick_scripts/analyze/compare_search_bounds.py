@@ -27,6 +27,24 @@ RESEARCH=ex.REPO/'results/sat_research'
 ALLOWED={'Orders-Transitive','CSOnet','MaxSAT-Journal','BigM-Gurobi','BigM-CPLEX'}
 
 
+def cutoff_reference(path,cutoff):
+    receipt=json.loads((path.parent/'archive_hashes.json').read_text())
+    data=json.loads(path.read_text())
+    methods={'SAT','CSOnet','MaxSAT-Journal','BigM-Gurobi','BigM-CPLEX'}
+    if (ex.focus.sha(path)!=receipt.get(path.name) or not data['complete'] or not data['audit_passed']
+            or data['dataset_sha256']!=ex.focus.dataset_hash() or data['timeout_seconds']!=cutoff
+            or set(data['summary'])!=methods or set(data['measurements'])!=methods or data['failed_cases']):
+        raise ValueError('incomplete or mismatched cutoff reference evidence')
+    for method,rows in data['measurements'].items():
+        summary=data['summary'][method]
+        keys={(r['objective'],r['name']) for r in rows}
+        if (len(keys)!=len(rows) or len(rows)!=summary['measured'] or len(rows)!=summary['expected']
+                or any(r['timeout_seconds']!=cutoff for r in rows if method!='SAT')
+                or summary['proven']!=summary['reused']+sum(r['proven'] for r in rows)):
+            raise ValueError('cutoff reference membership changed')
+    return data
+
+
 def logged_bounds(text):
     lows=[int(x) for x in re.findall(r'^\s*(?:EXHAUST )?LB=(\d+)\b',text,re.M)]
     highs=[int(x) for x in re.findall(r'^HEUR\.FEAS\.\s+(\d+)\b',text,re.M)]
@@ -39,6 +57,17 @@ class Pool:
 
     def track(self,path):
         path=Path(path);self.sources[str(path.resolve())]=ex.focus.sha(path)
+
+    def add_cutoff_reference(self,path,data):
+        self.track(path)
+        for method,rows in data['measurements'].items():
+            tag='SAT-'+data['sat_method'] if method=='SAT' else method
+            for r in rows:
+                record=self.add(r['objective'],r['name'],r.get('lb'),r.get('ub'),tag,data['timeout_seconds'],
+                    str(path)+'#'+method+'/'+r['objective']+'/'+r['name'],
+                    'matching-cutoff observation replayed from native receipts')
+                if record is not None:
+                    record['upper_witness_verified']=method=='SAT' or r['upper_witness_verified']
 
     def add(self,objective,name,lb,ub,method,budget,source,validation):
         if (objective,name) not in self.selection:return
@@ -452,6 +481,9 @@ def full_comparison(records,baseline,cutoff,confirmations,baseline_label='V17 fu
 def evaluate(args,candidate):
     audited=search.audit(candidate,args.reference,args.diagnostics)
     records=audited['records'];expected=audited['expected_runs'];full=None
+    candidate_manifest=json.loads((candidate/'manifest.json').read_text())
+    match=getattr(args,'cutoff_reference',None)
+    matched=cutoff_reference(match,candidate_manifest['timeout_seconds']) if match is not None else None
     followup=getattr(args,'followup',None)
     if followup is not None:
         fm=json.loads((followup/'manifest.json').read_text());hm=json.loads((candidate/'manifest.json').read_text())
@@ -473,6 +505,8 @@ def evaluate(args,candidate):
         if cached.get('schema')!='frozen-bound-reference-pool-v2' or cached['dataset_sha256']!=ex.focus.dataset_hash() or {tuple(p) for p in cached['selection']}!=pool.selection:
             raise ValueError('frozen bound reference pool changed dataset or selection')
         pool.records=cached['records'];pool.sources=cached['sources'];pool.excluded=cached['excluded'];pool.conflicts=cached['conflicts']
+        if match is not None and pool.sources.get(str(match.resolve()))!=ex.focus.sha(match):
+            raise ValueError('the frozen pool lacks the selected cutoff reference')
     else:
         pool.full_v17(args.reference);pool.v39_controls(args.diagnostics,args.reference)
         pool.v17_600(args.sat600)
@@ -485,6 +519,8 @@ def evaluate(args,candidate):
         pool.gurobi_tail()
         if getattr(args,'cplex_tail',None) is not None:
             pool.cplex_tail(args.cplex_tail)
+        if matched is not None:
+            pool.add_cutoff_reference(match,matched)
         for path in sorted(RESEARCH.glob('offline_incumbent_polish_*/witness.json')):
             pool.offline_upper_witness(path)
         pool.check_reference_consistency()
@@ -495,10 +531,19 @@ def evaluate(args,candidate):
             args.reference_pool.with_suffix('.sha256').write_text(ex.focus.sha(args.reference_pool)+'\n')
     report=comparison_report(records,pool,expected)
     report['full_comparison']=full
+    if matched is not None:
+        for row in records:
+            known=matched['verified_optima'].get(row['objective']+'/'+row['name'])
+            if known is not None and not row['lb']<=known<=row['ub']:
+                raise ValueError('candidate bounds contradict a checked baseline optimum')
+        baseline={m:r['proven'] for m,r in matched['summary'].items()}
+        wins=report['summary']['proven_optimal']>max(baseline.values())
+        report['matched_cutoff_coverage']=dict(baseline=baseline,beats_baselines=bool(full and not full['lost'] and wins),
+            timeout_seconds=matched['timeout_seconds'],runtime_comparable=False)
     report['candidate_audit_passed']=audited['audit_passed']
     report['candidate_root']=str(args.candidate.resolve())
     report['candidate_manifest_sha256']=ex.focus.sha(candidate/'manifest.json')
-    report['candidate_cutoff_seconds']=json.loads((candidate/'manifest.json').read_text())['timeout_seconds']
+    report['candidate_cutoff_seconds']=candidate_manifest['timeout_seconds']
     report['candidate_input_sha256']={str(p.relative_to(candidate)):ex.focus.sha(p) for p in candidate.rglob('*')
         if p.is_file() and p.name in ('manifest.json','build_manifest.json','result.json','result.trace.jsonl','launch.json','completion.json')}
     if followup is not None:
@@ -541,6 +586,7 @@ if __name__=='__main__':
     p.add_argument('--sat600',type=Path,default=RESEARCH/'v17_extended600_20261107')
     p.add_argument('--cplex-archive',type=Path,default=RESEARCH/'cplex_full_120_20261108/raw_snapshot.tar.gz')
     p.add_argument('--cplex-tail',type=Path)
+    p.add_argument('--cutoff-reference',type=Path,help='independently rebuilt complete observations at the candidate cutoff')
     p.add_argument('--extended-archive',type=Path,action='append',default=[
         RESEARCH/'extended_300_20261106/progress_82/raw_snapshot.tar.gz',
         RESEARCH/'cadical_300_20261106/minisat_diagnostic/raw_snapshot.tar.gz'])

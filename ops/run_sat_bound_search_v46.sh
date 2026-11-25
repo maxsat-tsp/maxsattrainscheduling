@@ -32,6 +32,8 @@ export GRB_LICENSE_FILE=/home/tuyenkv/gurobi.lic
 export CARGO_TARGET_DIR=/home/tuyenkv/projects/maxsattrainscheduling/target
 
 session="${THRESHOLD_SESSION:-reuse-offset}"
+cutoff="${SEARCH_TIMEOUT_SECS:-600}"
+reserve=$((cutoff + 100))
 binary="$root/solver/sat_bound_search"
 if [[ ! -f "$root/preflight.json" ]]; then
     python3 -m unittest discover -s quick_scripts/analyze -p 'test_*.py' > "$root/python-tests.log" 2>&1
@@ -51,21 +53,23 @@ run_phase() {
     local phase="$1" seconds
     shift
     seconds="$(remaining)"
-    if (( seconds < 700 )); then incomplete; fi
+    if (( seconds < reserve )); then incomplete; fi
     taskset -c 0,1,4,5 python3 quick_scripts/analyze/run_sat_bound_search.py run \
         --reference "$REFERENCE" --diagnostic-root "$DIAGNOSTIC_ROOT" --binary "$binary" \
         --results "$phase" --build-manifest "$root/build_manifest.json" --selection-archive "$selection" \
         --threshold-policy upper --threshold-session "$session" --rc2-warmup-seconds 60 \
-        --timeout 600 --round-seconds "$seconds" "$@"
+        --timeout "$cutoff" --round-seconds "$seconds" "$@"
     if [[ -f "$phase/followup_stopped.json" ]]; then return; fi
     if ! python3 -c 'import json,sys; sys.exit(not json.load(open(sys.argv[1]))["complete"])' "$phase/audit.json"; then
         incomplete
     fi
 }
 compare() {
+    local args=()
+    if [[ -n "${CUTOFF_REFERENCE:-}" ]]; then args+=(--cutoff-reference "$CUTOFF_REFERENCE"); fi
     python3 quick_scripts/analyze/compare_search_bounds.py --candidate "$root/hard" \
         --reference "$REFERENCE" --diagnostics "$DIAGNOSTIC_ROOT" --cplex-tail "$CPLEX_REFERENCE" \
-        --gurobi-json cont "$MIP_ROOT/cont.json" --gurobi-json infsteps180 "$MIP_ROOT/infsteps180.json" "$@"
+        --gurobi-json cont "$MIP_ROOT/cont.json" --gurobi-json infsteps180 "$MIP_ROOT/infsteps180.json" "${args[@]}" "$@"
 }
 run_phase "$root/hard"
 compare --output "$root/hard-evaluation.json" --reference-pool "$root/hard-reference-pool.json"

@@ -19,7 +19,7 @@ import targeted_order_cycles as trial
 import bound_quality
 
 OFFSET_SESSIONS = ('reuse-offset', 'reuse-offset-tree')
-REUSE_SESSIONS = ('reuse', *OFFSET_SESSIONS)
+REUSE_SESSIONS = ('reuse', *OFFSET_SESSIONS, 'reuse-seed')
 SESSIONS = ('restart', 'restart-assumptions', *REUSE_SESSIONS)
 
 
@@ -111,6 +111,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     if session != 'restart':
         solver = {'reuse': 'SAT-Upper-Reuse', 'reuse-offset': 'SAT-Upper-ReuseOffset',
                   'reuse-offset-tree': 'SAT-Upper-ReuseOffsetTree',
+                  'reuse-seed': 'SAT-Upper-ReuseSeed',
                   'restart-assumptions': 'SAT-Upper-RestartAssumptions'}[session]
     requested=result.get('rc2_warmup_seconds',0)
     if isinstance(requested,bool) or not isinstance(requested,(int,float)) or not math.isfinite(requested) or requested<0:raise ValueError('invalid RC2 warmup allocation')
@@ -140,6 +141,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     capacity = upper - 1
     model_size = (0, 0)
     encoding_seconds = 0.0
+    seeded_points = None
     for index, q in enumerate(queries, 1):
         if unknown:raise ValueError('continued after UNKNOWN')
         if lower>=upper:raise ValueError('queried after the gap closed')
@@ -189,6 +191,16 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
             encoding_seconds = t
         elif 'threshold_objective_encoding' in evidence or 'threshold_objective_encoding_seconds' in evidence:
             raise ValueError('unrequested balanced objective encoding')
+        if session == 'reuse-seed':
+            points = evidence.get('threshold_seeded_points')
+            if (type(points) is not int or not 0 < points <= q['variables']
+                    or type(evidence.get('threshold_seed_cost')) is not int
+                    or evidence['threshold_seed_cost'] != capacity + 1
+                    or (seeded_points is not None and seeded_points != points)):
+                raise ValueError('wrong incumbent seed or inconsistent initial point count')
+            seeded_points = points
+        elif 'threshold_seed_cost' in evidence or 'threshold_seeded_points' in evidence:
+            raise ValueError('unrequested incumbent seeding')
         if any(k.startswith('diagnostic_') for k in evidence):raise ValueError('diagnostic oracle metadata leaked into optimizer')
         answer=q.get('outcome')
         polish=q.get('polish')
@@ -246,6 +258,8 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     if session == 'reuse-offset-tree':
         record.update(objective_encoding_seconds=encoding_seconds,
             threshold_sat_seconds=sum(q['native_sat_seconds'] for q in queries))
+    if session == 'reuse-seed':
+        record['seeded_points'] = seeded_points
     return record,trace
 
 
@@ -458,7 +472,7 @@ def main():
     p.add_argument('--rc2-warmup-seconds',type=float,default=0)
     p.add_argument('--incumbent-polish-checks',type=int,default=0)
     p.add_argument('--threshold-session',choices=SESSIONS)
-    p.add_argument('--timeout', type=int, choices=(300,600), help='override the measured cutoff; selection still comes from the audited reference')
+    p.add_argument('--timeout', type=int, choices=(300,600,1200), help='override the measured cutoff; selection still comes from the audited reference')
     p.add_argument('--selection-archive',type=Path,help='audited previous full search; test only its unresolved pairs')
     p.add_argument('--round-seconds',type=int,default=18000);a=p.parse_args()
     if a.action=='audit':print(json.dumps(audit(a.results,a.reference,a.diagnostic_root),indent=2));return

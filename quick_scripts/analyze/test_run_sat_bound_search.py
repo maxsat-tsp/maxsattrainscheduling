@@ -10,6 +10,24 @@ import run_sat_bound_search as search
 
 
 class SearchAuditTests(unittest.TestCase):
+    def test_reuse_seed_uses_the_pre_query_incumbent_and_a_single_seed(self):
+        data = self.fixture('upper')
+        data.update(solver_name='SAT-Upper-ReuseSeed',threshold_session='reuse-seed',sat_model_builds=1)
+        for q in data['queries']:
+            q['model_generation'] = 1
+            q['threshold_evidence'].update(threshold_budget_assumptions=True,
+                threshold_budget_capacity=data['initial_ub']-1,
+                threshold_seed_cost=data['initial_ub'],threshold_seeded_points=20)
+        result, _ = search.check_result(data,'origA1','cont',300,5526)
+        self.assertEqual(result['seeded_points'],20)
+        self.assertTrue(result['proven'])
+        for bad in (dict(threshold_seed_cost=5526),dict(threshold_seeded_points=21),
+                    dict(threshold_seeded_points=-1)):
+            altered=copy.deepcopy(data)
+            altered['queries'][-1]['threshold_evidence'].update(bad)
+            with self.assertRaisesRegex(ValueError,'wrong incumbent seed'):
+                search.check_result(altered,'origA1','cont',300,5526)
+
     def test_tree_session_records_valid_encoding_time_at_each_threshold(self):
         data = self.fixture('upper')
         data.update(solver_name='SAT-Upper-ReuseOffsetTree',

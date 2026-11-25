@@ -21,6 +21,7 @@ pub enum ThresholdSession {
     Reuse,
     ReuseOffset,
     ReuseOffsetTree,
+    ReuseSeed,
 }
 
 impl ThresholdSession {
@@ -31,6 +32,7 @@ impl ThresholdSession {
             "reuse" => Ok(Self::Reuse),
             "reuse-offset" => Ok(Self::ReuseOffset),
             "reuse-offset-tree" => Ok(Self::ReuseOffsetTree),
+            "reuse-seed" => Ok(Self::ReuseSeed),
             _ => Err("unsupported threshold session".into()),
         }
     }
@@ -47,7 +49,13 @@ impl ThresholdSession {
             (Self::ReuseOffset, true) => "RC2-Warm-SAT-Upper-ReuseOffset",
             (Self::ReuseOffsetTree, false) => "SAT-Upper-ReuseOffsetTree",
             (Self::ReuseOffsetTree, true) => "RC2-Warm-SAT-Upper-ReuseOffsetTree",
+            (Self::ReuseSeed, false) => "SAT-Upper-ReuseSeed",
+            (Self::ReuseSeed, true) => "RC2-Warm-SAT-Upper-ReuseSeed",
         }
+    }
+
+    pub(super) fn reuses_model(self) -> bool {
+        matches!(self, Self::Reuse | Self::ReuseOffset | Self::ReuseOffsetTree | Self::ReuseSeed)
     }
 }
 
@@ -152,6 +160,7 @@ pub(super) fn search(
         let mut pending = Some(decision);
         models += 1;
         let evidence = RefCell::new(Map::new());
+        let seed = (session == ThresholdSession::ReuseSeed).then(|| incumbent.clone());
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             solve_threshold_session(
                 counting_solver::CountingSolver::new(solver),
@@ -162,6 +171,7 @@ pub(super) fn search(
                 capacity,
                 target,
                 session == ThresholdSession::ReuseOffsetTree,
+                seed.as_deref(),
                 |solved_target, cost, schedule| {
                     let decision = pending.take().expect("active threshold");
                     if decision.target != solved_target {
@@ -184,7 +194,7 @@ pub(super) fn search(
                         ),
                         *interval,
                     );
-                    if matches!(session, ThresholdSession::Reuse | ThresholdSession::ReuseOffset | ThresholdSession::ReuseOffsetTree) {
+                    if session.reuses_model() {
                         if let Some(next) = interval.target_for(policy) {
                             let decision = Decision::start(next, deadline);
                             if decision.remaining_seconds > 0.0 {

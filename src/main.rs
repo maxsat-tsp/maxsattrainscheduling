@@ -1525,6 +1525,9 @@ fn main() {
             if let Err(SolverError::InvalidSolution(message)) = solution.as_ref() {
                 solve_data.insert("validation_error".to_string(), message.clone().into());
             }
+            if let Err(SolverError::GurobiError(grb::Error::FromAPI(_, code))) = solution.as_ref() {
+                solve_data.insert("gurobi_error_code".to_string(), (*code).into());
+            }
             let solve_status = match solution.as_ref() {
                 Ok(_) => "ok",
                 Err(SolverError::NoSolution) => "no_solution",

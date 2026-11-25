@@ -4,6 +4,7 @@
 import argparse
 from contextlib import contextmanager
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -25,6 +26,7 @@ GUROBI = controls.RESEARCH/'baseline_inventory_20261110'
 SAT = 'SAT'
 ALL_PAIRS = {(o,n) for o in ex.audit.OBJECTIVES for n in ex.common.EXPECTED_NAMES}
 SAT_CPUS = {0, 1, 4, 5}
+GUROBI_METHOD = 'BigM-Gurobi'
 
 
 def read(path):
@@ -162,6 +164,24 @@ def register_optima(rows):
     return optima
 
 
+def load_prior(root, lock):
+    path = root/'manifest.json'
+    prior = read(path)
+    expected = {k:v for k,v in lock.items() if k not in ('runner_commit','source_sha256')}
+    matched = {k:v for k,v in prior.items() if k not in ('runner_commit','source_sha256')}
+    # The previous worktree lives at <repo>/results/aglr/<run>. The
+    # references outside both worktrees keep their absolute names.
+    old_repo = root.parents[2]
+
+    def sources(manifest, repo):
+        return {str(Path(path).relative_to(repo)) if Path(path).is_relative_to(repo) else path: sha
+                for path, sha in manifest['source_sha256'].items()}
+
+    if expected != matched or sources(lock,ex.REPO) != sources(prior,old_repo):
+        raise ValueError('prior extension protocol or reference hashes differ')
+    return prior
+
+
 def prepare_lock(plan, sat_lock, args):
     v47_binary = args.v47/'solver/sat_bound_search' if args.v47 is not None else None
     sat_binary = args.v45_binary if plan['label']=='V45' else v47_binary
@@ -179,12 +199,48 @@ def prepare_lock(plan, sat_lock, args):
                 sat_commit=sat_lock['commit'],sat_session=sat_lock['threshold_session'],
                 rc2_warmup_seconds=sat_lock['rc2_warmup_seconds'],
                 ram_kb=cplex.RAM_KB,threads_milp=4,uses_optimum_oracle=False)
+    if args.prior_results is not None:
+        prior = args.prior_results.resolve()
+        current = args.results.resolve()
+        if prior==current or prior in current.parents or current in prior.parents:
+            raise ValueError('recovery requires a separate results directory')
+        load_prior(prior,lock)
+        lock['prior_results'] = dict(root=str(prior),manifest_sha256=ex.focus.sha(prior/'manifest.json'),
+                                     audit_sha256=ex.focus.sha(prior/'audit.json'))
     manifest = args.results/'manifest.json'
     if not manifest.is_file():
         ex.save(manifest,lock)
     if read(manifest) != lock:
         raise ValueError('unsafe extension resume')
     return sat_binary, lock
+
+
+def gurobi_failure(case, pair, profile, evidence):
+    o,n = pair
+    rows = ex.common.load_rows(case/(o+'.json'))
+    if len(rows)!=1 or rows[0][0]!=n:
+        raise ValueError('Gurobi failure has the wrong identity')
+    raw = rows[0][1]
+    if raw.get('status') != 'gurobi_error':
+        return None
+    fields = controls.launch_fields(case,GUROBI_METHOD,o,n,profile)
+    elapsed = raw.get('process_wall_time_seconds')
+    cutoff = profile['timeout_seconds']
+    per_case = case/'logs/instances'/(n+'.json')
+    logs = [case/'logs'/f'{n}.{stream}.log' for stream in ('stdout','stderr')]
+    code = raw.get('gurobi_error_code')
+    if (raw.get('solver_name')!='BigMLazy' or raw.get('process_exit_code')!=0
+            or raw.get('external_status') is not None or raw.get('timeout_seconds')!=cutoff
+            or fields.get('selected_instance_count')!='1'
+            or type(elapsed) not in (int,float) or not math.isfinite(elapsed) or elapsed<0
+            or (code is not None and type(code) is not int)
+            or per_case.with_suffix('.raw.json').exists() or ex.common.load_rows(per_case)!=rows
+            or any(b'panicked at' in log.read_bytes() for log in logs)):
+        raise ValueError('Gurobi failure lacks matching native evidence')
+    for path in (per_case,*logs):
+        evidence[str(path.relative_to(case))] = ex.focus.sha(path)
+    return dict(method=GUROBI_METHOD,objective=o,name=n,status='gurobi_error',seconds=elapsed,
+                timeout_seconds=cutoff,gurobi_error_code=code,source=str(case))
 
 
 def measure(args, method, pair, root, lock, sat_lock, sat_binary, known, lp_tasks, optima, repeat=0, run=True):
@@ -208,7 +264,10 @@ def measure(args, method, pair, root, lock, sat_lock, sat_binary, known, lp_task
     profile = dict(lock,binary_sha256=lock['binaries']['BigM-CPLEX' if method=='BigM-CPLEX' else 'ddd'])
     case = stage
     receipt = case/'completion.json'
-    if not receipt.is_file():
+    failure_receipt = case/'failure.json'
+    if receipt.is_file() and failure_receipt.is_file():
+        raise ValueError('baseline has both completion and failure receipts')
+    if not receipt.is_file() and not failure_receipt.is_file():
         if not run:
             return None
         if case.exists():
@@ -218,6 +277,18 @@ def measure(args, method, pair, root, lock, sat_lock, sat_binary, known, lp_task
         controls.measured_case(SimpleNamespace(method=method,timeout=cutoff,binary=args.ddd,cplex=args.cplex),
                                case,o,n,lp_tasks)
     evidence = controls.case_evidence(case,method,o,n,profile)
+    failure = gurobi_failure(case,pair,profile,evidence) if method==GUROBI_METHOD else None
+    if failure is not None:
+        if receipt.is_file():
+            raise ValueError('Gurobi failure cannot have a completion receipt')
+        if failure_receipt.is_file():
+            if read(failure_receipt)['files']!=evidence:
+                raise ValueError('saved Gurobi failure evidence changed')
+        else:
+            ex.save(failure_receipt,dict(files=evidence))
+        return failure
+    if failure_receipt.is_file():
+        raise ValueError('Gurobi failure receipt no longer matches its result')
     if method=='BigM-CPLEX' and evidence['model.lp']!=lp_tasks[pair]['lp_sha256']:
         raise ValueError('CPLEX cutoff run used a different LP')
     if receipt.is_file() and read(receipt)['files']!=evidence:
@@ -232,7 +303,7 @@ def measure(args, method, pair, root, lock, sat_lock, sat_binary, known, lp_task
     return row
 
 
-def report(lock, measured):
+def report(lock, measured, failures=()):
     summary = {}
     proven = {}
     for method, data in lock['methods'].items():
@@ -242,12 +313,85 @@ def report(lock, measured):
         summary[method] = dict(proven=len(covered),
             coverage={o:sum(p[0]==o for p in covered) for o in ex.audit.OBJECTIVES},
             reused=len(data['reused']),measured=len(measured[method]),expected=len(data['tasks']),
+            replayed=sum(r.get('replayed_from_prior',False) for r in measured[method]),
             external_timeouts=sum(r['status']=='external_timeout' for r in measured[method]),
             complete=len(measured[method])==len(data['tasks']))
     complete = all(s['complete'] for s in summary.values())
     return dict(audit_passed=True,complete=complete,timeout_seconds=lock['timeout_seconds'],
-        sat_method=lock['label'],summary=summary,measurements=measured,runtime_comparable=False,
+        sat_method=lock['label'],summary=summary,measurements=measured,failed_cases=list(failures),runtime_comparable=False,
         beats_all_baselines=complete and proven[SAT]>max(v for m,v in proven.items() if m!=SAT))
+
+
+def replay_prior(args, lock, sat_lock, known, lp_tasks, optima):
+    methods = (SAT,*controls.METHODS)
+    saved = {method:[] for method in methods}
+    provenance = lock.get('prior_results')
+    if provenance is None:
+        return saved
+    root = Path(provenance['root'])
+    manifest, audit = root/'manifest.json', root/'audit.json'
+    if (ex.focus.sha(manifest)!=provenance['manifest_sha256']
+            or ex.focus.sha(audit)!=provenance['audit_sha256']):
+        raise ValueError('prior manifest or audit changed')
+    previous = read(manifest)
+    expected = read(audit)
+    if not expected['audit_passed'] or set(expected['measurements'])!=set(methods):
+        raise ValueError('prior audit has invalid status or methods')
+    for method in methods:
+        for pair in map(tuple,lock['methods'][method]['tasks']):
+            row = measure(args,method,pair,root/'cases',previous,sat_lock,None,known,lp_tasks,optima,run=False)
+            if row is not None and row['status']!='gurobi_error':
+                saved[method].append(row)
+    if not ex.reports_match(saved,expected['measurements']):
+        raise ValueError('prior observations do not match their saved audit')
+    for rows in saved.values():
+        for row in rows:
+            row['replayed_from_prior'] = True
+    return saved
+
+
+def diagnose_gurobi(args, lock, failures, known, deadline):
+    if args.diagnostic_ddd is None:
+        return 76
+    root = args.results/'diagnostics'
+    root.mkdir(exist_ok=True)
+    profile = dict(lock,binary_sha256=ex.focus.sha(args.diagnostic_ddd),diagnostic_only=True)
+    if profile['binary_sha256']==lock['binaries']['ddd']:
+        raise ValueError('Gurobi diagnostic must use the instrumented binary')
+    identity = {k:profile[k] for k in ('runner_commit','binary_sha256','timeout_seconds','ram_kb',
+                                      'cpu_affinity','threads_milp','diagnostic_only')}
+    identity['tasks'] = [[f['objective'],f['name']] for f in failures]
+    manifest = root/'manifest.json'
+    if not manifest.exists():
+        ex.save(manifest,identity)
+    if read(manifest)!=identity:
+        raise ValueError('Gurobi diagnostic protocol changed')
+    os.sched_setaffinity(0,set(lock['cpu_affinity']))
+    observations = []
+    for o,n in map(tuple,identity['tasks']):
+        case = root/'cases'/o/n
+        receipt = case/'diagnostic.json'
+        if not receipt.exists():
+            if time.monotonic()>deadline-lock['timeout_seconds']-90:
+                return 75
+            if case.exists():
+                raise ValueError(f'interrupted Gurobi diagnostic: {case}')
+            print(f'Gurobi diagnostic {o}/{n}',flush=True)
+            ex.run_case(GUROBI_METHOD,o,n,
+                        SimpleNamespace(timeout=lock['timeout_seconds'],ram_kb=lock['ram_kb'],binary=args.diagnostic_ddd),
+                        case)
+        evidence = controls.case_evidence(case,GUROBI_METHOD,o,n,profile)
+        row = gurobi_failure(case,(o,n),profile,evidence)
+        if row is None:
+            row = controls.checked_case(case,GUROBI_METHOD,o,n,profile,known[o,n])
+        if receipt.is_file() and read(receipt)['files']!=evidence:
+            raise ValueError('saved Gurobi diagnostic evidence changed')
+        if not receipt.is_file():
+            ex.save(receipt,dict(files=evidence))
+        observations.append(row)
+        ex.save(root/'audit.json',dict(diagnostic_only=True,observations=observations))
+    (args.results/'BLOCKED').touch()
+    return 77
 
 
 def run(args):
@@ -256,35 +400,48 @@ def run(args):
     sat_binary, lock = prepare_lock(plan,sat_lock,args)
     deadline = time.monotonic()+args.round_seconds
     methods = (SAT,*controls.METHODS)
-    measured = {method:[] for method in methods}
     reused = [r for data in lock['methods'].values() for r in data['reused']]
     optima = register_optima(reused)
+    measured = replay_prior(args,lock,sat_lock,known,lp_tasks,optima)
+    failures = []
     # Replay every committed observation, including stages finished in a
     # previous service invocation, before scheduling more work.
     for method in methods:
+        replayed = {(r['objective'],r['name']) for r in measured[method]}
         for pair in map(tuple,lock['methods'][method]['tasks']):
             row = measure(args,method,pair,args.results/'cases',lock,sat_lock,sat_binary,known,optima=optima,
                           lp_tasks=lp_tasks,run=False)
             if row is not None:
-                measured[method].append(row)
+                if pair in replayed:
+                    raise ValueError('case has evidence in both the prior and recovery directories')
+                if row['status']=='gurobi_error':
+                    failures.append(row)
+                else:
+                    measured[method].append(row)
     optima = register_optima(reused+[r for rows in measured.values() for r in rows])
+    ex.save(args.results/'audit.json',report(lock,measured,failures))
     for method in methods:
         if method in (SAT,'CSOnet','MaxSAT-Journal'):
             os.sched_setaffinity(0,SAT_CPUS)
         else:
             os.sched_setaffinity(0,set(lock['cpu_affinity']))
         done = {(r['objective'],r['name']) for r in measured[method]}
+        done.update((r['objective'],r['name']) for r in failures if r['method']==method)
         for pair in map(tuple,lock['methods'][method]['tasks']):
             if pair in done:
                 continue
             if time.monotonic()>deadline-lock['timeout_seconds']-90:
-                ex.save(args.results/'audit.json',report(lock,measured))
                 return 75
             row = measure(args,method,pair,args.results/'cases',lock,sat_lock,sat_binary,known,lp_tasks,optima)
-            if row['proven'] and optima.setdefault(pair,row['cost'])!=row['cost']:
-                raise ValueError(f'proved optima disagree at {pair}')
-            measured[method].append(row)
-            ex.save(args.results/'audit.json',report(lock,measured))
+            if row['status']=='gurobi_error':
+                failures.append(row)
+            else:
+                if row['proven'] and optima.setdefault(pair,row['cost'])!=row['cost']:
+                    raise ValueError(f'proved optima disagree at {pair}')
+                measured[method].append(row)
+            ex.save(args.results/'audit.json',report(lock,measured,failures))
+    if failures:
+        return diagnose_gurobi(args,lock,failures,known,deadline)
     result = report(lock,measured)
     if result['beats_all_baselines'] and measured[SAT]:
         os.sched_setaffinity(0,SAT_CPUS)
@@ -315,6 +472,8 @@ def main():
     p.add_argument('action',choices=('plan','run'))
     for key in ('reference','diagnostics','cplex-reference','v47','v45-binary','ddd','cplex','results'):
         p.add_argument('--'+key,type=Path,required=key in ('reference','diagnostics','cplex-reference'))
+    p.add_argument('--prior-results',type=Path,help='read-only results directory from the previous extension')
+    p.add_argument('--diagnostic-ddd',type=Path,help='native error probe used only after valid measurements')
     p.add_argument('--round-seconds',type=int,default=21000)
     a = p.parse_args()
     if a.action=='plan':

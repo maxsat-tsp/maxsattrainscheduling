@@ -348,7 +348,7 @@ def reports_match(left, right, field: str = "") -> bool:
     if isinstance(left, list) and isinstance(right, list):
         return len(left) == len(right) and all(reports_match(a, b, field) for a,b in zip(left,right))
     if field in {"par2_seconds", "median_solved_seconds", "mean_selected_growth",
-                 "paired_geomean_speedup", "later_query_seconds", "unsolved_gap_sum",
+                 "paired_geomean_speedup", "later_query_seconds", "threshold_sat_seconds", "unsolved_gap_sum",
                  "mean_unsolved_relative_gap"}:
         if isinstance(left, (int,float)) and isinstance(right, (int,float)):
             return math.isclose(left,right,rel_tol=1e-12,abs_tol=1e-12)

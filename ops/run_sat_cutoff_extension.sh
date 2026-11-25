@@ -7,7 +7,7 @@ mkdir -p "$EXTENSION_ROOT"
 exec 9>"$EXTENSION_ROOT/campaign.lock"
 flock -n 9
 if [[ -f "$EXTENSION_ROOT/COMPLETED" ]]; then exit 0; fi
-if [[ -f "$EXTENSION_ROOT/FAILED" ]]; then exit 78; fi
+if [[ -f "$EXTENSION_ROOT/FAILED" || -f "$EXTENSION_ROOT/BLOCKED" ]]; then exit 78; fi
 trap 'printf "exit=%s line=%s\n" "$?" "$LINENO" > "$EXTENSION_ROOT/FAILED"; exit 78' ERR
 rm -f "$EXTENSION_ROOT/INCOMPLETE"
 deadline=$(( $(date +%s) + 21600 ))
@@ -36,13 +36,31 @@ export GUROBI_HOME=/home/tuyenkv/miniconda3/envs/gurobi
 export LD_LIBRARY_PATH="$GUROBI_HOME/lib"
 export GRB_LICENSE_FILE=/home/tuyenkv/gurobi.lic
 
+args=(run --results "$EXTENSION_ROOT" --v47 "$V47_ROOT"
+    --reference "$REFERENCE" --diagnostics "$DIAGNOSTIC_ROOT" --cplex-reference "$CPLEX_REFERENCE"
+    --v45-binary "$V45_ROOT/solver/sat_bound_search" --ddd "$V45_ROOT/solver/ddd"
+    --cplex "$CPLEX_BIN")
+if [[ -n "${PRIOR_EXTENSION_ROOT:-}" ]]; then args+=(--prior-results "$PRIOR_EXTENSION_ROOT"); fi
+runner=quick_scripts/analyze/run_sat_cutoff_extension.py
 status=0
-python3 quick_scripts/analyze/run_sat_cutoff_extension.py run \
-    --results "$EXTENSION_ROOT" --v47 "$V47_ROOT" \
-    --reference "$REFERENCE" --diagnostics "$DIAGNOSTIC_ROOT" --cplex-reference "$CPLEX_REFERENCE" \
-    --v45-binary "$V45_ROOT/solver/sat_bound_search" --ddd "$V45_ROOT/solver/ddd" \
-    --cplex "$CPLEX_BIN" --round-seconds "$(remaining)" || status=$?
+python3 "$runner" "${args[@]}" --round-seconds "$(remaining)" || status=$?
+if (( status == 76 )); then
+    if (( $(remaining) < 1350 )); then incomplete; fi
+    probe="$EXTENSION_ROOT/diagnostics/solver/ddd"
+    if [[ ! -x "$probe" ]]; then
+        mkdir -p "$(dirname "$probe")"
+        source /home/tuyenkv/.cargo/env
+        export CARGO_TARGET_DIR=/home/tuyenkv/projects/maxsattrainscheduling/target
+        cargo build --locked --release --bin ddd -j 2 > "$EXTENSION_ROOT/diagnostics/build.log" 2>&1
+        install "$CARGO_TARGET_DIR/release/ddd" "$probe.tmp"
+        mv "$probe.tmp" "$probe"
+    fi
+    if (( $(remaining) < 1350 )); then incomplete; fi
+    status=0
+    python3 "$runner" "${args[@]}" --diagnostic-ddd "$probe" --round-seconds "$(remaining)" || status=$?
+fi
 if (( status == 75 )); then incomplete; fi
+if (( status == 77 )) && [[ -f "$EXTENSION_ROOT/BLOCKED" ]]; then exit 78; fi
 if (( status != 0 )); then
     printf 'extension runner exited %d\n' "$status" > "$EXTENSION_ROOT/FAILED"
     exit 78

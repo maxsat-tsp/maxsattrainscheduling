@@ -1,0 +1,96 @@
+{
+  "audit_passed": true,
+  "complete": false,
+  "timeout_seconds": 1200,
+  "replayed": {
+    "SAT": 10,
+    "BigM-Gurobi": 4,
+    "BigM-CPLEX": 0,
+    "CSOnet": 0,
+    "MaxSAT-Journal": 0
+  },
+  "summary": {
+    "CSOnet": {
+      "proven": 200,
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 68,
+        "cont": 60
+      },
+      "reused": 200,
+      "measured": 0,
+      "expected": 16,
+      "external_timeouts": 0,
+      "complete": false
+    },
+    "MaxSAT-Journal": {
+      "proven": 200,
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 68,
+        "cont": 60
+      },
+      "reused": 200,
+      "measured": 0,
+      "expected": 16,
+      "external_timeouts": 0,
+      "complete": false
+    },
+    "BigM-Gurobi": {
+      "proven": 208,
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 68,
+        "cont": 68
+      },
+      "reused": 208,
+      "measured": 4,
+      "expected": 8,
+      "external_timeouts": 0,
+      "complete": false
+    },
+    "BigM-CPLEX": {
+      "proven": 208,
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 68,
+        "cont": 68
+      },
+      "reused": 208,
+      "measured": 0,
+      "expected": 8,
+      "external_timeouts": 0,
+      "complete": false
+    },
+    "SAT": {
+      "proven": 206,
+      "coverage": {
+        "finsteps123": 72,
+        "infsteps180": 68,
+        "cont": 66
+      },
+      "reused": 206,
+      "measured": 10,
+      "expected": 10,
+      "external_timeouts": 0,
+      "complete": true
+    }
+  },
+  "gurobi_failure": {
+    "method": "BigM-Gurobi",
+    "objective": "infsteps180",
+    "name": "stationA11",
+    "status": "gurobi_error",
+    "seconds": 1124.718,
+    "timeout_seconds": 1200,
+    "gurobi_error_code": null,
+    "source": "cases/BigM-Gurobi/infsteps180/stationA11"
+  },
+  "gurobi_failure_evidence": {
+    "infsteps180.json": "cbb5135df29619da6e4f2ad820523318c047d8028a8fa1271cfff4dfe5ab3702",
+    "logs/manifest.txt": "e0a923dbe6b41eaa8910a3365618c11dc490e2406b2998a356c635baeac5919a",
+    "logs/instances/stationA11.json": "8a62ef3297b762723ad8093d3f28c3caab8364701dd2790efbcae722db5117cd",
+    "logs/stationA11.stdout.log": "7d1971b5609924425890592f63ad909d50aba093df6b9aba2b82323d661cbc1c",
+    "logs/stationA11.stderr.log": "d31105162ff395fba931269ccf71f795207c5e8fbdb920d030c9913789494812"
+  }
+}

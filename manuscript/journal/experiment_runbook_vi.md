@@ -2158,6 +2158,42 @@ V45 đã giải. Trường `matched_cutoff_coverage` ghi so sánh
 coverage ở cùng mốc sau khi hoàn tất. Để vượt mốc 208, V48 cần
 giữ đủ 206 ca cũ và chứng minh tối ưu ít nhất 209 ca.
 
+### V49 dùng chi phí bắt buộc của các cặp tàu
+
+V48 đã đo đủ 10 ca. Cả 10 ca hết giờ, không có cận tốt nhất
+mới. Năm ca `cont` hết giờ ở câu hỏi SAT đầu tiên. Kết quả gốc
+và bản phát lại nằm trong
+`results/sat_research/v48_sat_bound_search_20261126/`.
+
+V49 chạy MiniSAT với `reuse-pair-budget`. Trước khi chạy,
+tính phần chi phí chắc chắn do các tàu phải nhường đường.
+Mô hình SAT dùng cận này để bỏ các mốc thời gian vượt ngân
+sách. Các cặp và chi phí được tính từ dữ liệu lịch tàu.
+Mỗi ca có 1.200 giây, gồm tối đa 60 giây RC2.
+
+```bash
+systemctl status maxsat-sat-bound-search-v49-pair-budget.service --no-pager
+systemctl status maxsat-sat-cutoff-extension-v49.service --no-pager
+```
+
+V49 ghi kết quả trong
+`~/projects/sat-bound-search-v49-pair-budget/results/aglr/sat-bound-search-v49-pair-budget1200-20261126/`.
+Xem `hard/audit.json` để biết số ca đã chạy, cận ban đầu
+`pair_budget_lower` và số điều kiện ngân sách
+`pair_budget_rows`. Nếu có ca mới, VM tự xác nhận ba lần
+và chạy lại 206 ca V45 đã chứng minh. `full-evaluation.json`
+cho biết có đạt ít nhất 209 ca và giữ đủ các ca cũ hay không.
+
+Lượt 2.400 giây đợi V49 hoàn tất. Nếu V49 xác nhận được ít
+nhất một chứng minh mới trong cả ba lần, lượt 2.400 giây
+ghi `SKIPPED`. Trong trường hợp còn lại, chạy tuần tự 54 ca
+chưa có chứng minh ở 1.200 giây. V45 có 10 ca, Gurobi và
+CPLEX mỗi bên 8 ca, CSOnet 15 ca và MaxSAT-Journal 13 ca.
+`audit.json` trong
+`~/projects/sat-cutoff-extension-v49/results/aglr/sat-cutoff-extension-v49-2400-20261126/`
+tách chứng minh dùng lại và kết quả đo mới. Mỗi giai đoạn
+tối đa sáu giờ và tiếp tục từ các biên nhận đã kiểm toán.
+
 ## Lượt V45 ở 600 giây ban đầu
 
 Lượt 300 giây của V45 đã qua kiểm toán đủ 22 ca và chưa có optimum

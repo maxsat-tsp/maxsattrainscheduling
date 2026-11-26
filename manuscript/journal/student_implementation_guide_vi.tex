@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Hướng dẫn cài đặt AGLR}
-\fancyhead[R]{\small Phiên bản 5.37}
+\fancyhead[R]{\small Phiên bản 5.38}
 \fancyfoot[C]{\thepage}
 
 \begin{document}
@@ -74,7 +74,7 @@ gian hội nghị cũng được dùng làm mốc so sánh với giả định V
 Mỗi báo cáo phải ghi rõ giả định này.
 
 \vfill
-{\normalsize Phiên bản 5.37, tháng 11 năm 2026\par}
+{\normalsize Phiên bản 5.38, tháng 11 năm 2026\par}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}
@@ -94,7 +94,8 @@ V47 thử cách mã hóa tổng chi phí trên cùng 10 ca. Cả hai lượt
 chưa chứng minh thêm ca nào. Bảng 1.200 giây đã hoàn tất.
 V45 vẫn đạt $206/216$, CSOnet đạt $201/216$, MaxSAT-Journal
 đạt $203/216$, Gurobi và CPLEX đều đạt $208/216$.
-V48 chỉ thử 10 ca V45 chưa chứng minh được. Xem số ca chứng minh
+V48 đã thử 10 ca V45 còn mở và chưa cải thiện cận tốt nhất.
+V49 thử dùng chi phí nhường đường trên cùng 10 ca. Xem số ca chứng minh
 tối ưu trước, rồi đến cận ở các ca còn mở, sau cùng là thời gian.
 
 V42 chứng minh $205/216$ ca ở 300 giây. Ca
@@ -2308,6 +2309,38 @@ dùng MiniSAT, tối đa 60 giây RC2 trong tổng 1.200 giây và
 khởi tạo các mốc này một lần. VM tự đo 10 ca chưa giải. Có
 ca mới thì VM xác nhận ba lần và kiểm tra lại 206 ca cũ.
 Mốc vượt đối chứng hiện tại là ít nhất $209/216$.
+
+\section{V49 tính thêm chi phí nhường đường}
+
+Khi hai tàu muốn dùng cùng một đoạn đường, một tàu phải đợi.
+Ví dụ, nếu tàu A đi trước thì chi phí tăng ít nhất 3 điểm.
+Nếu tàu B đi trước thì chi phí tăng ít nhất 5 điểm. Hai tàu
+chắc chắn làm tăng ít nhất $\min(3,5)=3$ điểm. Ta tính tương tự
+cho từng chỗ hai tàu gặp nhau và giữ cận lớn nhất của cặp đó.
+
+Gọi $C_0$ là chi phí khi từng tàu đi sớm nhất theo hành trình.
+Xếp các cặp theo cận giảm dần, hòa thì theo chỉ số tàu. Chọn
+lần lượt, mỗi tàu chỉ thuộc một cặp. Gọi $P$ là tập cặp đã
+chọn và $d_p$ là cận tăng chi phí của cặp $p$. Cận dưới là
+$C_0+\sum_{p\in P}d_p$. Chọn các cặp rời nhau giúp mỗi khoản
+trễ chỉ được tính một lần.
+
+Nếu mốc $t$ làm lượt $v$ của tàu $i$ đi muộn thì tính phần
+chi phí tăng tối thiểu $\Delta_i(v,t)$ từ lượt đó đến cuối
+hành trình. Mốc chỉ được phép chọn khi ngân sách SAT $T$ đủ:
+\[
+ x_v(t)\ \Longrightarrow\quad
+ T \ge C_0 + \Delta_i(v,t) +
+       \sum_{p\in P:\,i\notin p} d_p.
+\]
+Khi tính vế phải, bỏ cặp chứa tàu $i$ vì phần trễ của tàu này
+đã nằm trong $\Delta_i(v,t)$. Mã hóa tổng chi phí của V45 vẫn
+kiểm tra tổng chi phí thật của cả lịch.
+
+Dùng \code{--threshold-session reuse-pair-budget} để chạy
+V49 ở 1.200 giây với MiniSAT. Nếu lượt này chưa có chứng
+minh mới được xác nhận, VM tự thử V45 và các baseline ở
+2.400 giây. Mỗi solver chỉ chạy những ca mình còn mở.
 
 \section{Nội dung được phép đưa vào bài báo}
 

@@ -10,6 +10,24 @@ import run_sat_bound_search as search
 
 
 class SearchAuditTests(unittest.TestCase):
+    def test_pair_budget_recomputes_the_initial_bound(self):
+        for name, objective, increase in [('trackA8','cont',2907),('stationA12','cont',5018),
+                                           ('trackA11','infsteps180',26)]:
+            self.assertEqual(search.pair_budget_lower(name,objective),search.initial_lower(name,objective)+increase)
+        data = self.fixture('upper')
+        lower = search.pair_budget_lower('origA1','cont')
+        data.update(solver_name='SAT-Upper-ReusePairBudget',threshold_session='reuse-pair-budget',
+                    initial_lb=lower,pair_budget_lower=lower,sat_model_builds=1)
+        for index,q in enumerate(data['queries'],1):
+            q.update(lower_before=lower,model_generation=1)
+            q['threshold_evidence'].update(threshold_budget_assumptions=True,
+                threshold_budget_capacity=data['initial_ub']-1,
+                threshold_pair_budget_lower=lower,threshold_pair_budget_rows=index)
+        self.assertTrue(search.check_result(data,'origA1','cont',300,5526)[0]['proven'])
+        data['pair_budget_lower']+=1
+        with self.assertRaisesRegex(ValueError,'wrong train pair cost lower bound'):
+            search.check_result(data,'origA1','cont',300,5526)
+
     def test_reuse_seed_uses_the_pre_query_incumbent_and_a_single_seed(self):
         data = self.fixture('upper')
         data.update(solver_name='SAT-Upper-ReuseSeed',threshold_session='reuse-seed',sat_model_builds=1)

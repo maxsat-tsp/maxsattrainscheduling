@@ -1,6 +1,7 @@
 use super::{
     bound_search::{QueryRecord, SearchInterval, ThresholdPolicy},
     maxsat_ladder_sc::{solve_threshold_session, MaxSatDddLadderScSettings},
+    shared::pair_budget::PairBudget,
 };
 use crate::{
     problem::{DelayCostType, Problem},
@@ -22,6 +23,7 @@ pub enum ThresholdSession {
     ReuseOffset,
     ReuseOffsetTree,
     ReuseSeed,
+    ReusePairBudget,
 }
 
 impl ThresholdSession {
@@ -33,6 +35,7 @@ impl ThresholdSession {
             "reuse-offset" => Ok(Self::ReuseOffset),
             "reuse-offset-tree" => Ok(Self::ReuseOffsetTree),
             "reuse-seed" => Ok(Self::ReuseSeed),
+            "reuse-pair-budget" => Ok(Self::ReusePairBudget),
             _ => Err("unsupported threshold session".into()),
         }
     }
@@ -51,11 +54,13 @@ impl ThresholdSession {
             (Self::ReuseOffsetTree, true) => "RC2-Warm-SAT-Upper-ReuseOffsetTree",
             (Self::ReuseSeed, false) => "SAT-Upper-ReuseSeed",
             (Self::ReuseSeed, true) => "RC2-Warm-SAT-Upper-ReuseSeed",
+            (Self::ReusePairBudget, false) => "SAT-Upper-ReusePairBudget",
+            (Self::ReusePairBudget, true) => "RC2-Warm-SAT-Upper-ReusePairBudget",
         }
     }
 
     pub(super) fn reuses_model(self) -> bool {
-        matches!(self, Self::Reuse | Self::ReuseOffset | Self::ReuseOffsetTree | Self::ReuseSeed)
+        matches!(self, Self::Reuse | Self::ReuseOffset | Self::ReuseOffsetTree | Self::ReuseSeed | Self::ReusePairBudget)
     }
 }
 
@@ -121,6 +126,7 @@ pub(super) fn search(
     objective: DelayCostType,
     deadline: Instant,
     session: ThresholdSession,
+    pair_budget: Option<&PairBudget>,
     interval: &mut SearchInterval,
     incumbent: &mut Vec<Vec<i32>>,
     queries: &mut Vec<QueryRecord>,
@@ -172,6 +178,7 @@ pub(super) fn search(
                 target,
                 session == ThresholdSession::ReuseOffsetTree,
                 seed.as_deref(),
+                pair_budget,
                 |solved_target, cost, schedule| {
                     let decision = pending.take().expect("active threshold");
                     if decision.target != solved_target {

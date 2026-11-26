@@ -10,5 +10,6 @@
 pub mod common;
 pub mod costtree;
 pub mod greedy;
+pub(crate) mod pair_budget;
 pub mod precedence;
 pub mod refinement;

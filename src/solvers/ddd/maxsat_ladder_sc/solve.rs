@@ -1150,6 +1150,7 @@ struct BudgetSession<'a> {
     target: i32,
     tree: bool,
     seed: Option<&'a [Vec<i32>]>,
+    pair_budget: Option<&'a crate::solvers::ddd::shared::pair_budget::PairBudget>,
     after_sat: &'a mut AfterSat<'a>,
 }
 
@@ -1165,6 +1166,7 @@ pub(crate) fn solve_threshold_session<L: satcoder::Lit + Copy + std::fmt::Debug 
     target: i32,
     tree: bool,
     seed: Option<&[Vec<i32>]>,
+    pair_budget: Option<&crate::solvers::ddd::shared::pair_budget::PairBudget>,
     mut after_sat: impl FnMut(i32, i32, &[Vec<i32>]) -> Result<Option<i32>, SolverError>,
     mut output_stats: impl FnMut(String, serde_json::Value),
 ) -> Result<(), SolverError> {
@@ -1173,7 +1175,7 @@ pub(crate) fn solve_threshold_session<L: satcoder::Lit + Copy + std::fmt::Debug 
     }
     solve_inner(|| panic!("a threshold decision never starts a MIP heuristic"),
         solver, problem, timeout, objective, settings, None, None,
-        Some(BudgetSession { capacity, target, tree, seed, after_sat: &mut after_sat }),
+        Some(BudgetSession { capacity, target, tree, seed, pair_budget, after_sat: &mut after_sat }),
         |_| {}, threshold_stats(&mut output_stats)).map(|_| ())
 }
 
@@ -1623,6 +1625,14 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         None
     };
     let mut last_progress_iteration = 0usize;
+    let pair_budget = threshold_session.as_ref().and_then(|s| s.pair_budget);
+    let mut pair_minimums = HashMap::new();
+    let mut pair_budget_rows = 0usize;
+    if let Some(bound) = pair_budget {
+        debug_assert_eq!(initial_cost_offset, 0, "pair budget uses absolute costs");
+        output_stats("threshold_pair_budget_lower".into(), bound.lower().into());
+        output_stats("threshold_pair_budget_rows".into(), 0.into());
+    }
     let mut last_heuristic_submission_iteration = None;
 
     // Main DDD loop.
@@ -2218,6 +2228,24 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
         for (visit, new_timepoint_var, new_t) in new_time_points.drain(..) {
             n_timepoints += 1;
             let (train_idx, visit_idx) = visits[visit];
+            if let Some(bound) = pair_budget {
+                let minimum = bound.point_lower(problem, delay_cost_type, train_idx, visit_idx, new_t);
+                if minimum > bound.lower() {
+                    let budget = binary_objective.as_ref().unwrap();
+                    let enough = *pair_minimums.entry(minimum).or_insert_with(|| {
+                        if minimum > budget.upper_bound as u64 {
+                            return false.into();
+                        }
+                        let bits: Vec<_> = budget.reg_bits.iter().rev().copied().collect();
+                        let cost: Vec<_> = (0..bits.len()).rev()
+                            .map(|bit| (minimum & (1 << bit) != 0).into())
+                            .collect();
+                        binary_le_literal_bits(&mut solver, &cost, &bits)
+                    });
+                    solver.add_clause([!new_timepoint_var, enough]);
+                    pair_budget_rows += 1;
+                }
+            }
 
             let new_timepoint_cost =
                 problem.trains[train_idx].visit_delay_cost(delay_cost_type, visit_idx, new_t)
@@ -2266,6 +2294,9 @@ fn solve_inner<L: satcoder::Lit + Copy + std::fmt::Debug + 'static>(
             // set the cost for this new time point.
         }
 
+        if pair_budget.is_some() {
+            output_stats("threshold_pair_budget_rows".into(), pair_budget_rows.into());
+        }
         if let Some(objective) = binary_objective.as_mut() {
             let encoding_start = Instant::now();
             let grew = !new_objective_terms.is_empty();

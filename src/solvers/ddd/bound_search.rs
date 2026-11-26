@@ -1,6 +1,7 @@
 //! Oracle-free binary search using independently rebuilt SAT-DDD decisions.
 use crate::{problem::{Problem,DelayCostType},solvers::SolverError};
 use super::{maxsat_ladder_sc as sc,incumbent_polish,shared::{greedy,precedence}};
+use super::shared::pair_budget::PairBudget;
 use crate::solvers::util::{counting_solver,minisat_deadline,cadical_deadline::DeadlineReached};
 use serde::Serialize;
 use std::time::Instant;
@@ -94,6 +95,8 @@ pub struct SearchResult {
     pub incumbent_polish_checks:usize,
     pub threshold_session: ThresholdSession,
     pub sat_model_builds: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pair_budget_lower: Option<i32>,
 }
 
 /// Costs at chain-propagated earliest starts are an input-only lower bound.
@@ -156,6 +159,14 @@ pub fn solve_with_session(problem:&Problem,objective:DelayCostType,timeout:f64,p
     let deadline=started.checked_add(duration)
         .ok_or_else(||SolverError::InvalidSolution("search deadline exceeds Instant range".into()))?;
     let (mut interval,mut incumbent)=initial_bounds(problem,objective)?;
+    let pair_budget = (session == ThresholdSession::ReusePairBudget)
+        .then(|| PairBudget::new(problem, objective, interval.lower));
+    let pair_budget_lower = if let Some(bound) = &pair_budget {
+        let lower = i32::try_from(bound.lower())
+            .map_err(|_| SolverError::InvalidSolution("train pair lower bound exceeds i32".into()))?;
+        interval = SearchInterval::new(lower, interval.upper).map_err(SolverError::InvalidSolution)?;
+        Some(lower)
+    } else { None };
     let initial_lb=interval.lower;let initial_ub=interval.upper;let initial_solution=incumbent.clone();
     let mut queries=Vec::new();
     let mut signature=minisat::Solver::new().solver_name().to_string();
@@ -257,7 +268,7 @@ pub fn solve_with_session(problem:&Problem,objective:DelayCostType,timeout:f64,p
     queries.len()
     } else {
         super::threshold_session::search(problem, objective, deadline, session,
-            &mut interval, &mut incumbent, &mut queries, &mut checkpoint)?
+            pair_budget.as_ref(), &mut interval, &mut incumbent, &mut queries, &mut checkpoint)?
     };
     let elapsed=started.elapsed().as_secs_f64();
     let cost=problem.verify_solution(&incumbent,objective)
@@ -276,13 +287,51 @@ pub fn solve_with_session(problem:&Problem,objective:DelayCostType,timeout:f64,p
         uses_optimum_oracle:false,maxsat_backend:"minisat",maxsat_backend_signature:signature,
         timeout_seconds:timeout,total_time:elapsed,lb:interval.lower,ub:interval.upper,cost,solution:incumbent,
         initial_lb,initial_ub,initial_solution,queries,threshold_policy:policy,rc2_warmup_seconds:warmup_seconds,warmup,
-        incumbent_polish_checks:polish_checks,threshold_session:session,sat_model_builds})
+        incumbent_polish_checks:polish_checks,threshold_session:session,sat_model_builds,pair_budget_lower})
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::problem::{Train,Visit};
+
+    #[test]
+    fn disjoint_pair_budget_preserves_every_feasible_small_schedule() {
+        let problem = Problem {
+            name: "train-pair-budget".into(),
+            conflicts: vec![(1,1),(2,2)],
+            trains: [(1,2),(1,1),(1,1),(2,2),(2,1)].into_iter().map(|(resource_id,travel_time)| Train {
+                visits: vec![Visit { resource_id,earliest:0,aimed:Some(0),travel_time }],
+            }).collect(),
+        };
+        for objective in [DelayCostType::Continuous, DelayCostType::FiniteSteps123, DelayCostType::InfiniteSteps180] {
+            let bound=PairBudget::new(&problem,objective,0);
+            assert_eq!(bound.lower(),2);
+            let mut optimum=i32::MAX;
+            for mut code in 0..6usize.pow(5) {
+                let mut times=Vec::new();
+                for train in &problem.trains {
+                    let time=(code%6) as i32;
+                    code/=6;
+                    times.push(vec![time,time+train.visits[0].travel_time]);
+                }
+                if let Some(cost)=problem.verify_solution(&times,objective) {
+                    optimum=optimum.min(cost);
+                    for (i, route) in times.iter().enumerate() {
+                        assert!(bound.point_lower(&problem,objective,i,0,route[0])<=cost as u64);
+                    }
+                }
+            }
+            for session in [ThresholdSession::Reuse,ThresholdSession::ReusePairBudget] {
+                let result=solve_with_session(&problem,objective,5.0,ThresholdPolicy::Upper,
+                    0.0,0,session,|_,_,_| {}).unwrap();
+                assert_eq!((result.status,result.lb,result.ub),("ok",optimum,optimum));
+                if session==ThresholdSession::ReusePairBudget {
+                    assert_eq!(result.pair_budget_lower,Some(2));
+                }
+            }
+        }
+    }
 
     #[test]
     fn threshold_sessions_match_exhaustive_optima_and_count_models() {

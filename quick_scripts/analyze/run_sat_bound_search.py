@@ -12,6 +12,7 @@ import time
 import tarfile
 import tempfile
 from functools import lru_cache
+from itertools import combinations
 
 import diagnose_optimal_bounds as diagnostic
 import extended_timeout_experiments as ex
@@ -19,7 +20,7 @@ import targeted_order_cycles as trial
 import bound_quality
 
 OFFSET_SESSIONS = ('reuse-offset', 'reuse-offset-tree')
-REUSE_SESSIONS = ('reuse', *OFFSET_SESSIONS, 'reuse-seed')
+REUSE_SESSIONS = ('reuse', *OFFSET_SESSIONS, 'reuse-seed', 'reuse-pair-budget')
 SESSIONS = ('restart', 'restart-assumptions', *REUSE_SESSIONS)
 
 
@@ -32,6 +33,55 @@ def initial_lower(name,objective):
             if visit['aimed'] is not None:total+=ex.common.delay_cost(objective,earliest-visit['aimed'])
             following=earliest+visit['travel']
     return total
+
+
+@lru_cache(maxsize=None)
+def pair_budget_lower(name, objective):
+    trains = ex.common.parse_txt_instance(name)
+    earliest, uses = [], {}
+    for i, train in enumerate(trains):
+        times = []
+        for j, visit in enumerate(train):
+            start = visit['earliest']
+            if j:
+                start = max(start, times[-1] + train[j-1]['travel'])
+            times.append(start)
+            if visit['resource'] is not None:
+                uses.setdefault(visit['resource'], []).append((i,j))
+        earliest.append(times)
+
+    def release(i, j):
+        if j+1 < len(earliest[i]):
+            return earliest[i][j+1]
+        return earliest[i][j] + trains[i][j]['travel']
+
+    def extra(i, j, t):
+        increase = 0
+        for start, visit in zip(earliest[i][j:], trains[i][j:]):
+            t = max(t, start)
+            aimed = visit['aimed']
+            if aimed is not None:
+                increase += ex.common.delay_cost(objective,t-aimed) - ex.common.delay_cost(objective,start-aimed)
+            t += visit['travel']
+        return increase
+
+    weights = {}
+    for visits in uses.values():
+        for (i,j),(k,l) in combinations(visits,2):
+            if i==k:
+                continue
+            # TXT instances use exclusive tracks and unshared station visits.
+            weight = min(extra(i,j,release(k,l)),extra(k,l,release(i,j)))
+            if weight:
+                pair = (min(i,k),max(i,k))
+                weights[pair] = max(weights.get(pair,0),weight)
+    used = set()
+    lower = initial_lower(name,objective)
+    for (i,k), weight in sorted(weights.items(),key=lambda x:(-x[1],x[0])):
+        if i not in used and k not in used:
+            used.update((i,k))
+            lower += weight
+    return lower
 
 
 def validate_schedule(name,objective,solution,cost):
@@ -112,6 +162,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
         solver = {'reuse': 'SAT-Upper-Reuse', 'reuse-offset': 'SAT-Upper-ReuseOffset',
                   'reuse-offset-tree': 'SAT-Upper-ReuseOffsetTree',
                   'reuse-seed': 'SAT-Upper-ReuseSeed',
+                  'reuse-pair-budget': 'SAT-Upper-ReusePairBudget',
                   'restart-assumptions': 'SAT-Upper-RestartAssumptions'}[session]
     requested=result.get('rc2_warmup_seconds',0)
     if isinstance(requested,bool) or not isinstance(requested,(int,float)) or not math.isfinite(requested) or requested<0:raise ValueError('invalid RC2 warmup allocation')
@@ -126,7 +177,13 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     if not isinstance(seconds,(float,int)) or not math.isfinite(seconds) or seconds<0:
         raise ValueError('invalid elapsed time')
     chain_bound=initial_lower(name,objective);lower=chain_bound;upper=result.get('initial_ub')
-    if result.get('initial_lb')!=chain_bound:raise ValueError('initial LB is not the input-only chain bound')
+    if session=='reuse-pair-budget':
+        lower=pair_budget_lower(name,objective)
+        if type(result.get('pair_budget_lower')) is not int or result['pair_budget_lower']!=lower:
+            raise ValueError('wrong train pair cost lower bound')
+    elif 'pair_budget_lower' in result:
+        raise ValueError('unrequested train pair cost lower bound')
+    if result.get('initial_lb')!=lower:raise ValueError('initial LB differs from the input-only bound')
     validate_schedule(name,objective,result.get('initial_solution'),upper)
     if lower>upper:raise ValueError('initial bounds cross')
     lower,upper,spent,warm_calls=replay_warmup(result,name,objective,cutoff,lower,upper)
@@ -142,6 +199,7 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
     model_size = (0, 0)
     encoding_seconds = 0.0
     seeded_points = None
+    pair_rows = 0
     for index, q in enumerate(queries, 1):
         if unknown:raise ValueError('continued after UNKNOWN')
         if lower>=upper:raise ValueError('queried after the gap closed')
@@ -201,6 +259,14 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
             seeded_points = points
         elif 'threshold_seed_cost' in evidence or 'threshold_seeded_points' in evidence:
             raise ValueError('unrequested incumbent seeding')
+        if session=='reuse-pair-budget':
+            rows=evidence.get('threshold_pair_budget_rows')
+            if (type(rows) is not int or not pair_rows<=rows<=q['clauses']
+                    or evidence.get('threshold_pair_budget_lower')!=result['pair_budget_lower']):
+                raise ValueError('wrong train pair budget evidence')
+            pair_rows=rows
+        elif 'threshold_pair_budget_rows' in evidence or 'threshold_pair_budget_lower' in evidence:
+            raise ValueError('unrequested train pair budget evidence')
         if any(k.startswith('diagnostic_') for k in evidence):raise ValueError('diagnostic oracle metadata leaked into optimizer')
         answer=q.get('outcome')
         polish=q.get('polish')
@@ -260,6 +326,8 @@ def check_result(result,name,objective,cutoff,known_optimum=None):
             threshold_sat_seconds=sum(q['native_sat_seconds'] for q in queries))
     if session == 'reuse-seed':
         record['seeded_points'] = seeded_points
+    if session == 'reuse-pair-budget':
+        record.update(pair_budget_lower=result['pair_budget_lower'],pair_budget_rows=pair_rows)
     return record,trace
 
 

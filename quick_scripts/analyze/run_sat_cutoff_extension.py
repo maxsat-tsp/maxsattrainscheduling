@@ -14,6 +14,7 @@ import time
 from types import SimpleNamespace
 
 import bound_quality
+from compare_search_bounds import cutoff_reference
 import extended_timeout_experiments as ex
 from inventory_gurobi_reference import summarize
 import run_cplex_reference_tail as cplex
@@ -77,6 +78,31 @@ def pick_sat(args, prior, v45):
     return records, method, 'V47', 600 if len(proofs) >= 209 else 1200
 
 
+def v49_reproduced(root, reference, diagnostics):
+    if not (root/'COMPLETED').is_file() or (root/'FAILED').exists():
+        raise ValueError('V49 must have a clean completion marker')
+    hard = root/'hard'
+    manifest = read(hard/'manifest.json')
+    if manifest['threshold_session']!='reuse-pair-budget' or manifest['timeout_seconds']!=1200:
+        raise ValueError('V49 completed with a different protocol')
+    report = search.audit(hard,reference,diagnostics)
+    if not report['audit_passed'] or not report['complete']:
+        raise ValueError('V49 hard set is incomplete')
+    if not report['newly_solved']:
+        return False
+    followup = root/'followup'
+    search.same_method(manifest,read(followup/'manifest.json'))
+    replay = search.audit(followup,reference,diagnostics)
+    if not replay['audit_passed'] or (not replay['complete'] and not (followup/'followup_stopped.json').is_file()):
+        raise ValueError('V49 confirmation lacks a terminal audit')
+    repeats = {(r['objective'],r['name'],r['repeat']):r for r in replay['records'] if r['repeat']}
+    for r in report['newly_solved']:
+        trials = [repeats.get((r['objective'],r['name'],i)) for i in (1,2,3)]
+        if all(trial is not None and trial['proven'] and trial['cost']==r['cost'] for trial in trials):
+            return True
+    return False
+
+
 def checked_gurobi_rows(known, sources):
     inventory = GUROBI/'gurobi_inventory.json'
     snapshot = GUROBI/'gurobi_tail_snapshot.tar.gz'
@@ -103,6 +129,7 @@ def checked_gurobi_rows(known, sources):
 
 
 def material(args):
+    extended = getattr(args,'baseline_1200',None)
     snapshot = DATA/'complete_snapshot.tar.gz'
     sources = [snapshot, controls.BASELINE_SNAPSHOT, *(controls.RESEARCH/p for p in controls.SAT_SOURCES),
                cplex.ORIGINAL,cplex.CORRECTION,cplex.DATA/'archive_hashes.json']
@@ -126,6 +153,18 @@ def material(args):
             rows[method].append(row)
 
     rows[SAT] = [dict(r,timeout_seconds=600,upper_witness_verified=r['proven']) for r in records]
+    longer = None
+    if extended is not None:
+        if label!='V45' or cutoff!=1200:
+            raise ValueError('the 2400-second protocol extends V45 and its audited controls')
+        longer = cutoff_reference(extended,1200)
+        if longer['sat_method']!='V45':
+            raise ValueError('the 1200-second controls use another candidate')
+        sources.append(extended)
+        cutoff = 2400
+        for method, observations in longer['measurements'].items():
+            rows[method].extend(dict(r,timeout_seconds=1200,upper_witness_verified=True)
+                                for r in observations if r['proven'])
     if args.v47 is not None:
         sources.append(args.v47/'hard/manifest.json')
         if (args.v47/'full-evaluation.json').is_file():
@@ -135,13 +174,18 @@ def material(args):
         # Independently audited proof rows from shorter runs are valid for
         # coverage. Late proofs and failed launches are never carried over.
         observations = [dict(r,source=method) for r in observations]
-        reuse = controls.first_checked_proofs(observations, ALL_PAIRS)
+        reuse = controls.first_checked_proofs(observations,ALL_PAIRS,cutoff if longer is not None else controls.CUTOFF)
         reused = {pair:{k:r[k] for k in ('objective','name','cost','seconds','timeout_seconds','proven')}
                   for pair,r in reuse.items()}
         if method.startswith('BigM-') and len(reused)!=208:
             raise ValueError(f'incomplete known MILP proofs for {method}')
+        if longer is not None:
+            if len(reused)!=longer['summary'][method]['proven']:
+                raise ValueError(f'cannot rebuild the previous proof coverage for {method}')
+            if any(r['cost']!=longer['verified_optima'].get(o+'/'+n) for (o,n),r in reused.items()):
+                raise ValueError(f'previous optimum differs for {method}')
         at_600 = summarize(observations,600)
-        tasks = sorted(ALL_PAIRS-reused.keys()) if cutoff==1200 else [
+        tasks = sorted(ALL_PAIRS-reused.keys()) if cutoff>600 else [
             tuple(pair) for pair in at_600['missing_at_cutoff']]
         if method=='BigM-CPLEX' and not set(tasks)<={(r['objective'],r['name']) for r in cp[1]}:
             raise ValueError('a scheduled CPLEX case is missing its frozen LP')
@@ -474,6 +518,8 @@ def main():
         p.add_argument('--'+key,type=Path,required=key in ('reference','diagnostics','cplex-reference'))
     p.add_argument('--prior-results',type=Path,help='read-only results directory from the previous extension')
     p.add_argument('--diagnostic-ddd',type=Path,help='native error probe used only after valid measurements')
+    p.add_argument('--baseline-1200',type=Path,help='completed 1200-second cutoff audit to extend to 2400 seconds')
+    p.add_argument('--after-v49',type=Path,help='run the 2400-second protocol only with no reproduced V49 gain')
     p.add_argument('--round-seconds',type=int,default=21000)
     a = p.parse_args()
     if a.action=='plan':
@@ -483,6 +529,13 @@ def main():
         return 0
     if any(getattr(a,k) is None for k in ('v45_binary','ddd','cplex','results')) or not 0<a.round_seconds<=21600:
         p.error('run requires frozen executable paths, hash, output and a valid phase budget')
+    if a.after_v49 is not None:
+        if a.baseline_1200 is None or a.v47 is not None:
+            p.error('the V49 fallback requires the 1200-second baseline audit and no V47 selection')
+        if v49_reproduced(a.after_v49,a.reference,a.diagnostics):
+            a.results.mkdir(parents=True,exist_ok=True)
+            ex.save(a.results/'SKIPPED',dict(reason='V49 reproduced a new optimum'))
+            return 0
     return run(a)
 
 

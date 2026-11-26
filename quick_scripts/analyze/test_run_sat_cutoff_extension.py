@@ -8,6 +8,33 @@ import run_sat_cutoff_extension as extension
 
 
 class CutoffExtensionTests(unittest.TestCase):
+    def test_v49_fallback_requires_three_matching_confirmations(self):
+        proof=dict(objective='cont',name='trackA8',cost=24441,proven=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'COMPLETED').touch()
+            for phase in ('hard','followup'):
+                (root/phase).mkdir()
+            fixed={k:0 for k in ('commit','binary_sha256','build_manifest_sha256','dataset_sha256','ram_kb','cpu_affinity')}
+            fixed.update(threshold_session='reuse-pair-budget',timeout_seconds=1200)
+            for phase in ('hard','followup'):
+                extension.ex.save(root/phase/'manifest.json',fixed)
+            screen=dict(audit_passed=True,complete=True,newly_solved=[proof])
+            repeats=[dict(proof,repeat=i) for i in (1,2,3)]
+            for rows, expected in ((repeats,True),(repeats[:2],False),
+                                  (repeats[:2]+[dict(repeats[2],proven=False)],False)):
+                replay=dict(audit_passed=True,complete=True,records=rows)
+                with patch.object(extension.search,'audit',side_effect=[screen,replay]):
+                    self.assertEqual(extension.v49_reproduced(root,None,None),expected)
+
+    def test_longer_extension_reuses_proofs_within_their_original_cutoff(self):
+        pair=('cont','trackB12')
+        row=dict(objective=pair[0],name=pair[1],cost=15182,proven=True,upper_witness_verified=True,
+                 seconds=1000,timeout_seconds=1200)
+        self.assertFalse(extension.controls.first_checked_proofs([row],{pair}))
+        self.assertIn(pair,extension.controls.first_checked_proofs([row],{pair},2400))
+        self.assertFalse(extension.controls.first_checked_proofs([dict(row,timeout_seconds=600)],{pair},2400))
+
     def test_prior_protocol_checks_relative_source_paths_and_binary_hashes(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)/'before'

@@ -27,7 +27,7 @@ GUROBI_RAW = {
 }
 
 
-def first_checked_proofs(rows, pairs):
+def first_checked_proofs(rows, pairs, cutoff=CUTOFF):
     proofs = {}
     for row in rows:
         key = row['objective'],row['name']
@@ -38,7 +38,7 @@ def first_checked_proofs(rows, pairs):
                 or int(cost) != cost or cost < 0 or not isinstance(seconds,(int,float))
                 or not math.isfinite(seconds) or seconds < 0):
             raise ValueError(f'invalid reusable proof for {key}')
-        if seconds > min(CUTOFF,row['timeout_seconds']):
+        if seconds > min(cutoff,row['timeout_seconds']):
             continue
         if key in proofs and proofs[key]['cost'] != cost:
             raise ValueError(f'checked proof costs disagree for {key}')
